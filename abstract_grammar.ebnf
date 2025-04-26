@@ -1,0 +1,8 @@
+program = stmt
+
+stmt = stmt | stmt stmts
+stmt = expression
+
+expression = name
+
+name = identifier
