@@ -11,11 +11,11 @@ impl Interpreter {
 
     pub fn eval(&mut self, input: &str) {
         let lexer = Lexer::new(input.to_string());
-        let parser = parser::Parser::new(lexer);
+        let mut parser = parser::Parser::new(lexer);
 
         match parser.parse() {
-            Ok(program) => {
-                program.accept(self);
+            Ok(module) => {
+                module.accept(self);
             }
             Err(e) => {
                 eprintln!("{}", e);
@@ -25,8 +25,8 @@ impl Interpreter {
 }
 
 impl Visitor for Interpreter {
-    fn visit_program(&mut self, program: &parser::Program) {
-        for statement in &program.statements {
+    fn visit_module(&mut self, module: &parser::Module) {
+        for statement in &module.statements {
             statement.accept(self);
         }
     }

@@ -28,9 +28,9 @@ impl ASTDumper {
 }
 
 impl Visitor for ASTDumper {
-    fn visit_program(&mut self, program: &parser::Program) {
-        self.push("Program(");
-        for statement in &program.statements {
+    fn visit_module(&mut self, module: &parser::Module) {
+        self.push("Module(");
+        for statement in &module.statements {
             statement.accept(self);
         }
         self.concat(")");

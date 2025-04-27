@@ -10,12 +10,12 @@ use interpreter::Interpreter;
 #[allow(dead_code)]
 fn dump() {
     let lexer = lexer::Lexer::new("about".to_string());
-    let parser = parser::Parser::new(lexer);
+    let mut parser = parser::Parser::new(lexer);
 
     match parser.parse() {
-        Ok(program) => {
+        Ok(module) => {
             let mut dumper = ASTDumper::new();
-            program.accept(&mut dumper);
+            module.accept(&mut dumper);
             println!("{}", dumper.output);
         }
         Err(e) => {

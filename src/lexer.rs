@@ -5,12 +5,12 @@ pub enum TokenType {
     Newline,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
-    kind: TokenType,
-    value: String,
-    line: usize,
-    column: usize,
+    pub kind: TokenType,
+    pub value: String,
+    pub line: usize,
+    pub column: usize,
 }
 
 // const KEYWORDS: [&str; 3] = ["def", "end"];
@@ -72,11 +72,11 @@ impl Lexer {
                 return Ok(Some(self.read_identifier()));
             }
 
-            LexerError::new(
-                format!("Unexpected character: {}", self.peek().unwrap()),
+            return Err(LexerError::new(
+                format!("Unexpected character: {}", c),
                 self.line,
                 self.column,
-            );
+            ));
         }
 
         Ok(None)

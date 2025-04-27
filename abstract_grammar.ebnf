@@ -1,8 +1,5 @@
-program = stmt
+mod = Module(statements)
 
-stmt = stmt | stmt stmts
-stmt = expression
+stmt = expr
 
-expression = name
-
-name = identifier
+expr = Name(identifier)
