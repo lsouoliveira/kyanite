@@ -1,5 +1,5 @@
 use crate::lexer::Lexer;
-use crate::Visitor;
+use crate::visitor::Visitor;
 
 pub trait ASTNode {
     fn accept(&self, visitor: &mut dyn Visitor);
