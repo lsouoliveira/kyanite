@@ -1,8 +1,8 @@
 use crate::builtins::kya_print;
 use crate::lexer::Lexer;
-use crate::objects::{Context, KyaError, KyaObject, KyaObjectKind, KyaRsFunction};
+use crate::objects::{Context, KyaError, KyaNone, KyaObject, KyaObjectKind, KyaRsFunction};
 use crate::parser;
-use crate::visitor::Visitor;
+use crate::visitor::Evaluator;
 
 pub struct Interpreter {
     input: String,
@@ -25,33 +25,40 @@ impl Interpreter {
         Interpreter { input, context }
     }
 
-    pub fn eval(&mut self) {
+    pub fn evaluate(&mut self) -> Result<(), KyaError> {
         let lexer = Lexer::new(self.input.clone());
         let mut parser = parser::Parser::new(lexer);
 
         match parser.parse() {
             Ok(module) => {
-                module.accept(self);
+                module.eval(self)?;
             }
             Err(e) => {
                 eprintln!("{}", e);
             }
         }
+
+        Ok(())
     }
 }
 
-impl Visitor for Interpreter {
-    fn visit_module(&mut self, module: &parser::Module) {
+impl Evaluator for Interpreter {
+    fn eval_module(&mut self, module: &parser::Module) -> Result<Box<dyn KyaObject>, KyaError> {
         for statement in &module.statements {
-            statement.accept(self);
+            statement.eval(self)?;
         }
+
+        Ok(Box::new(KyaNone {}))
     }
 
-    fn visit_name(&mut self, name: &parser::Name) {
-        name.identifier.accept(self);
+    fn eval_name(&mut self, name: &parser::Name) -> Result<Box<dyn KyaObject>, KyaError> {
+        name.identifier.eval(self)
     }
 
-    fn visit_identifier(&mut self, identifier: &parser::Identifier) {
+    fn eval_identifier(
+        &mut self,
+        identifier: &parser::Identifier,
+    ) -> Result<Box<dyn KyaObject>, KyaError> {
         if let Some(object) = self.context.get(&identifier.name) {
             match object.kind() {
                 KyaObjectKind::RsFunction => {
@@ -62,7 +69,9 @@ impl Visitor for Interpreter {
                 _ => {}
             }
         } else {
-            eprintln!("Undefined identifier: {}", identifier.name);
+            return Err(KyaError::UndefinedVariable(identifier.name.clone()));
         }
+
+        Ok(Box::new(KyaNone {}))
     }
 }

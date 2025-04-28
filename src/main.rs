@@ -30,5 +30,5 @@ fn main() {
     let input = "print\n";
     let mut interpreter = Interpreter::new(input.to_string());
 
-    interpreter.eval();
+    interpreter.evaluate();
 }

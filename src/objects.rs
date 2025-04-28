@@ -3,6 +3,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub enum KyaError {
     RuntimeError(String),
+    UndefinedVariable(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -38,6 +39,7 @@ impl std::fmt::Display for KyaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             KyaError::RuntimeError(msg) => write!(f, "Runtime Error: {}", msg),
+            KyaError::UndefinedVariable(var) => write!(f, "Undefined Variable: {}", var),
         }
     }
 }

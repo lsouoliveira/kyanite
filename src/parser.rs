@@ -1,10 +1,12 @@
 use crate::lexer::Lexer;
 use crate::lexer::{Token, TokenType};
-use crate::visitor::Visitor;
+use crate::objects::{KyaError, KyaObject};
+use crate::visitor::{Evaluator, Visitor};
 use std::any::Any;
 
 pub trait ASTNode {
     fn accept(&self, visitor: &mut dyn Visitor);
+    fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<Box<dyn KyaObject>, KyaError>;
     fn as_any(&self) -> &dyn Any;
 }
 
@@ -29,22 +31,36 @@ impl ASTNode for Module {
         visitor.visit_module(self);
     }
 
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-impl ASTNode for Name {
-    fn accept(&self, visitor: &mut dyn Visitor) {
-        visitor.visit_name(self);
+    fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<Box<dyn KyaObject>, KyaError> {
+        evaluator.eval_module(self)
     }
 
     fn as_any(&self) -> &dyn Any {
         self
     }
 }
+
+impl ASTNode for Name {
+    fn accept(&self, visitor: &mut dyn Visitor) {
+        visitor.visit_name(self);
+    }
+
+    fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<Box<dyn KyaObject>, KyaError> {
+        evaluator.eval_name(self)
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
 impl ASTNode for Identifier {
     fn accept(&self, visitor: &mut dyn Visitor) {
         visitor.visit_identifier(self);
+    }
+
+    fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<Box<dyn KyaObject>, KyaError> {
+        evaluator.eval_identifier(self)
     }
 
     fn as_any(&self) -> &dyn Any {
