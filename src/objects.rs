@@ -24,7 +24,8 @@ pub struct KyaString {
     pub value: String,
 }
 
-pub type KyaRsFunctionPtr = fn(&Context) -> Result<Box<dyn KyaObject>, KyaError>;
+pub type KyaRsFunctionPtr =
+    fn(&Context, Vec<Box<dyn KyaObject>>) -> Result<Box<dyn KyaObject>, KyaError>;
 pub struct KyaRsFunction {
     pub name: String,
     pub function: KyaRsFunctionPtr,
@@ -92,8 +93,12 @@ impl KyaRsFunction {
         KyaRsFunction { name, function }
     }
 
-    pub fn call(&self, context: &Context) -> Result<Box<dyn KyaObject>, KyaError> {
-        (self.function)(context)
+    pub fn call(
+        &self,
+        context: &Context,
+        args: Vec<Box<dyn KyaObject>>,
+    ) -> Result<Box<dyn KyaObject>, KyaError> {
+        (self.function)(context, args)
     }
 }
 
@@ -136,7 +141,9 @@ mod tests {
 
     #[test]
     fn test_kya_rs_function() {
-        let function = |_context: &Context| -> Result<Box<dyn KyaObject>, KyaError> {
+        let function = |_context: &Context,
+                        _args: Vec<Box<dyn KyaObject>>|
+         -> Result<Box<dyn KyaObject>, KyaError> {
             let result = KyaString {
                 value: String::from("Hello from KyaRsFunction!"),
             };
@@ -146,7 +153,7 @@ mod tests {
 
         let kya_rs_function = KyaRsFunction::new(String::from("test_function"), function);
         let context = Context::new(None);
-        let result = kya_rs_function.call(&context);
+        let result = kya_rs_function.call(&context, vec![]);
         assert!(result.is_ok());
         let result_object = result.unwrap();
         assert_eq!(result_object.kind(), KyaObjectKind::String);

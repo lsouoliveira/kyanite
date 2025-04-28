@@ -63,7 +63,7 @@ impl Evaluator for Interpreter {
             match object.kind() {
                 KyaObjectKind::RsFunction => {
                     if let Some(function) = object.as_any().downcast_ref::<KyaRsFunction>() {
-                        function.call(&self.context).unwrap();
+                        function.call(&self.context, vec![])?;
                     }
                 }
                 _ => {}
