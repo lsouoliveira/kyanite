@@ -1,9 +1,10 @@
+mod builtins;
 mod dumper;
 mod interpreter;
 mod lexer;
+mod objects;
 mod parser;
 mod visitor;
-mod objects;
 
 use dumper::ASTDumper;
 use interpreter::Interpreter;
@@ -26,8 +27,8 @@ fn dump() {
 }
 
 fn main() {
-    let input = "my_function";
-    let mut interpreter = Interpreter::new();
+    let input = "print";
+    let mut interpreter = Interpreter::new(input.to_string());
 
-    interpreter.eval(input);
+    interpreter.eval();
 }

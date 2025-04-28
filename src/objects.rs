@@ -1,20 +1,23 @@
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
-enum KyaError {
+pub enum KyaError {
     RuntimeError(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum KyaObjectKind {
     String,
-    KyaRsFunction,
+    RsFunction,
+    None,
 }
 
 pub trait KyaObject {
     fn kind(&self) -> KyaObjectKind;
     fn as_any(&self) -> &dyn std::any::Any;
 }
+
+pub struct KyaNone;
 
 pub struct KyaString {
     pub value: String,
@@ -46,6 +49,30 @@ impl Context {
             objects: HashMap::new(),
         }
     }
+
+    pub fn register(&mut self, name: String, object: Box<dyn KyaObject>) {
+        self.objects.insert(name, object);
+    }
+
+    pub fn get(&self, name: &str) -> Option<&Box<dyn KyaObject>> {
+        if let Some(object) = self.objects.get(name) {
+            return Some(object);
+        }
+        if let Some(parent) = &self.parent {
+            return parent.get(name);
+        }
+        None
+    }
+}
+
+impl KyaObject for KyaNone {
+    fn kind(&self) -> KyaObjectKind {
+        KyaObjectKind::None
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl KyaObject for KyaString {
@@ -65,6 +92,16 @@ impl KyaRsFunction {
 
     pub fn call(&self, context: &Context) -> Result<Box<dyn KyaObject>, KyaError> {
         (self.function)(context)
+    }
+}
+
+impl KyaObject for KyaRsFunction {
+    fn kind(&self) -> KyaObjectKind {
+        KyaObjectKind::RsFunction
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 

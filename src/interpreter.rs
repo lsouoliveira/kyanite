@@ -1,16 +1,32 @@
+use crate::builtins::kya_print;
 use crate::lexer::Lexer;
+use crate::objects::{Context, KyaError, KyaObject, KyaObjectKind, KyaRsFunction};
 use crate::parser;
 use crate::visitor::Visitor;
 
-pub struct Interpreter {}
+pub struct Interpreter {
+    input: String,
+    context: Context,
+}
+
+fn setup_builtins(context: &mut Context) {
+    context.register(
+        String::from("print"),
+        Box::new(KyaRsFunction::new(String::from("print"), kya_print)),
+    );
+}
 
 impl Interpreter {
-    pub fn new() -> Self {
-        Interpreter {}
+    pub fn new(input: String) -> Self {
+        let mut context = Context::new(None);
+
+        setup_builtins(&mut context);
+
+        Interpreter { input, context }
     }
 
-    pub fn eval(&mut self, input: &str) {
-        let lexer = Lexer::new(input.to_string());
+    pub fn eval(&mut self) {
+        let lexer = Lexer::new(self.input.clone());
         let mut parser = parser::Parser::new(lexer);
 
         match parser.parse() {
@@ -36,6 +52,17 @@ impl Visitor for Interpreter {
     }
 
     fn visit_identifier(&mut self, identifier: &parser::Identifier) {
-        println!("Identifier: {}", identifier.name);
+        if let Some(object) = self.context.get(&identifier.name) {
+            match object.kind() {
+                KyaObjectKind::RsFunction => {
+                    if let Some(function) = object.as_any().downcast_ref::<KyaRsFunction>() {
+                        function.call(&self.context).unwrap();
+                    }
+                }
+                _ => {}
+            }
+        } else {
+            eprintln!("Undefined identifier: {}", identifier.name);
+        }
     }
 }
