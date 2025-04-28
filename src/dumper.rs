@@ -10,7 +10,7 @@ impl ASTDumper {
     pub fn new() -> Self {
         ASTDumper {
             output: String::new(),
-            indent: 0,
+            indent: 4,
         }
     }
 
@@ -25,11 +25,16 @@ impl ASTDumper {
     fn concat(&mut self, text: &str) {
         self.output.push_str(text);
     }
+
+    fn push_newline(&mut self) {
+        self.output.push_str("\n");
+    }
 }
 
 impl Visitor for ASTDumper {
     fn visit_module(&mut self, module: &parser::Module) {
-        self.push("Module(");
+        self.concat("Module(");
+        self.push_newline();
         for statement in &module.statements {
             statement.accept(self);
         }
