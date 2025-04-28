@@ -3,6 +3,7 @@ mod interpreter;
 mod lexer;
 mod parser;
 mod visitor;
+mod objects;
 
 use dumper::ASTDumper;
 use interpreter::Interpreter;
