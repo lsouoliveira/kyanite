@@ -3,6 +3,7 @@ pub enum TokenType {
     Identifier,
     Keyword,
     Newline,
+    StringLiteral,
 }
 
 #[derive(Debug, Clone)]
@@ -12,8 +13,6 @@ pub struct Token {
     pub line: usize,
     pub column: usize,
 }
-
-// const KEYWORDS: [&str; 3] = ["def", "end"];
 
 #[derive(Debug)]
 pub struct LexerError {
@@ -46,6 +45,10 @@ fn is_identifier_start(c: char) -> bool {
     c == '_' || c.is_alphabetic()
 }
 
+fn is_string_literal(c: char) -> bool {
+    c == '"' || c == '\''
+}
+
 impl Lexer {
     pub fn new(input: String) -> Self {
         Lexer {
@@ -66,6 +69,10 @@ impl Lexer {
 
             if is_whitespace(c) {
                 self.skip_whitespace();
+            }
+
+            if is_string_literal(c) {
+                return self.read_string_literal();
             }
 
             if is_identifier_start(c) {
@@ -124,6 +131,40 @@ impl Lexer {
             line: self.line,
             column: self.column,
         }
+    }
+
+    fn read_string_literal(&mut self) -> Result<Option<Token>, LexerError> {
+        let mut content = String::new();
+        let quote_character = self.peek().unwrap();
+        let mut is_terminated = false;
+
+        self.advance();
+
+        while let Some(c) = self.peek() {
+            if c == quote_character {
+                is_terminated = true;
+                self.advance();
+                break;
+            } else {
+                content.push(c);
+                self.advance();
+            }
+        }
+
+        if !is_terminated {
+            return Err(LexerError::new(
+                "Unterminated string literal".to_string(),
+                self.line,
+                self.column,
+            ));
+        }
+
+        Ok(Some(Token {
+            kind: TokenType::StringLiteral,
+            value: content,
+            line: self.line,
+            column: self.column,
+        }))
     }
 
     fn skip_whitespace(&mut self) {
@@ -198,5 +239,42 @@ mod tests {
         assert_eq!(token.value, "_my_function");
         assert_eq!(token.line, 1);
         assert_eq!(token.column, 1);
+    }
+
+    #[test]
+    fn test_string_literal_with_quotes() {
+        let mut lexer = Lexer::new("\"my string\"".to_string());
+
+        let token = lexer.next_token().unwrap().unwrap();
+
+        assert_eq!(token.kind, TokenType::StringLiteral);
+        assert_eq!(token.value, "my string");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 1);
+    }
+
+    #[test]
+    fn test_string_literal_with_single_quotes() {
+        let mut lexer = Lexer::new("'my string'".to_string());
+
+        let token = lexer.next_token().unwrap().unwrap();
+
+        assert_eq!(token.kind, TokenType::StringLiteral);
+        assert_eq!(token.value, "my string");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 1);
+    }
+
+    #[test]
+    fn test_unterminated_string_literal() {
+        let mut lexer = Lexer::new("\"my string".to_string());
+
+        let result = lexer.next_token();
+
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert_eq!(error.message, "Unterminated string literal");
+        assert_eq!(error.line, 1);
+        assert_eq!(error.column, 1);
     }
 }
