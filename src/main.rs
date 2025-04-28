@@ -6,12 +6,13 @@ mod objects;
 mod parser;
 mod visitor;
 
+use clap::Parser;
+
 use dumper::ASTDumper;
 use interpreter::Interpreter;
 
-#[allow(dead_code)]
-fn dump() {
-    let lexer = lexer::Lexer::new("about".to_string());
+fn dump(input: &str) {
+    let lexer = lexer::Lexer::new(input.to_string());
     let mut parser = parser::Parser::new(lexer);
 
     match parser.parse() {
@@ -26,9 +27,34 @@ fn dump() {
     }
 }
 
-fn main() {
-    let input = "print\n";
+fn interpret(input: &str) -> Result<(), String> {
     let mut interpreter = Interpreter::new(input.to_string());
+    interpreter.evaluate().unwrap();
 
-    interpreter.evaluate();
+    Ok(())
+}
+
+#[derive(Parser)]
+struct Cli {
+    #[arg(required = true)]
+    file: String,
+
+    /// Dump the AST
+    #[clap(short, long)]
+    dump: bool,
+}
+
+fn main() {
+    let cli = Cli::parse();
+
+    let input = std::fs::read_to_string(&cli.file).unwrap_or_else(|_| {
+        eprintln!("Error: Could not read file {}", cli.file);
+        std::process::exit(1);
+    });
+
+    if cli.dump {
+        dump(&input);
+    } else {
+        interpret(&input).unwrap();
+    }
 }
