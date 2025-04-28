@@ -27,7 +27,7 @@ fn dump() {
 }
 
 fn main() {
-    let input = "print";
+    let input = "print\n";
     let mut interpreter = Interpreter::new(input.to_string());
 
     interpreter.eval();

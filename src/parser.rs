@@ -105,7 +105,11 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Result<Box<dyn ASTNode>, ParserError> {
-        return self.parse_expression();
+        let expr = self.parse_expression()?;
+
+        self.skip_newlines();
+
+        Ok(expr)
     }
 
     fn parse_expression(&mut self) -> Result<Box<dyn ASTNode>, ParserError> {
@@ -145,6 +149,12 @@ impl Parser {
     fn next_token(&mut self) -> Result<(), ParserError> {
         self.current_token = self.lexer.next_token().unwrap();
         Ok(())
+    }
+
+    fn skip_newlines(&mut self) {
+        while self.accept(TokenType::Newline).is_ok() {
+            self.next_token().unwrap();
+        }
     }
 }
 
