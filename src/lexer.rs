@@ -1,9 +1,12 @@
+use std::collections::HashMap;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
     Identifier,
-    Keyword,
     Newline,
     StringLiteral,
+    LeftParen,
+    RightParen,
 }
 
 #[derive(Debug, Clone)]
@@ -27,6 +30,7 @@ pub struct Lexer {
     position: usize,
     line: usize,
     column: usize,
+    symbols: HashMap<String, TokenType>,
 }
 
 fn is_newline(c: char) -> bool {
@@ -49,6 +53,17 @@ fn is_string_literal(c: char) -> bool {
     c == '"' || c == '\''
 }
 
+// TODO: Replace with a static map
+fn symbols() -> HashMap<String, TokenType> {
+    let mut symbols = HashMap::new();
+    symbols.insert("(".to_string(), TokenType::LeftParen);
+    symbols.insert(")".to_string(), TokenType::RightParen);
+    symbols
+}
+fn is_symbol(c: char) -> bool {
+    symbols().contains_key(&c.to_string())
+}
+
 impl Lexer {
     pub fn new(input: String) -> Self {
         Lexer {
@@ -56,6 +71,7 @@ impl Lexer {
             position: 0,
             line: 1,
             column: 1,
+            symbols: symbols(),
         }
     }
 
@@ -69,6 +85,10 @@ impl Lexer {
 
             if is_whitespace(c) {
                 self.skip_whitespace();
+            }
+
+            if is_symbol(c) {
+                return Ok(Some(self.read_symbol()));
             }
 
             if is_string_literal(c) {
@@ -91,6 +111,7 @@ impl Lexer {
 
     fn advance(&mut self) {
         self.position += 1;
+        self.column += 1;
     }
 
     fn peek(&self) -> Option<char> {
@@ -113,8 +134,24 @@ impl Lexer {
         }
     }
 
+    fn read_symbol(&mut self) -> Token {
+        let c = self.peek().unwrap();
+        let kind = self.symbols.get(&c.to_string()).unwrap().clone();
+        let column_start = self.column;
+
+        self.advance();
+
+        Token {
+            kind,
+            value: c.to_string(),
+            line: self.line,
+            column: column_start,
+        }
+    }
+
     fn read_identifier(&mut self) -> Token {
         let mut identifier = String::new();
+        let column_start = self.column;
 
         while let Some(c) = self.peek() {
             if is_identifier(c) {
@@ -129,7 +166,7 @@ impl Lexer {
             kind: TokenType::Identifier,
             value: identifier,
             line: self.line,
-            column: self.column,
+            column: column_start,
         }
     }
 
@@ -137,6 +174,7 @@ impl Lexer {
         let mut content = String::new();
         let quote_character = self.peek().unwrap();
         let mut is_terminated = false;
+        let column_start = self.column;
 
         self.advance();
 
@@ -155,7 +193,7 @@ impl Lexer {
             return Err(LexerError::new(
                 "Unterminated string literal".to_string(),
                 self.line,
-                self.column,
+                column_start,
             ));
         }
 
@@ -163,7 +201,7 @@ impl Lexer {
             kind: TokenType::StringLiteral,
             value: content,
             line: self.line,
-            column: self.column,
+            column: column_start,
         }))
     }
 
@@ -276,5 +314,22 @@ mod tests {
         assert_eq!(error.message, "Unterminated string literal");
         assert_eq!(error.line, 1);
         assert_eq!(error.column, 1);
+    }
+
+    #[test]
+    fn test_symbol() {
+        let mut lexer = Lexer::new("()".to_string());
+
+        let token = lexer.next_token().unwrap().unwrap();
+        assert_eq!(token.kind, TokenType::LeftParen);
+        assert_eq!(token.value, "(");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 1);
+
+        let token = lexer.next_token().unwrap().unwrap();
+        assert_eq!(token.kind, TokenType::RightParen);
+        assert_eq!(token.value, ")");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 2);
     }
 }
