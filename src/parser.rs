@@ -18,12 +18,21 @@ pub struct Body {
     pub statements: Vec<Box<dyn ASTNode>>,
 }
 
+pub struct FunctionCall {
+    pub func: Box<dyn ASTNode>,
+    pub arguments: Vec<Box<dyn ASTNode>>,
+}
+
 pub struct Name {
     pub identifier: Box<dyn ASTNode>,
 }
 
 pub struct Identifier {
     pub name: String,
+}
+
+pub struct StringLiteral {
+    pub value: String,
 }
 
 impl ASTNode for Module {
@@ -33,6 +42,20 @@ impl ASTNode for Module {
 
     fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<Box<dyn KyaObject>, KyaError> {
         evaluator.eval_module(self)
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl ASTNode for FunctionCall {
+    fn accept(&self, visitor: &mut dyn Visitor) {
+        visitor.visit_function_call(self);
+    }
+
+    fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<Box<dyn KyaObject>, KyaError> {
+        evaluator.eval_function_call(self)
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -61,6 +84,20 @@ impl ASTNode for Identifier {
 
     fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<Box<dyn KyaObject>, KyaError> {
         evaluator.eval_identifier(self)
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl ASTNode for StringLiteral {
+    fn accept(&self, visitor: &mut dyn Visitor) {
+        visitor.visit_string_literal(self);
+    }
+
+    fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<Box<dyn KyaObject>, KyaError> {
+        evaluator.eval_string_literal(self)
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -121,6 +158,8 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Result<Box<dyn ASTNode>, ParserError> {
+        self.skip_newlines();
+
         let expr = self.parse_expression()?;
 
         self.skip_newlines();
@@ -129,33 +168,60 @@ impl Parser {
     }
 
     fn parse_expression(&mut self) -> Result<Box<dyn ASTNode>, ParserError> {
-        let token = self.current_token.clone();
+        if let Some(identifier) = self.accept(TokenType::Identifier).ok() {
+            let name = Name {
+                identifier: Box::new(Identifier {
+                    name: identifier.unwrap().value,
+                }),
+            };
 
-        self.expect(TokenType::Identifier).unwrap();
+            if self.accept(TokenType::LeftParen).is_ok() {
+                let mut arguments = vec![];
 
-        return Ok(Box::new(Identifier {
-            name: token.unwrap().value,
-        }));
+                if let Some(arg) = self.parse_expression().ok() {
+                    arguments.push(arg);
+                }
+
+                self.expect(TokenType::RightParen)?;
+
+                return Ok(Box::new(FunctionCall {
+                    func: Box::new(name),
+                    arguments,
+                }));
+            }
+
+            return Ok(Box::new(name));
+        } else if let Some(name) = self.accept(TokenType::StringLiteral).ok() {
+            let string_literal = StringLiteral {
+                value: name.unwrap().value,
+            };
+
+            return Ok(Box::new(string_literal));
+        }
+
+        Err(ParserError::new("Expected expression"))
     }
 
-    fn expect(&mut self, token_type: TokenType) -> Result<(), ParserError> {
+    fn expect(&mut self, token_type: TokenType) -> Result<Option<Token>, ParserError> {
         if let Some(token) = &self.current_token {
             if token.kind == token_type {
-                self.current_token = self.lexer.next_token().unwrap();
+                let current_token = self.current_token.clone();
+                self.next_token()?;
 
-                return Ok(());
+                return Ok(current_token);
             }
         }
 
         Err(ParserError::new("Unexpected symbol"))
     }
 
-    fn accept(&mut self, token_type: TokenType) -> Result<(), ParserError> {
+    fn accept(&mut self, token_type: TokenType) -> Result<Option<Token>, ParserError> {
         if let Some(token) = &self.current_token {
             if token.kind == token_type {
-                self.current_token = self.lexer.next_token().unwrap();
+                let current_token = self.current_token.clone();
+                self.next_token()?;
 
-                return Ok(());
+                return Ok(current_token);
             }
         }
 
@@ -168,9 +234,7 @@ impl Parser {
     }
 
     fn skip_newlines(&mut self) {
-        while self.accept(TokenType::Newline).is_ok() {
-            self.next_token().unwrap();
-        }
+        while self.accept(TokenType::Newline).is_ok() {}
     }
 }
 
@@ -208,10 +272,57 @@ mod tests {
 
         assert_eq!(module.statements.len(), 1);
 
-        let identifier_node = module.statements[0]
+        let name_node = module.statements[0]
+            .as_any()
+            .downcast_ref::<Name>()
+            .unwrap();
+        let identifier_node = name_node
+            .identifier
             .as_any()
             .downcast_ref::<Identifier>()
             .unwrap();
         assert_eq!(identifier_node.name, "my_function");
+    }
+
+    #[test]
+    fn test_parse_function_call() {
+        let input = "my_function()";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let result = parser.parse();
+
+        assert!(result.is_ok());
+
+        let module_node = result.unwrap();
+        let module = module_node.as_any().downcast_ref::<Module>().unwrap();
+
+        assert_eq!(module.statements.len(), 1);
+
+        let function_call_node = module.statements[0]
+            .as_any()
+            .downcast_ref::<FunctionCall>()
+            .unwrap();
+        assert_eq!(function_call_node.arguments.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_string_literal() {
+        let input = "\"Hello, World!\"";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let result = parser.parse();
+
+        assert!(result.is_ok());
+
+        let module_node = result.unwrap();
+        let module = module_node.as_any().downcast_ref::<Module>().unwrap();
+
+        assert_eq!(module.statements.len(), 1);
+
+        let string_literal_node = module.statements[0]
+            .as_any()
+            .downcast_ref::<StringLiteral>()
+            .unwrap();
+        assert_eq!(string_literal_node.value, "Hello, World!");
     }
 }

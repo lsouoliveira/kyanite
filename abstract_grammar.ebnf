@@ -3,3 +3,4 @@ mod = Module(statements)
 stmt = expr
 
 expr = Name(identifier)
+     | FunctionCall(func, args)

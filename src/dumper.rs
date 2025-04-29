@@ -50,4 +50,21 @@ impl Visitor for ASTDumper {
     fn visit_identifier(&mut self, identifier: &parser::Identifier) {
         self.push(&format!("Identifier: {}", identifier.name));
     }
+
+    fn visit_function_call(&mut self, function_call: &parser::FunctionCall) {
+        self.push("FunctionCall(");
+        function_call.func.accept(self);
+        self.push("(");
+        for (i, arg) in function_call.arguments.iter().enumerate() {
+            arg.accept(self);
+            if i < function_call.arguments.len() - 1 {
+                self.concat(", ");
+            }
+        }
+        self.concat("))");
+    }
+
+    fn visit_string_literal(&mut self, string_literal: &parser::StringLiteral) {
+        self.push(&format!("StringLiteral: {}", string_literal.value));
+    }
 }

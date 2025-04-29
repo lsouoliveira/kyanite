@@ -79,12 +79,13 @@ impl Lexer {
         while self.position < self.input.len() {
             let c = self.peek().unwrap();
 
-            if is_newline(c) {
-                return Ok(Some(self.read_newline()));
-            }
-
             if is_whitespace(c) {
                 self.skip_whitespace();
+                continue;
+            }
+
+            if is_newline(c) {
+                return Ok(Some(self.read_newline()));
             }
 
             if is_symbol(c) {
@@ -237,6 +238,17 @@ impl std::fmt::Display for LexerError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_skips_whitespace() {
+        let mut lexer = Lexer::new("   \t\n".to_string());
+
+        let token = lexer.next_token().unwrap().unwrap();
+        assert_eq!(token.kind, TokenType::Newline);
+        assert_eq!(token.value, "\n");
+        assert_eq!(token.line, 2);
+        assert_eq!(token.column, 1);
+    }
 
     #[test]
     fn test_newline() {

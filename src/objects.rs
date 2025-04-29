@@ -16,10 +16,12 @@ pub enum KyaObjectKind {
 pub trait KyaObject {
     fn kind(&self) -> KyaObjectKind;
     fn as_any(&self) -> &dyn std::any::Any;
+    fn dup(&self) -> Box<dyn KyaObject>;
 }
 
 pub struct KyaNone;
 
+#[derive(Debug, Clone)]
 pub struct KyaString {
     pub value: String,
 }
@@ -45,6 +47,16 @@ impl std::fmt::Display for KyaError {
     }
 }
 
+impl std::fmt::Display for KyaObjectKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            KyaObjectKind::String => write!(f, "String"),
+            KyaObjectKind::RsFunction => write!(f, "RsFunction"),
+            KyaObjectKind::None => write!(f, "None"),
+        }
+    }
+}
+
 impl Context {
     pub fn new(parent: Option<Box<Context>>) -> Self {
         Context {
@@ -59,12 +71,12 @@ impl Context {
 
     pub fn get(&self, name: &str) -> Option<&Box<dyn KyaObject>> {
         if let Some(object) = self.objects.get(name) {
-            return Some(object);
+            Some(object)
+        } else if let Some(parent) = &self.parent {
+            parent.get(name)
+        } else {
+            None
         }
-        if let Some(parent) = &self.parent {
-            return parent.get(name);
-        }
-        None
     }
 }
 
@@ -76,6 +88,22 @@ impl KyaObject for KyaNone {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
+
+    fn dup(&self) -> Box<dyn KyaObject> {
+        Box::new(KyaNone {})
+    }
+}
+
+impl KyaString {
+    pub fn new(value: String) -> Self {
+        KyaString { value }
+    }
+
+    pub fn dup(&self) -> Box<dyn KyaObject> {
+        Box::new(KyaString {
+            value: self.value.clone(),
+        })
+    }
 }
 
 impl KyaObject for KyaString {
@@ -85,6 +113,12 @@ impl KyaObject for KyaString {
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn dup(&self) -> Box<dyn KyaObject> {
+        Box::new(KyaString {
+            value: self.value.clone(),
+        })
     }
 }
 
@@ -100,6 +134,13 @@ impl KyaRsFunction {
     ) -> Result<Box<dyn KyaObject>, KyaError> {
         (self.function)(context, args)
     }
+
+    pub fn dup(&self) -> Box<dyn KyaObject> {
+        Box::new(KyaRsFunction {
+            name: self.name.clone(),
+            function: self.function,
+        })
+    }
 }
 
 impl KyaObject for KyaRsFunction {
@@ -109,6 +150,13 @@ impl KyaObject for KyaRsFunction {
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn dup(&self) -> Box<dyn KyaObject> {
+        Box::new(KyaRsFunction {
+            name: self.name.clone(),
+            function: self.function,
+        })
     }
 }
 
