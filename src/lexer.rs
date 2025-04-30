@@ -8,6 +8,7 @@ pub enum TokenType {
     StringLiteral,
     LeftParen,
     RightParen,
+    Equal,
 }
 
 #[derive(Debug, Clone)]
@@ -52,6 +53,7 @@ fn symbols() -> HashMap<String, TokenType> {
     let mut symbols = HashMap::new();
     symbols.insert("(".to_string(), TokenType::LeftParen);
     symbols.insert(")".to_string(), TokenType::RightParen);
+    symbols.insert("=".to_string(), TokenType::Equal);
     symbols
 }
 fn is_symbol(c: char) -> bool {
@@ -302,19 +304,14 @@ mod tests {
         assert_eq!(lexer_error.message, "Unterminated string literal");
     }
     #[test]
-    fn test_symbol() {
-        let mut lexer = Lexer::new("()".to_string());
-
-        let token = lexer.next_token().unwrap().unwrap();
-        assert_eq!(token.kind, TokenType::LeftParen);
-        assert_eq!(token.value, "(");
-        assert_eq!(token.line, 1);
-        assert_eq!(token.column, 1);
-
-        let token = lexer.next_token().unwrap().unwrap();
-        assert_eq!(token.kind, TokenType::RightParen);
-        assert_eq!(token.value, ")");
-        assert_eq!(token.line, 1);
-        assert_eq!(token.column, 2);
+    fn test_symbols() {
+        for symbol in symbols().keys() {
+            let mut lexer = Lexer::new(symbol.clone());
+            let token = lexer.next_token().unwrap().unwrap();
+            assert_eq!(&token.kind, symbols().get(symbol).unwrap());
+            assert_eq!(&token.value, symbol);
+            assert_eq!(token.line, 1);
+            assert_eq!(token.column, 1);
+        }
     }
 }
