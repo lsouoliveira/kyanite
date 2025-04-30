@@ -1,10 +1,11 @@
+use crate::ast;
 use crate::builtins::kya_print;
+use crate::errors::Error;
 use crate::lexer::Lexer;
-use crate::objects::{
-    Context, KyaError, KyaNone, KyaObject, KyaObjectKind, KyaRsFunction, KyaString,
-};
+use crate::objects::{Context, KyaNone, KyaObject, KyaRsFunction, KyaString};
 use crate::parser;
 use crate::visitor::Evaluator;
+use std::rc::Rc;
 
 pub struct Interpreter {
     input: String,
@@ -14,7 +15,10 @@ pub struct Interpreter {
 fn setup_builtins(context: &mut Context) {
     context.register(
         String::from("print"),
-        Box::new(KyaRsFunction::new(String::from("print"), kya_print)),
+        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+            String::from("print"),
+            kya_print,
+        ))),
     );
 }
 
@@ -27,7 +31,7 @@ impl Interpreter {
         Interpreter { input, context }
     }
 
-    pub fn evaluate(&mut self) -> Result<(), KyaError> {
+    pub fn evaluate(&mut self) -> Result<(), Error> {
         let lexer = Lexer::new(self.input.clone());
         let mut parser = parser::Parser::new(lexer);
 
@@ -45,64 +49,55 @@ impl Interpreter {
 }
 
 impl Evaluator for Interpreter {
-    fn eval_module(&mut self, module: &parser::Module) -> Result<Box<dyn KyaObject>, KyaError> {
+    fn eval_module(&mut self, module: &ast::Module) -> Result<Rc<KyaObject>, Error> {
         for statement in &module.statements {
             statement.eval(self)?;
         }
 
-        Ok(Box::new(KyaNone {}))
+        Ok(Rc::new(KyaObject::None(KyaNone {})))
     }
 
-    fn eval_name(&mut self, name: &parser::Name) -> Result<Box<dyn KyaObject>, KyaError> {
-        name.identifier.eval(self)
-    }
-
-    fn eval_identifier(
-        &mut self,
-        identifier: &parser::Identifier,
-    ) -> Result<Box<dyn KyaObject>, KyaError> {
+    fn eval_identifier(&mut self, identifier: &ast::Identifier) -> Result<Rc<KyaObject>, Error> {
         if let Some(object) = self.context.get(&identifier.name) {
-            return Ok(object.dup());
+            Ok(object.clone())
+        } else {
+            Err(Error::RuntimeError(format!(
+                "Undefined identifier: {}",
+                identifier.name
+            )))
         }
-
-        Err(KyaError::RuntimeError(format!(
-            "Name '{}' is not defined",
-            identifier.name
-        )))
     }
 
-    fn eval_function_call(
+    fn eval_string_literal(&mut self, string_literal: &str) -> Result<Rc<KyaObject>, Error> {
+        Ok(Rc::new(KyaObject::String(KyaString {
+            value: string_literal.to_string(),
+        })))
+    }
+
+    fn eval_method_call(
         &mut self,
-        function_call: &parser::FunctionCall,
-    ) -> Result<Box<dyn KyaObject>, KyaError> {
-        let func = function_call.func.eval(self)?;
-        let name = function_call.func.as_any().downcast_ref::<parser::Name>();
-        let identifier = name
-            .unwrap()
-            .identifier
-            .as_any()
-            .downcast_ref::<parser::Identifier>();
+        method_call: &ast::MethodCall,
+    ) -> Result<Rc<KyaObject>, Error> {
+        let callee = method_call.name.eval(self)?;
+        let args: Vec<Rc<KyaObject>> = method_call
+            .arguments
+            .iter()
+            .map(|arg| arg.eval(self))
+            .collect::<Result<Vec<_>, _>>()?;
 
-        if let Some(func) = func.as_any().downcast_ref::<KyaRsFunction>() {
-            let mut args = vec![];
-
-            for arg in &function_call.arguments {
-                args.push(arg.eval(self)?);
-            }
-
+        if let KyaObject::RsFunction(func) = callee.as_ref() {
             return func.call(&self.context, args);
         }
 
-        Err(KyaError::RuntimeError(format!(
-            "Function call failed: {}",
-            identifier.unwrap().name
-        )))
-    }
+        if let ast::ASTNode::Identifier(identifier) = &*method_call.name {
+            return Err(Error::RuntimeError(format!(
+                "Undefined method: {}",
+                identifier.name
+            )));
+        }
 
-    fn eval_string_literal(
-        &mut self,
-        string_literal: &parser::StringLiteral,
-    ) -> Result<Box<dyn KyaObject>, KyaError> {
-        Ok(Box::new(KyaString::new(string_literal.value.clone())))
+        Err(Error::RuntimeError(format!(
+            "Unexpected method call",
+        )))
     }
 }

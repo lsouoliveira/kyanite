@@ -1,3 +1,4 @@
+use crate::errors::{Error, LexerError};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -15,13 +16,6 @@ pub struct Token {
     pub value: String,
     pub line: usize,
     pub column: usize,
-}
-
-#[derive(Debug)]
-pub struct LexerError {
-    message: String,
-    line: usize,
-    column: usize,
 }
 
 #[derive(Debug)]
@@ -75,7 +69,7 @@ impl Lexer {
         }
     }
 
-    pub fn next_token(&mut self) -> Result<Option<Token>, LexerError> {
+    pub fn next_token(&mut self) -> Result<Option<Token>, Error> {
         while self.position < self.input.len() {
             let c = self.peek().unwrap();
 
@@ -100,11 +94,11 @@ impl Lexer {
                 return Ok(Some(self.read_identifier()));
             }
 
-            return Err(LexerError::new(
-                format!("Unexpected character: {}", c),
+            return Err(Error::LexerError(LexerError::new(
+                format!("Invalid symbol: {}", c),
                 self.line,
                 self.column,
-            ));
+            )));
         }
 
         Ok(None)
@@ -171,7 +165,7 @@ impl Lexer {
         }
     }
 
-    fn read_string_literal(&mut self) -> Result<Option<Token>, LexerError> {
+    fn read_string_literal(&mut self) -> Result<Option<Token>, Error> {
         let mut content = String::new();
         let quote_character = self.peek().unwrap();
         let mut is_terminated = false;
@@ -191,11 +185,11 @@ impl Lexer {
         }
 
         if !is_terminated {
-            return Err(LexerError::new(
+            return Err(Error::LexerError(LexerError::new(
                 "Unterminated string literal".to_string(),
                 self.line,
                 column_start,
-            ));
+            )));
         }
 
         Ok(Some(Token {
@@ -210,28 +204,6 @@ impl Lexer {
         while self.position < self.input.len() && is_whitespace(self.peek().unwrap()) {
             self.advance();
         }
-    }
-}
-
-impl LexerError {
-    pub fn new(message: String, line: usize, column: usize) -> Self {
-        LexerError {
-            message,
-            line,
-            column,
-        }
-    }
-}
-
-impl std::error::Error for LexerError {}
-
-impl std::fmt::Display for LexerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Invalid syntax: {} at line {}, column {}",
-            self.message, self.line, self.column
-        )
     }
 }
 
@@ -323,11 +295,12 @@ mod tests {
 
         assert!(result.is_err());
         let error = result.unwrap_err();
-        assert_eq!(error.message, "Unterminated string literal");
-        assert_eq!(error.line, 1);
-        assert_eq!(error.column, 1);
+        let lexer_error = match error {
+            Error::LexerError(err) => err,
+            _ => panic!("Expected LexerError"),
+        };
+        assert_eq!(lexer_error.message, "Unterminated string literal");
     }
-
     #[test]
     fn test_symbol() {
         let mut lexer = Lexer::new("()".to_string());

@@ -1,5 +1,7 @@
+mod ast;
 mod builtins;
 mod dumper;
+mod errors;
 mod interpreter;
 mod lexer;
 mod objects;
@@ -22,7 +24,7 @@ fn dump(input: &str) {
             println!("{}", dumper.output);
         }
         Err(e) => {
-            eprintln!("Error: {}", e);
+            eprintln!("{}", e);
         }
     }
 }

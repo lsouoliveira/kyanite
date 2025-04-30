@@ -1,6 +1,24 @@
-mod = Module(statements)
+module = { statement };
 
-stmt = expr
+statement = simple_stmt newline
+          | compound_stmt newline
+          | newline ;
 
-expr = Name(identifier)
-     | FunctionCall(func, args)
+simple_stmt = expression ;
+
+expression = literal
+           | variable
+           | assignment
+           | method_call
+           | binary_expr
+           | unary_expr ;
+
+compound_stmt = ...
+
+literal = ...
+
+identifier = (letter | "_"), { letter | digit | "_" } ;
+digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+letter = uppercase and lowercase alphabet letters ; 
+
+newline = "\n" ;

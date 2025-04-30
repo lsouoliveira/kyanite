@@ -1,130 +1,7 @@
+use crate::ast;
+use crate::errors::Error;
 use crate::lexer::Lexer;
 use crate::lexer::{Token, TokenType};
-use crate::objects::{KyaError, KyaObject};
-use crate::visitor::{Evaluator, Visitor};
-use std::any::Any;
-
-pub trait ASTNode {
-    fn accept(&self, visitor: &mut dyn Visitor);
-    fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<Box<dyn KyaObject>, KyaError>;
-    fn as_any(&self) -> &dyn Any;
-}
-
-pub struct Module {
-    pub statements: Vec<Box<dyn ASTNode>>,
-}
-
-pub struct Body {
-    pub statements: Vec<Box<dyn ASTNode>>,
-}
-
-pub struct FunctionCall {
-    pub func: Box<dyn ASTNode>,
-    pub arguments: Vec<Box<dyn ASTNode>>,
-}
-
-pub struct Name {
-    pub identifier: Box<dyn ASTNode>,
-}
-
-pub struct Identifier {
-    pub name: String,
-}
-
-pub struct StringLiteral {
-    pub value: String,
-}
-
-impl ASTNode for Module {
-    fn accept(&self, visitor: &mut dyn Visitor) {
-        visitor.visit_module(self);
-    }
-
-    fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<Box<dyn KyaObject>, KyaError> {
-        evaluator.eval_module(self)
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl ASTNode for FunctionCall {
-    fn accept(&self, visitor: &mut dyn Visitor) {
-        visitor.visit_function_call(self);
-    }
-
-    fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<Box<dyn KyaObject>, KyaError> {
-        evaluator.eval_function_call(self)
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl ASTNode for Name {
-    fn accept(&self, visitor: &mut dyn Visitor) {
-        visitor.visit_name(self);
-    }
-
-    fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<Box<dyn KyaObject>, KyaError> {
-        evaluator.eval_name(self)
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl ASTNode for Identifier {
-    fn accept(&self, visitor: &mut dyn Visitor) {
-        visitor.visit_identifier(self);
-    }
-
-    fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<Box<dyn KyaObject>, KyaError> {
-        evaluator.eval_identifier(self)
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl ASTNode for StringLiteral {
-    fn accept(&self, visitor: &mut dyn Visitor) {
-        visitor.visit_string_literal(self);
-    }
-
-    fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<Box<dyn KyaObject>, KyaError> {
-        evaluator.eval_string_literal(self)
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-#[derive(Debug)]
-pub struct ParserError {
-    message: String,
-}
-
-impl ParserError {
-    fn new(message: &str) -> Self {
-        ParserError {
-            message: message.to_string(),
-        }
-    }
-}
-
-impl std::fmt::Display for ParserError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ParserError: {}", self.message)
-    }
-}
-
-impl std::error::Error for ParserError {}
 
 pub struct Parser {
     lexer: Lexer,
@@ -139,102 +16,104 @@ impl Parser {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Box<dyn ASTNode>, ParserError> {
-        self.next_token()?;
-        let mut module = Module { statements: vec![] };
+    pub fn parse(&mut self) -> Result<ast::ASTNode, Error> {
+        self.next_token().unwrap();
 
-        if self.current_token.is_none() {
-            return Ok(Box::new(module));
-        }
+        let mut statements = Vec::new();
 
         while self.current_token.is_some() {
+            self.skip_newlines();
             match self.parse_statement() {
-                Ok(statement) => module.statements.push(statement),
+                Ok(statement) => statements.push(statement),
                 Err(e) => return Err(e),
             }
         }
 
-        Ok(Box::new(module))
+        Ok(ast::ASTNode::Module(ast::Module::new(statements)))
     }
 
-    fn parse_statement(&mut self) -> Result<Box<dyn ASTNode>, ParserError> {
-        self.skip_newlines();
-
+    fn parse_statement(&mut self) -> Result<Box<ast::ASTNode>, Error> {
         let expr = self.parse_expression()?;
 
+        self.expect(TokenType::Newline)?;
         self.skip_newlines();
 
         Ok(expr)
     }
 
-    fn parse_expression(&mut self) -> Result<Box<dyn ASTNode>, ParserError> {
-        if let Some(identifier) = self.accept(TokenType::Identifier).ok() {
-            let name = Name {
-                identifier: Box::new(Identifier {
-                    name: identifier.unwrap().value,
-                }),
-            };
+    fn parse_expression(&mut self) -> Result<Box<ast::ASTNode>, Error> {
+        if let Some(token) = self.accept(TokenType::Identifier) {
+            let identifier = Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                name: token.value.clone(),
+            }));
 
-            if self.accept(TokenType::LeftParen).is_ok() {
-                let mut arguments = vec![];
+            if let Some(_) = self.accept(TokenType::LeftParen) {
+                let mut arguments = Vec::new();
 
-                if let Some(arg) = self.parse_expression().ok() {
-                    arguments.push(arg);
+                if self.accept(TokenType::RightParen).is_none() {
+                    arguments.push(self.parse_expression()?);
+                    self.expect(TokenType::RightParen)?;
                 }
 
-                self.expect(TokenType::RightParen)?;
-
-                return Ok(Box::new(FunctionCall {
-                    func: Box::new(name),
-                    arguments,
-                }));
+                return Ok(Box::new(ast::ASTNode::MethodCall(ast::MethodCall::new(
+                    identifier, arguments,
+                ))));
             }
 
-            return Ok(Box::new(name));
-        } else if let Some(name) = self.accept(TokenType::StringLiteral).ok() {
-            let string_literal = StringLiteral {
-                value: name.unwrap().value,
-            };
-
-            return Ok(Box::new(string_literal));
+            return Ok(identifier);
+        } else if let Some(token) = self.accept(TokenType::StringLiteral) {
+            return Ok(Box::new(ast::ASTNode::StringLiteral(token.value.clone())));
         }
 
-        Err(ParserError::new("Expected expression"))
+        let token = self.peek().unwrap();
+
+        Err(Error::ParserError(format!(
+            "Unexpected token {} at line {}, column {}",
+            token.value, token.line, token.column
+        )))
     }
 
-    fn expect(&mut self, token_type: TokenType) -> Result<Option<Token>, ParserError> {
-        if let Some(token) = &self.current_token {
+    fn peek(&self) -> Option<&Token> {
+        self.current_token.as_ref()
+    }
+
+    fn accept(&mut self, token_type: TokenType) -> Option<Token> {
+        if let Some(ref token) = self.current_token {
             if token.kind == token_type {
-                let current_token = self.current_token.clone();
-                self.next_token()?;
-
-                return Ok(current_token);
+                let token = self.current_token.clone();
+                self.next_token().unwrap();
+                return token;
             }
         }
 
-        Err(ParserError::new("Unexpected symbol"))
+        None
     }
 
-    fn accept(&mut self, token_type: TokenType) -> Result<Option<Token>, ParserError> {
-        if let Some(token) = &self.current_token {
+    fn expect(&mut self, token_type: TokenType) -> Result<Token, Error> {
+        if let Some(ref token) = self.current_token {
             if token.kind == token_type {
-                let current_token = self.current_token.clone();
-                self.next_token()?;
-
-                return Ok(current_token);
+                let token = self.current_token.clone();
+                self.next_token().unwrap();
+                return Ok(token.unwrap());
+            } else {
+                return Err(Error::ParserError(format!(
+                    "Expected token \"{}\" at line {}, column {}",
+                    token.value, token.line, token.column
+                )));
             }
         }
 
-        Err(ParserError::new("Unexpected token"))
+        Err(Error::ParserError(format!("Unexpected token",)))
     }
 
-    fn next_token(&mut self) -> Result<(), ParserError> {
-        self.current_token = self.lexer.next_token().unwrap();
+    fn next_token(&mut self) -> Result<(), Error> {
+        self.current_token = self.lexer.next_token()?;
+
         Ok(())
     }
 
     fn skip_newlines(&mut self) {
-        while self.accept(TokenType::Newline).is_ok() {}
+        while self.accept(TokenType::Newline).is_some() {}
     }
 }
 
@@ -244,85 +123,132 @@ mod tests {
     use crate::lexer::Lexer;
 
     #[test]
-    fn test_parse_program() {
+    fn test_parse_empty_module() {
         let input = "";
         let lexer = Lexer::new(input.to_string());
         let mut parser = Parser::new(lexer);
-        let result = parser.parse();
 
-        assert!(result.is_ok());
-
-        let module_node = result.unwrap();
-        let module = module_node.as_any().downcast_ref::<Module>().unwrap();
-
-        assert_eq!(module.statements.len(), 0);
+        let result = parser.parse().unwrap();
+        assert_eq!(result, ast::ASTNode::Module(ast::Module::new(vec![])));
     }
 
     #[test]
-    fn test_parse_identifier() {
-        let input = "my_function";
+    fn test_parse_single_statement() {
+        let input = "identifier\n";
         let lexer = Lexer::new(input.to_string());
         let mut parser = Parser::new(lexer);
-        let result = parser.parse();
 
-        assert!(result.is_ok());
+        let result = parser.parse().unwrap();
 
-        let module_node = result.unwrap();
-        let module = module_node.as_any().downcast_ref::<Module>().unwrap();
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::Identifier(ast::Identifier {
+                name: "identifier".to_string(),
+            }),
+        )]));
 
-        assert_eq!(module.statements.len(), 1);
-
-        let name_node = module.statements[0]
-            .as_any()
-            .downcast_ref::<Name>()
-            .unwrap();
-        let identifier_node = name_node
-            .identifier
-            .as_any()
-            .downcast_ref::<Identifier>()
-            .unwrap();
-        assert_eq!(identifier_node.name, "my_function");
+        assert_eq!(result, expected);
     }
 
     #[test]
-    fn test_parse_function_call() {
-        let input = "my_function()";
+    fn test_parse_multiple_statements() {
+        let input = "identifier1\nidentifier2\n";
         let lexer = Lexer::new(input.to_string());
         let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![
+            Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                name: "identifier1".to_string(),
+            })),
+            Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                name: "identifier2".to_string(),
+            })),
+        ]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_invalid_token() {
+        let input = "identifier1\n(\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
         let result = parser.parse();
 
-        assert!(result.is_ok());
+        assert!(result.is_err());
+        if let Err(Error::ParserError(msg)) = result {
+            assert!(msg.contains("Unexpected token"));
+        } else {
+            panic!("Expected a ParserError");
+        }
+    }
 
-        let module_node = result.unwrap();
-        let module = module_node.as_any().downcast_ref::<Module>().unwrap();
+    #[test]
+    fn test_parse_identiifer() {
+        let input = "my_function\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
 
-        assert_eq!(module.statements.len(), 1);
+        let result = parser.parse().unwrap();
 
-        let function_call_node = module.statements[0]
-            .as_any()
-            .downcast_ref::<FunctionCall>()
-            .unwrap();
-        assert_eq!(function_call_node.arguments.len(), 0);
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::Identifier(ast::Identifier {
+                name: "my_function".to_string(),
+            }),
+        )]));
+
+        assert_eq!(result, expected);
     }
 
     #[test]
     fn test_parse_string_literal() {
-        let input = "\"Hello, World!\"";
+        let input = "\"my string\"\n";
         let lexer = Lexer::new(input.to_string());
         let mut parser = Parser::new(lexer);
-        let result = parser.parse();
 
-        assert!(result.is_ok());
+        let result = parser.parse().unwrap();
 
-        let module_node = result.unwrap();
-        let module = module_node.as_any().downcast_ref::<Module>().unwrap();
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::StringLiteral("my string".to_string()),
+        )]));
 
-        assert_eq!(module.statements.len(), 1);
+        assert_eq!(result, expected);
+    }
 
-        let string_literal_node = module.statements[0]
-            .as_any()
-            .downcast_ref::<StringLiteral>()
-            .unwrap();
-        assert_eq!(string_literal_node.value, "Hello, World!");
+    #[test]
+    fn test_parse_string_literal_with_single_quotes() {
+        let input = "'my string'\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::StringLiteral("my string".to_string()),
+        )]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_method_call() {
+        let input = "my_function()\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::MethodCall(ast::MethodCall {
+                name: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                    name: "my_function".to_string(),
+                })),
+                arguments: vec![],
+            }),
+        )]));
+
+        assert_eq!(result, expected);
     }
 }

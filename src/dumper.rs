@@ -1,4 +1,4 @@
-use crate::parser;
+use crate::ast;
 use crate::visitor::Visitor;
 
 pub struct ASTDumper {
@@ -32,39 +32,32 @@ impl ASTDumper {
 }
 
 impl Visitor for ASTDumper {
-    fn visit_module(&mut self, module: &parser::Module) {
+    fn visit_module(&mut self, module: &ast::Module) {
         self.concat("Module(");
         self.push_newline();
         for statement in &module.statements {
             statement.accept(self);
         }
-        self.concat(")");
-    }
-
-    fn visit_name(&mut self, name: &parser::Name) {
-        self.push("Name(");
-        name.identifier.accept(self);
         self.push(")");
     }
 
-    fn visit_identifier(&mut self, identifier: &parser::Identifier) {
-        self.push(&format!("Identifier: {}", identifier.name));
+    fn visit_identifier(&mut self, identifier: &ast::Identifier) {
+        self.push(&format!("Identifier({})", identifier.name));
     }
 
-    fn visit_function_call(&mut self, function_call: &parser::FunctionCall) {
-        self.push("FunctionCall(");
-        function_call.func.accept(self);
-        self.push("(");
-        for (i, arg) in function_call.arguments.iter().enumerate() {
+    fn visit_method_call(&mut self, method_call: &ast::MethodCall) {
+        self.push("MethodCall(");
+        self.concat("name: ");
+        method_call.name.accept(self);
+        self.concat("arguments: [");
+        for arg in &method_call.arguments {
             arg.accept(self);
-            if i < function_call.arguments.len() - 1 {
-                self.concat(", ");
-            }
         }
-        self.concat("))");
+        self.push("]");
+        self.push(")");
     }
 
-    fn visit_string_literal(&mut self, string_literal: &parser::StringLiteral) {
-        self.push(&format!("StringLiteral: {}", string_literal.value));
+    fn visit_string_literal(&mut self, string_literal: &str) {
+        self.push(&format!("StringLiteral({})", string_literal));
     }
 }

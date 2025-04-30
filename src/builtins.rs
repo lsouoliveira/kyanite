@@ -1,11 +1,10 @@
-use crate::objects::{Context, KyaError, KyaNone, KyaObject, KyaObjectKind, KyaString};
+use crate::errors::Error;
+use crate::objects::{Context, KyaNone, KyaObject};
+use std::rc::Rc;
 
-pub fn kya_print(
-    context: &Context,
-    args: Vec<Box<dyn KyaObject>>,
-) -> Result<Box<dyn KyaObject>, KyaError> {
+pub fn kya_print(_: &Context, args: Vec<Rc<KyaObject>>) -> Result<Rc<KyaObject>, Error> {
     if args.is_empty() {
-        return Err(KyaError::RuntimeError(
+        return Err(Error::RuntimeError(
             "print() requires at least one argument".to_string(),
         ));
     }
@@ -13,16 +12,16 @@ pub fn kya_print(
     let mut output = String::new();
 
     for arg in args {
-        if let Some(string) = arg.as_any().downcast_ref::<KyaString>() {
-            output.push_str(&string.value);
+        if let KyaObject::String(ref s) = *arg {
+            output.push_str(&s.value);
         } else {
-            return Err(KyaError::RuntimeError(
-                "print() only accepts strings".to_string(),
+            return Err(Error::RuntimeError(
+                "print() only accepts string arguments".to_string(),
             ));
         }
     }
 
     println!("{}", output);
 
-    Ok(Box::new(KyaNone {}))
+    Ok(Rc::new(KyaObject::None(KyaNone {})))
 }
