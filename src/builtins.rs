@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 pub fn kya_print(_: &Context, args: Vec<Rc<KyaObject>>) -> Result<Rc<KyaObject>, Error> {
     if args.is_empty() {
-        return Err(Error::RuntimeError(
+        return Err(Error::TypeError(
             "print() requires at least one argument".to_string(),
         ));
     }

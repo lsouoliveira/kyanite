@@ -4,6 +4,7 @@ pub enum Error {
     ParserError(String),
     UndefinedVariable(String),
     LexerError(LexerError),
+    TypeError(String),
 }
 
 #[derive(Debug, Clone)]
@@ -40,6 +41,7 @@ impl std::fmt::Display for Error {
             Error::UndefinedVariable(var) => write!(f, "Undefined Variable: {}", var),
             Error::ParserError(msg) => write!(f, "Parser Error: {}", msg),
             Error::LexerError(err) => write!(f, "Lexer Error: {}", err),
+            Error::TypeError(msg) => write!(f, "Type Error: {}", msg),
         }
     }
 }
