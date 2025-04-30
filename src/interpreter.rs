@@ -74,10 +74,7 @@ impl Evaluator for Interpreter {
         })))
     }
 
-    fn eval_method_call(
-        &mut self,
-        method_call: &ast::MethodCall,
-    ) -> Result<Rc<KyaObject>, Error> {
+    fn eval_method_call(&mut self, method_call: &ast::MethodCall) -> Result<Rc<KyaObject>, Error> {
         let callee = method_call.name.eval(self)?;
         let args: Vec<Rc<KyaObject>> = method_call
             .arguments
@@ -96,8 +93,15 @@ impl Evaluator for Interpreter {
             )));
         }
 
-        Err(Error::RuntimeError(format!(
-            "Unexpected method call",
-        )))
+        Err(Error::RuntimeError(format!("Unexpected method call",)))
+    }
+
+    fn eval_assignment(&mut self, assignment: &ast::Assignment) -> Result<Rc<KyaObject>, Error> {
+        let value = assignment.value.eval(self)?;
+
+        self.context
+            .register(assignment.name.clone(), value.clone());
+
+        Ok(value)
     }
 }

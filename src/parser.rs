@@ -58,6 +58,12 @@ impl Parser {
                 return Ok(Box::new(ast::ASTNode::MethodCall(ast::MethodCall::new(
                     identifier, arguments,
                 ))));
+            } else if self.accept(TokenType::Equal).is_some() {
+                let value = self.parse_expression()?;
+                return Ok(Box::new(ast::ASTNode::Assignment(ast::Assignment::new(
+                    token.value.clone(),
+                    value,
+                ))));
             }
 
             return Ok(identifier);
@@ -246,6 +252,24 @@ mod tests {
                     name: "my_function".to_string(),
                 })),
                 arguments: vec![],
+            }),
+        )]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_assignment() {
+        let input = "my_variable = \"42\"\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::Assignment(ast::Assignment {
+                name: "my_variable".to_string(),
+                value: Box::new(ast::ASTNode::StringLiteral("42".to_string())),
             }),
         )]));
 

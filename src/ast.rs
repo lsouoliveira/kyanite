@@ -11,6 +11,7 @@ pub enum ASTNode {
     Identifier(Identifier),
     StringLiteral(String),
     MethodCall(MethodCall),
+    Assignment(Assignment),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -41,6 +42,18 @@ impl MethodCall {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct Assignment {
+    pub name: String,
+    pub value: Box<ASTNode>,
+}
+
+impl Assignment {
+    pub fn new(name: String, value: Box<ASTNode>) -> Self {
+        Assignment { name, value }
+    }
+}
+
 impl ASTNode {
     pub fn accept(&self, visitor: &mut dyn Visitor) {
         match self {
@@ -48,6 +61,7 @@ impl ASTNode {
             ASTNode::Identifier(identifier) => visitor.visit_identifier(&identifier),
             ASTNode::StringLiteral(string_literal) => visitor.visit_string_literal(string_literal),
             ASTNode::MethodCall(method_call) => visitor.visit_method_call(&method_call),
+            ASTNode::Assignment(assignment) => visitor.visit_assignment(&assignment),
         }
     }
 
@@ -57,6 +71,7 @@ impl ASTNode {
             ASTNode::Identifier(identifier) => evaluator.eval_identifier(&identifier),
             ASTNode::StringLiteral(string_literal) => evaluator.eval_string_literal(string_literal),
             ASTNode::MethodCall(method_call) => evaluator.eval_method_call(&method_call),
+            ASTNode::Assignment(assignment) => evaluator.eval_assignment(&assignment),
         }
     }
 }

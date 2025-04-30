@@ -60,4 +60,10 @@ impl Visitor for ASTDumper {
     fn visit_string_literal(&mut self, string_literal: &str) {
         self.push(&format!("StringLiteral({})", string_literal));
     }
+
+    fn visit_assignment(&mut self, assignment: &ast::Assignment) {
+        self.push(&format!("Assignment({} = ", assignment.name));
+        assignment.value.accept(self);
+        self.push(")");
+    }
 }
