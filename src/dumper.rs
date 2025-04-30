@@ -66,4 +66,8 @@ impl Visitor for ASTDumper {
         assignment.value.accept(self);
         self.push(")");
     }
+
+    fn visit_number_literal(&mut self, number_literal: &f64) {
+        self.push(&format!("NumberLiteral({})", number_literal));
+    }
 }

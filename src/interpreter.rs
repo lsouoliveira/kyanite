@@ -104,4 +104,8 @@ impl Evaluator for Interpreter {
 
         Ok(value)
     }
+
+    fn eval_number_literal(&mut self, number_literal: &f64) -> Result<Rc<KyaObject>, Error> {
+        Ok(Rc::new(KyaObject::Number(*number_literal)))
+    }
 }

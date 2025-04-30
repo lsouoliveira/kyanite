@@ -10,6 +10,7 @@ pub enum ASTNode {
     // Expressions
     Identifier(Identifier),
     StringLiteral(String),
+    NumberLiteral(f64),
     MethodCall(MethodCall),
     Assignment(Assignment),
 }
@@ -62,6 +63,7 @@ impl ASTNode {
             ASTNode::StringLiteral(string_literal) => visitor.visit_string_literal(string_literal),
             ASTNode::MethodCall(method_call) => visitor.visit_method_call(&method_call),
             ASTNode::Assignment(assignment) => visitor.visit_assignment(&assignment),
+            ASTNode::NumberLiteral(number_literal) => visitor.visit_number_literal(&number_literal),
         }
     }
 
@@ -72,6 +74,9 @@ impl ASTNode {
             ASTNode::StringLiteral(string_literal) => evaluator.eval_string_literal(string_literal),
             ASTNode::MethodCall(method_call) => evaluator.eval_method_call(&method_call),
             ASTNode::Assignment(assignment) => evaluator.eval_assignment(&assignment),
+            ASTNode::NumberLiteral(number_literal) => {
+                evaluator.eval_number_literal(&number_literal)
+            }
         }
     }
 }

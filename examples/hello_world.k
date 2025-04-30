@@ -2,6 +2,6 @@ a = "Hello, world!"
 
 print(a)
 
-print("Hello, world!")
+print(1000)
 print("Hello, world!")
 print("Hello, world!")

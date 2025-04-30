@@ -5,6 +5,7 @@ use std::rc::Rc;
 #[derive(Debug, Clone, PartialEq)]
 pub enum KyaObject {
     String(KyaString),
+    Number(f64),
     RsFunction(KyaRsFunction),
     None(KyaNone),
 }
@@ -15,6 +16,7 @@ impl KyaObject {
             KyaObject::String(s) => s.value.clone(),
             KyaObject::RsFunction(f) => f.name.clone(),
             KyaObject::None(_) => "None".to_string(),
+            KyaObject::Number(n) => n.to_string(),
         }
     }
 }

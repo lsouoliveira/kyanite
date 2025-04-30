@@ -69,6 +69,15 @@ impl Parser {
             return Ok(identifier);
         } else if let Some(token) = self.accept(TokenType::StringLiteral) {
             return Ok(Box::new(ast::ASTNode::StringLiteral(token.value.clone())));
+        } else if let Some(token) = self.accept(TokenType::NumberLiteral) {
+            return Ok(Box::new(ast::ASTNode::NumberLiteral(
+                token.value.parse::<f64>().map_err(|_| {
+                    Error::ParserError(format!(
+                        "Invalid number literal: {} at line {}, column {}",
+                        token.value, token.line, token.column
+                    ))
+                })?,
+            )));
         }
 
         let token = self.peek().unwrap();
@@ -259,7 +268,7 @@ mod tests {
     }
 
     #[test]
-    fn test_assignment() {
+    fn test_parse_assignment() {
         let input = "my_variable = \"42\"\n";
         let lexer = Lexer::new(input.to_string());
         let mut parser = Parser::new(lexer);
@@ -271,6 +280,21 @@ mod tests {
                 name: "my_variable".to_string(),
                 value: Box::new(ast::ASTNode::StringLiteral("42".to_string())),
             }),
+        )]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_number_literal() {
+        let input = "42\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::NumberLiteral(42.0),
         )]));
 
         assert_eq!(result, expected);

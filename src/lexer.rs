@@ -9,6 +9,7 @@ pub enum TokenType {
     LeftParen,
     RightParen,
     Equal,
+    NumberLiteral,
 }
 
 #[derive(Debug, Clone)]
@@ -46,6 +47,10 @@ fn is_identifier_start(c: char) -> bool {
 
 fn is_string_literal(c: char) -> bool {
     c == '"' || c == '\''
+}
+
+fn is_number_literal(c: char) -> bool {
+    c.is_digit(10) || c == '+' || c == '-'
 }
 
 // TODO: Replace with a static map
@@ -90,6 +95,10 @@ impl Lexer {
 
             if is_string_literal(c) {
                 return self.read_string_literal();
+            }
+
+            if is_number_literal(c) {
+                return self.read_number_literal();
             }
 
             if is_identifier_start(c) {
@@ -197,6 +206,43 @@ impl Lexer {
         Ok(Some(Token {
             kind: TokenType::StringLiteral,
             value: content,
+            line: self.line,
+            column: column_start,
+        }))
+    }
+
+    fn read_number_literal(&mut self) -> Result<Option<Token>, Error> {
+        let mut number = String::new();
+        let column_start = self.column;
+        let mut dot_seen = false;
+        let mut number_seen = false;
+
+        while let Some(c) = self.peek() {
+            if c.is_digit(10) {
+                number_seen = true;
+                number.push(c);
+                self.advance();
+            } else if c == '+' || c == '-' && !number_seen {
+                number.push(c);
+                self.advance();
+            } else if c == '.' && !dot_seen {
+                dot_seen = true;
+                number.push(c);
+                self.advance();
+            } else if c == '.' && dot_seen {
+                return Err(Error::LexerError(LexerError::new(
+                    "Invalid number literal".to_string(),
+                    self.line,
+                    column_start,
+                )));
+            } else {
+                break;
+            }
+        }
+
+        Ok(Some(Token {
+            kind: TokenType::NumberLiteral,
+            value: number,
             line: self.line,
             column: column_start,
         }))
@@ -313,5 +359,61 @@ mod tests {
             assert_eq!(token.line, 1);
             assert_eq!(token.column, 1);
         }
+    }
+
+    #[test]
+    fn test_number_literal_unsigned() {
+        let mut lexer = Lexer::new("12345".to_string());
+
+        let token = lexer.next_token().unwrap().unwrap();
+
+        assert_eq!(token.kind, TokenType::NumberLiteral);
+        assert_eq!(token.value, "12345");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 1);
+    }
+
+    #[test]
+    fn test_number_literal_signed() {
+        let mut lexer = Lexer::new("-12345".to_string());
+
+        let token = lexer.next_token().unwrap().unwrap();
+
+        assert_eq!(token.kind, TokenType::NumberLiteral);
+        assert_eq!(token.value, "-12345");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 1);
+    }
+
+    #[test]
+    fn test_number_literal_with_decimal() {
+        let mut lexer = Lexer::new("123.45".to_string());
+
+        let token = lexer.next_token().unwrap().unwrap();
+
+        assert_eq!(token.kind, TokenType::NumberLiteral);
+        assert_eq!(token.value, "123.45");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 1);
+    }
+
+    #[test]
+    fn test_number_literal_with_plus() {
+        let mut lexer = Lexer::new("+12345".to_string());
+
+        let token = lexer.next_token().unwrap().unwrap();
+
+        assert_eq!(token.kind, TokenType::NumberLiteral);
+        assert_eq!(token.value, "+12345");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 1);
+    }
+
+    fn test_number_literal_with_extra_dot() {
+        let mut lexer = Lexer::new("12345.0.".to_string());
+
+        let token = lexer.next_token();
+
+        assert!(token.is_err());
     }
 }
