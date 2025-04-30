@@ -9,6 +9,16 @@ pub enum KyaObject {
     None(KyaNone),
 }
 
+impl KyaObject {
+    pub fn repr(&self) -> String {
+        match self {
+            KyaObject::String(s) => s.value.clone(),
+            KyaObject::RsFunction(f) => f.name.clone(),
+            KyaObject::None(_) => "None".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct KyaNone;
 
@@ -93,19 +103,17 @@ mod tests {
 
     #[test]
     fn test_kya_rs_function() {
-        let function = KyaRsFunction::new(
-            String::from("test_function"),
-            |_, _| Ok(Rc::new(KyaObject::None(KyaNone))),
-        );
+        let function = KyaRsFunction::new(String::from("test_function"), |_, _| {
+            Ok(Rc::new(KyaObject::None(KyaNone)))
+        });
         assert_eq!(function.name, "test_function");
     }
 
     #[test]
     fn test_kya_rs_function_call() {
-        let function = KyaRsFunction::new(
-            String::from("test_function"),
-            |_, _| Ok(Rc::new(KyaObject::None(KyaNone))),
-        );
+        let function = KyaRsFunction::new(String::from("test_function"), |_, _| {
+            Ok(Rc::new(KyaObject::None(KyaNone)))
+        });
         let result = function.call(&Context::new(None), vec![]);
         assert!(result.is_ok());
     }

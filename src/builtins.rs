@@ -12,13 +12,7 @@ pub fn kya_print(_: &Context, args: Vec<Rc<KyaObject>>) -> Result<Rc<KyaObject>,
     let mut output = String::new();
 
     for arg in args {
-        if let KyaObject::String(ref s) = *arg {
-            output.push_str(&s.value);
-        } else {
-            return Err(Error::RuntimeError(
-                "print() only accepts string arguments".to_string(),
-            ));
-        }
+        output.push_str(arg.repr().as_str());
     }
 
     println!("{}", output);
