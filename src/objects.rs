@@ -1,3 +1,4 @@
+use crate::ast::ASTNode;
 use crate::errors::Error;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -7,6 +8,8 @@ pub enum KyaObject {
     String(KyaString),
     Number(f64),
     RsFunction(KyaRsFunction),
+    Function(KyaFunction),
+    FunctionFrame(KyaFunctionFrame),
     None(KyaNone),
 }
 
@@ -17,6 +20,8 @@ impl KyaObject {
             KyaObject::RsFunction(f) => f.name.clone(),
             KyaObject::None(_) => "None".to_string(),
             KyaObject::Number(n) => n.to_string(),
+            KyaObject::Function(f) => format!("Function({:?})", f.name),
+            KyaObject::FunctionFrame(f) => format!("FunctionFrame({:?})", f.function),
         }
     }
 }
@@ -47,6 +52,29 @@ impl KyaRsFunction {
         args: Vec<Rc<KyaObject>>,
     ) -> Result<Rc<KyaObject>, Error> {
         (self.function)(context, args)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct KyaFunction {
+    pub name: String,
+    pub body: Vec<Box<ASTNode>>,
+}
+
+impl KyaFunction {
+    pub fn new(name: String, body: Vec<Box<ASTNode>>) -> Self {
+        KyaFunction { name, body }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct KyaFunctionFrame {
+    pub function: KyaFunction,
+}
+
+impl KyaFunctionFrame {
+    pub fn new(function: KyaFunction) -> Self {
+        KyaFunctionFrame { function }
     }
 }
 
@@ -118,5 +146,18 @@ mod tests {
         });
         let result = function.call(&Context::new(None), vec![]);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_kya_function() {
+        let kya_function = KyaFunction::new(String::from("test_function"), vec![]);
+        assert_eq!(kya_function.name, "test_function");
+    }
+
+    #[test]
+    fn test_kya_function_frame() {
+        let kya_function = KyaFunction::new(String::from("test_function"), vec![]);
+        let kya_function_frame = KyaFunctionFrame::new(kya_function.clone());
+        assert_eq!(kya_function_frame.function.name, kya_function.name);
     }
 }

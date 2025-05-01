@@ -13,6 +13,7 @@ pub enum ASTNode {
     NumberLiteral(f64),
     MethodCall(MethodCall),
     Assignment(Assignment),
+    MethodDef(MethodDef),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -55,6 +56,18 @@ impl Assignment {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct MethodDef {
+    pub name: String,
+    pub body: Vec<Box<ASTNode>>,
+}
+
+impl MethodDef {
+    pub fn new(name: String, body: Vec<Box<ASTNode>>) -> Self {
+        MethodDef { name, body }
+    }
+}
+
 impl ASTNode {
     pub fn accept(&self, visitor: &mut dyn Visitor) {
         match self {
@@ -64,6 +77,7 @@ impl ASTNode {
             ASTNode::MethodCall(method_call) => visitor.visit_method_call(&method_call),
             ASTNode::Assignment(assignment) => visitor.visit_assignment(&assignment),
             ASTNode::NumberLiteral(number_literal) => visitor.visit_number_literal(&number_literal),
+            ASTNode::MethodDef(method_def) => visitor.visit_method_def(&method_def),
         }
     }
 
@@ -77,6 +91,7 @@ impl ASTNode {
             ASTNode::NumberLiteral(number_literal) => {
                 evaluator.eval_number_literal(&number_literal)
             }
+            ASTNode::MethodDef(method_def) => evaluator.eval_method_def(&method_def),
         }
     }
 }

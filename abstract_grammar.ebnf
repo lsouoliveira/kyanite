@@ -13,7 +13,9 @@ expression = literal
            | binary_expr
            | unary_expr ;
 
-compound_stmt = ...
+compound_stmt = function_def
+
+function_def = "def" identifier "(" ")" NEWLINE block NEWLINE "end"
 
 literal = ...
 

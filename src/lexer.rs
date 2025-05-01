@@ -10,9 +10,11 @@ pub enum TokenType {
     RightParen,
     Equal,
     NumberLiteral,
+    Def,
+    End,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub kind: TokenType,
     pub value: String,
@@ -53,14 +55,21 @@ fn is_number_literal(c: char) -> bool {
     c.is_digit(10) || c == '+' || c == '-'
 }
 
+fn is_keyword(identifier: &str) -> bool {
+    symbols().contains_key(identifier)
+}
+
 // TODO: Replace with a static map
 fn symbols() -> HashMap<String, TokenType> {
     let mut symbols = HashMap::new();
     symbols.insert("(".to_string(), TokenType::LeftParen);
     symbols.insert(")".to_string(), TokenType::RightParen);
     symbols.insert("=".to_string(), TokenType::Equal);
+    symbols.insert("def".to_string(), TokenType::Def);
+    symbols.insert("end".to_string(), TokenType::End);
     symbols
 }
+
 fn is_symbol(c: char) -> bool {
     symbols().contains_key(&c.to_string())
 }
@@ -162,6 +171,20 @@ impl Lexer {
         while let Some(c) = self.peek() {
             if is_identifier(c) {
                 identifier.push(c);
+
+                if is_keyword(&identifier) {
+                    self.advance();
+
+                    let kind = self.symbols.get(&identifier).unwrap().clone();
+
+                    return Token {
+                        kind,
+                        value: identifier,
+                        line: self.line,
+                        column: column_start,
+                    };
+                }
+
                 self.advance();
             } else {
                 break;
@@ -415,5 +438,34 @@ mod tests {
         let token = lexer.next_token();
 
         assert!(token.is_err());
+    }
+
+    fn test_def_keyword() {
+        let mut lexer = Lexer::new("def my_method\nend\n".to_string());
+        let tokens = [
+            lexer.next_token().unwrap().unwrap(),
+            lexer.next_token().unwrap().unwrap(),
+        ];
+
+        assert_eq!(tokens[0].kind, TokenType::Def);
+        assert_eq!(tokens[0].value, "def");
+        assert_eq!(tokens[0].line, 1);
+        assert_eq!(tokens[0].column, 1);
+
+        assert_eq!(tokens[1].kind, TokenType::Identifier);
+        assert_eq!(tokens[1].value, "my_method");
+        assert_eq!(tokens[1].line, 1);
+        assert_eq!(tokens[1].column, 5);
+    }
+
+    fn test_end_keyword() {
+        let mut lexer = Lexer::new("end".to_string());
+
+        let token = lexer.next_token().unwrap().unwrap();
+
+        assert_eq!(token.kind, TokenType::End);
+        assert_eq!(token.value, "end");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 1);
     }
 }

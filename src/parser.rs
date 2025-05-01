@@ -22,7 +22,6 @@ impl Parser {
         let mut statements = Vec::new();
 
         while self.current_token.is_some() {
-            self.skip_newlines();
             match self.parse_statement() {
                 Ok(statement) => statements.push(statement),
                 Err(e) => return Err(e),
@@ -33,12 +32,50 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Result<Box<ast::ASTNode>, Error> {
-        let expr = self.parse_expression()?;
+        self.skip_newlines();
+
+        let stmt = if self.accept(TokenType::Def).is_some() {
+            self.parse_method_def()?
+        } else {
+            self.parse_expression()?
+        };
+
+        if self.peek().is_none() {
+            return Ok(stmt);
+        }
 
         self.expect(TokenType::Newline)?;
         self.skip_newlines();
 
-        Ok(expr)
+        Ok(stmt)
+    }
+
+    fn parse_method_def(&mut self) -> Result<Box<ast::ASTNode>, Error> {
+        let mut body = Vec::new();
+        let identifier = self.expect(TokenType::Identifier)?;
+
+        if let Some(_) = self.accept(TokenType::LeftParen) {
+            self.expect(TokenType::RightParen)?;
+        }
+
+        self.expect(TokenType::Newline)?;
+
+        while self.peek().is_some() {
+            if let Some(_) = self.accept(TokenType::End) {
+                break;
+            }
+
+            match self.parse_statement() {
+                Ok(statement) => {
+                    body.push(statement);
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
+        let method_def = ast::MethodDef::new(identifier.value.clone(), body);
+
+        Ok(Box::new(ast::ASTNode::MethodDef(method_def)))
     }
 
     fn parse_expression(&mut self) -> Result<Box<ast::ASTNode>, Error> {
@@ -295,6 +332,63 @@ mod tests {
 
         let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
             ast::ASTNode::NumberLiteral(42.0),
+        )]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_method_def_without_parens() {
+        let input = "def my_method\nend\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::MethodDef(ast::MethodDef {
+                name: "my_method".to_string(),
+                body: vec![],
+            }),
+        )]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_method_def_with_parens() {
+        let input = "def my_method()\nend\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::MethodDef(ast::MethodDef {
+                name: "my_method".to_string(),
+                body: vec![],
+            }),
+        )]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_method_def_with_body() {
+        let input = "def my_method\nmy_variable = \"42\"\nend\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::MethodDef(ast::MethodDef {
+                name: "my_method".to_string(),
+                body: vec![Box::new(ast::ASTNode::Assignment(ast::Assignment {
+                    name: "my_variable".to_string(),
+                    value: Box::new(ast::ASTNode::StringLiteral("42".to_string())),
+                }))],
+            }),
         )]));
 
         assert_eq!(result, expected);

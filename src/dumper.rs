@@ -70,4 +70,13 @@ impl Visitor for ASTDumper {
     fn visit_number_literal(&mut self, number_literal: &f64) {
         self.push(&format!("NumberLiteral({})", number_literal));
     }
+
+    fn visit_method_def(&mut self, method_def: &ast::MethodDef) {
+        self.push(&format!("MethodDef({})", method_def.name));
+        self.concat("body: [");
+        for statement in &method_def.body {
+            statement.accept(self);
+        }
+        self.push("]");
+    }
 }
