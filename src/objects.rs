@@ -58,35 +58,43 @@ impl KyaRsFunction {
 #[derive(Debug, Clone, PartialEq)]
 pub struct KyaFunction {
     pub name: String,
+    pub parameters: Vec<String>,
     pub body: Vec<Box<ASTNode>>,
 }
 
 impl KyaFunction {
-    pub fn new(name: String, body: Vec<Box<ASTNode>>) -> Self {
-        KyaFunction { name, body }
+    pub fn new(name: String, parameters: Vec<String>, body: Vec<Box<ASTNode>>) -> Self {
+        KyaFunction {
+            name,
+            parameters,
+            body,
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct KyaFunctionFrame {
     pub function: KyaFunction,
+    pub locals: Context,
 }
 
 impl KyaFunctionFrame {
     pub fn new(function: KyaFunction) -> Self {
-        KyaFunctionFrame { function }
+        KyaFunctionFrame {
+            function,
+            locals: Context::new(),
+        }
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Context {
-    pub parent: Option<Box<Context>>,
     pub objects: HashMap<String, Rc<KyaObject>>,
 }
 
 impl Context {
-    pub fn new(parent: Option<Box<Context>>) -> Self {
+    pub fn new() -> Self {
         Context {
-            parent,
             objects: HashMap::new(),
         }
     }
@@ -94,8 +102,6 @@ impl Context {
     pub fn get(&self, name: &str) -> Option<Rc<KyaObject>> {
         if let Some(object) = self.objects.get(name) {
             Some(object.clone())
-        } else if let Some(ref parent) = self.parent {
-            parent.get(name)
         } else {
             None
         }
@@ -112,15 +118,8 @@ mod tests {
 
     #[test]
     fn test_context() {
-        let context = Context::new(None);
+        let context = Context::new();
         assert_eq!(context.objects.len(), 0);
-    }
-
-    #[test]
-    fn test_context_with_parent() {
-        let parent_context = Context::new(None);
-        let child_context = Context::new(Some(Box::new(parent_context)));
-        assert_eq!(child_context.objects.len(), 0);
     }
 
     #[test]
@@ -144,19 +143,19 @@ mod tests {
         let function = KyaRsFunction::new(String::from("test_function"), |_, _| {
             Ok(Rc::new(KyaObject::None(KyaNone)))
         });
-        let result = function.call(&Context::new(None), vec![]);
+        let result = function.call(&Context::new(), vec![]);
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_kya_function() {
-        let kya_function = KyaFunction::new(String::from("test_function"), vec![]);
+        let kya_function = KyaFunction::new(String::from("test_function"), vec![], vec![]);
         assert_eq!(kya_function.name, "test_function");
     }
 
     #[test]
     fn test_kya_function_frame() {
-        let kya_function = KyaFunction::new(String::from("test_function"), vec![]);
+        let kya_function = KyaFunction::new(String::from("test_function"), vec![], vec![]);
         let kya_function_frame = KyaFunctionFrame::new(kya_function.clone());
         assert_eq!(kya_function_frame.function.name, kya_function.name);
     }

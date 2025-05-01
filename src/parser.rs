@@ -51,10 +51,12 @@ impl Parser {
     }
 
     fn parse_method_def(&mut self) -> Result<Box<ast::ASTNode>, Error> {
+        let mut parameters = Vec::new();
         let mut body = Vec::new();
         let identifier = self.expect(TokenType::Identifier)?;
 
         if let Some(_) = self.accept(TokenType::LeftParen) {
+            parameters = self.parse_parameters()?;
             self.expect(TokenType::RightParen)?;
         }
 
@@ -73,9 +75,25 @@ impl Parser {
             }
         }
 
-        let method_def = ast::MethodDef::new(identifier.value.clone(), body);
+        let method_def = ast::MethodDef::new(identifier.value.clone(), parameters, body);
 
         Ok(Box::new(ast::ASTNode::MethodDef(method_def)))
+    }
+
+    fn parse_parameters(&mut self) -> Result<Vec<Box<ast::ASTNode>>, Error> {
+        let mut parameters = Vec::new();
+
+        while let Some(token) = self.accept(TokenType::Identifier) {
+            parameters.push(Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                name: token.value.clone(),
+            })));
+
+            if self.accept(TokenType::Comma).is_none() {
+                break;
+            }
+        }
+
+        Ok(parameters)
     }
 
     fn parse_expression(&mut self) -> Result<Box<ast::ASTNode>, Error> {
@@ -348,6 +366,7 @@ mod tests {
         let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
             ast::ASTNode::MethodDef(ast::MethodDef {
                 name: "my_method".to_string(),
+                parameters: vec![],
                 body: vec![],
             }),
         )]));
@@ -366,6 +385,7 @@ mod tests {
         let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
             ast::ASTNode::MethodDef(ast::MethodDef {
                 name: "my_method".to_string(),
+                parameters: vec![],
                 body: vec![],
             }),
         )]));
@@ -384,10 +404,37 @@ mod tests {
         let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
             ast::ASTNode::MethodDef(ast::MethodDef {
                 name: "my_method".to_string(),
+                parameters: vec![],
                 body: vec![Box::new(ast::ASTNode::Assignment(ast::Assignment {
                     name: "my_variable".to_string(),
                     value: Box::new(ast::ASTNode::StringLiteral("42".to_string())),
                 }))],
+            }),
+        )]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_method_def_with_parameters() {
+        let input = "def my_method(param1, param2)\nend\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::MethodDef(ast::MethodDef {
+                name: "my_method".to_string(),
+                parameters: vec![
+                    Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                        name: "param1".to_string(),
+                    })),
+                    Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                        name: "param2".to_string(),
+                    })),
+                ],
+                body: vec![],
             }),
         )]));
 

@@ -5,8 +5,9 @@ print(a)
 print("Hello, world!")
 print("Hello, world!")
 
-def test()
-    print("Called from test function")
+def print2(text)
+    print(text)
+    print(text)
 end
 
-test()
+print2("Hello, world!")

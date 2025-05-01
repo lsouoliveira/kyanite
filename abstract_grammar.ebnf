@@ -15,7 +15,12 @@ expression = literal
 
 compound_stmt = function_def
 
-function_def = "def" identifier "(" ")" NEWLINE block NEWLINE "end"
+function_def = "def" identifier "(" { params } ")" NEWLINE block NEWLINE "end"
+
+params = { parameter }
+parameter = param ","
+          | param
+param = identifier
 
 literal = ...
 

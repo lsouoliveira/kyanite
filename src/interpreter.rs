@@ -27,7 +27,7 @@ fn setup_builtins(context: &mut Context) {
 
 impl Interpreter {
     pub fn new(input: String) -> Self {
-        let mut context = Context::new(None);
+        let mut context = Context::new();
 
         setup_builtins(&mut context);
 
@@ -53,6 +53,20 @@ impl Interpreter {
 
         Ok(())
     }
+
+    fn resolve(&self, name: &str) -> Option<Rc<KyaObject>> {
+        if let Some(object) = self.context.get(name) {
+            return Some(object.clone());
+        }
+
+        if let Some(frame) = self.function_frames.last() {
+            if let Some(object) = frame.locals.get(name) {
+                return Some(object.clone());
+            }
+        }
+
+        None
+    }
 }
 
 impl Evaluator for Interpreter {
@@ -65,7 +79,7 @@ impl Evaluator for Interpreter {
     }
 
     fn eval_identifier(&mut self, identifier: &ast::Identifier) -> Result<Rc<KyaObject>, Error> {
-        if let Some(object) = self.context.get(&identifier.name) {
+        if let Some(object) = self.resolve(&identifier.name) {
             Ok(object.clone())
         } else {
             Err(Error::RuntimeError(format!(
@@ -92,9 +106,23 @@ impl Evaluator for Interpreter {
         if let KyaObject::RsFunction(func) = callee.as_ref() {
             return func.call(&self.context, args);
         } else if let KyaObject::Function(func) = callee.as_ref() {
-            let frame = Rc::new(KyaFunctionFrame::new(func.clone()));
+            let mut frame = KyaFunctionFrame::new(func.clone());
 
-            self.function_frames.push(frame.clone());
+            if func.parameters.len() != args.len() {
+                return Err(Error::RuntimeError(format!(
+                    "{}() takes {} arguments but {} were given",
+                    func.name,
+                    func.parameters.len(),
+                    args.len()
+                )));
+            }
+
+            for (i, param) in func.parameters.iter().enumerate() {
+                let arg = args[i].clone();
+                frame.locals.register(param.clone(), arg);
+            }
+
+            self.function_frames.push(Rc::new(frame.clone()));
 
             let mut result = Rc::new(KyaObject::None(KyaNone {}));
 
@@ -138,8 +166,22 @@ impl Evaluator for Interpreter {
     }
 
     fn eval_method_def(&mut self, method_def: &ast::MethodDef) -> Result<Rc<KyaObject>, Error> {
+        let mut parameters = vec![];
+
+        for param in &method_def.parameters {
+            if let ast::ASTNode::Identifier(identifier) = &**param {
+                parameters.push(identifier.name.clone());
+            } else {
+                return Err(Error::RuntimeError(format!(
+                    "Invalid parameter: {:?}",
+                    param
+                )));
+            }
+        }
+
         let function = Rc::new(KyaObject::Function(KyaFunction::new(
             method_def.name.clone(),
+            parameters,
             method_def.body.clone(),
         )));
 

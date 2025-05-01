@@ -12,6 +12,7 @@ pub enum TokenType {
     NumberLiteral,
     Def,
     End,
+    Comma
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -67,6 +68,7 @@ fn symbols() -> HashMap<String, TokenType> {
     symbols.insert("=".to_string(), TokenType::Equal);
     symbols.insert("def".to_string(), TokenType::Def);
     symbols.insert("end".to_string(), TokenType::End);
+    symbols.insert(",".to_string(), TokenType::Comma);
     symbols
 }
 
@@ -465,6 +467,17 @@ mod tests {
 
         assert_eq!(token.kind, TokenType::End);
         assert_eq!(token.value, "end");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 1);
+    }
+
+    fn test_comma() {
+        let mut lexer = Lexer::new(",".to_string());
+
+        let token = lexer.next_token().unwrap().unwrap();
+
+        assert_eq!(token.kind, TokenType::Comma);
+        assert_eq!(token.value, ",");
         assert_eq!(token.line, 1);
         assert_eq!(token.column, 1);
     }

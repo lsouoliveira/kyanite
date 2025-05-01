@@ -31,7 +31,13 @@ fn dump(input: &str) {
 
 fn interpret(input: &str) -> Result<(), String> {
     let mut interpreter = Interpreter::new(input.to_string());
-    interpreter.evaluate().unwrap();
+
+    match interpreter.evaluate() {
+        Ok(_) => {}
+        Err(e) => {
+            eprintln!("{}", e);
+        }
+    }
 
     Ok(())
 }

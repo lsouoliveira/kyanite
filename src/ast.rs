@@ -59,12 +59,17 @@ impl Assignment {
 #[derive(Debug, PartialEq, Clone)]
 pub struct MethodDef {
     pub name: String,
+    pub parameters: Vec<Box<ASTNode>>,
     pub body: Vec<Box<ASTNode>>,
 }
 
 impl MethodDef {
-    pub fn new(name: String, body: Vec<Box<ASTNode>>) -> Self {
-        MethodDef { name, body }
+    pub fn new(name: String, parameters: Vec<Box<ASTNode>>, body: Vec<Box<ASTNode>>) -> Self {
+        MethodDef {
+            name,
+            parameters,
+            body,
+        }
     }
 }
 
