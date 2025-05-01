@@ -1,4 +1,4 @@
-use crate::ast::{Assignment, Identifier, MethodCall, MethodDef, Module};
+use crate::ast::{Assignment, ClassDef, Identifier, MethodCall, MethodDef, Module, Attribute};
 use crate::errors::Error;
 use crate::objects;
 use std::rc::Rc;
@@ -11,6 +11,8 @@ pub trait Visitor {
     fn visit_assignment(&mut self, assignment: &Assignment);
     fn visit_number_literal(&mut self, number_literal: &f64);
     fn visit_method_def(&mut self, method_def: &MethodDef);
+    fn visit_class_def(&mut self, class_def: &ClassDef);
+    fn visit_attribute(&mut self, attribute: &Attribute);
 }
 
 pub trait Evaluator {
@@ -32,4 +34,6 @@ pub trait Evaluator {
         number_literal: &f64,
     ) -> Result<Rc<objects::KyaObject>, Error>;
     fn eval_method_def(&mut self, method_def: &MethodDef) -> Result<Rc<objects::KyaObject>, Error>;
+    fn eval_class_def(&mut self, class_def: &ClassDef) -> Result<Rc<objects::KyaObject>, Error>;
+    fn eval_attribute(&mut self, attribute: &Attribute) -> Result<Rc<objects::KyaObject>, Error>;
 }

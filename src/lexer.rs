@@ -12,7 +12,9 @@ pub enum TokenType {
     NumberLiteral,
     Def,
     End,
-    Comma
+    Comma,
+    Class,
+    Dot
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -69,6 +71,8 @@ fn symbols() -> HashMap<String, TokenType> {
     symbols.insert("def".to_string(), TokenType::Def);
     symbols.insert("end".to_string(), TokenType::End);
     symbols.insert(",".to_string(), TokenType::Comma);
+    symbols.insert("class".to_string(), TokenType::Class);
+    symbols.insert(".".to_string(), TokenType::Dot);
     symbols
 }
 
@@ -478,6 +482,35 @@ mod tests {
 
         assert_eq!(token.kind, TokenType::Comma);
         assert_eq!(token.value, ",");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 1);
+    }
+
+    fn test_class_keyword() {
+        let mut lexer = Lexer::new("class MyClass\nend\n".to_string());
+        let tokens = [
+            lexer.next_token().unwrap().unwrap(),
+            lexer.next_token().unwrap().unwrap(),
+        ];
+
+        assert_eq!(tokens[0].kind, TokenType::Class);
+        assert_eq!(tokens[0].value, "class");
+        assert_eq!(tokens[0].line, 1);
+        assert_eq!(tokens[0].column, 1);
+
+        assert_eq!(tokens[1].kind, TokenType::Identifier);
+        assert_eq!(tokens[1].value, "MyClass");
+        assert_eq!(tokens[1].line, 1);
+        assert_eq!(tokens[1].column, 7);
+    }
+
+    fn test_dot() {
+        let mut lexer = Lexer::new(".".to_string());
+
+        let token = lexer.next_token().unwrap().unwrap();
+
+        assert_eq!(token.kind, TokenType::Dot);
+        assert_eq!(token.value, ".");
         assert_eq!(token.line, 1);
         assert_eq!(token.column, 1);
     }

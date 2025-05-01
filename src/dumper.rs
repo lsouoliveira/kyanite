@@ -62,7 +62,9 @@ impl Visitor for ASTDumper {
     }
 
     fn visit_assignment(&mut self, assignment: &ast::Assignment) {
-        self.push(&format!("Assignment({} = ", assignment.name));
+        self.push("Assignment(");
+        self.concat("name: ");
+        assignment.name.accept(self);
         assignment.value.accept(self);
         self.push(")");
     }
@@ -78,5 +80,23 @@ impl Visitor for ASTDumper {
             statement.accept(self);
         }
         self.push("]");
+    }
+
+    fn visit_class_def(&mut self, class_def: &ast::ClassDef) {
+        self.push(&format!("ClassDef({})", class_def.name));
+        self.concat("body: [");
+        for statement in &class_def.body {
+            statement.accept(self);
+        }
+        self.push("]");
+    }
+
+    fn visit_attribute(&mut self, attribute: &ast::Attribute) {
+        self.push("Attribute(");
+        self.concat("name: ");
+        attribute.name.accept(self);
+        self.concat("value: ");
+        self.push(&format!("\"{}\"", attribute.value));
+        self.push(")");
     }
 }

@@ -6,16 +6,26 @@ statement = simple_stmt newline
 
 simple_stmt = expression ;
 
-expression = literal
-           | variable
+expression = variable
            | assignment
            | method_call
            | binary_expr
            | unary_expr ;
 
 compound_stmt = function_def
+              | class_def ;
 
-function_def = "def" identifier "(" { params } ")" NEWLINE block NEWLINE "end"
+function_def = "def" identifier "(" { params } ")" NEWLINE block "end" ;
+
+class_def = "class" identifier NEWLINE block "end" ;
+
+method_call = primary "(" params "}" ;
+
+variable = primary ;
+primary = primary "." identifier
+        | atom ;
+
+atom = identifier
 
 params = { parameter }
 parameter = param ","

@@ -19,3 +19,11 @@ pub fn kya_print(_: &Context, args: Vec<Rc<KyaObject>>) -> Result<Rc<KyaObject>,
 
     Ok(Rc::new(KyaObject::None(KyaNone {})))
 }
+
+pub fn kya_globals(context: &Context, _: Vec<Rc<KyaObject>>) -> Result<Rc<KyaObject>, Error> {
+    for name in context.keys() {
+        println!("{}", name);
+    }
+
+    Ok(Rc::new(KyaObject::None(KyaNone {})))
+}

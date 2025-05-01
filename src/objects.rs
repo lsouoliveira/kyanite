@@ -1,5 +1,6 @@
 use crate::ast::ASTNode;
 use crate::errors::Error;
+use crate::interpreter::Interpreter;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -9,8 +10,10 @@ pub enum KyaObject {
     Number(f64),
     RsFunction(KyaRsFunction),
     Function(KyaFunction),
-    FunctionFrame(KyaFunctionFrame),
+    Frame(KyaFrame),
+    Class(KyaClass),
     None(KyaNone),
+    InstanceObject(KyaInstanceObject),
 }
 
 impl KyaObject {
@@ -21,7 +24,9 @@ impl KyaObject {
             KyaObject::None(_) => "None".to_string(),
             KyaObject::Number(n) => n.to_string(),
             KyaObject::Function(f) => format!("Function({:?})", f.name),
-            KyaObject::FunctionFrame(f) => format!("FunctionFrame({:?})", f.function),
+            KyaObject::Frame(f) => format!("Frame({:?})", f.locals),
+            KyaObject::Class(c) => format!("Class({:?})", c.name),
+            KyaObject::InstanceObject(i) => format!("InstanceObject({:?})", i.attributes),
         }
     }
 }
@@ -73,16 +78,45 @@ impl KyaFunction {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct KyaFunctionFrame {
-    pub function: KyaFunction,
+pub struct KyaFrame {
     pub locals: Context,
 }
 
-impl KyaFunctionFrame {
-    pub fn new(function: KyaFunction) -> Self {
-        KyaFunctionFrame {
-            function,
+impl KyaFrame {
+    pub fn new() -> Self {
+        KyaFrame {
             locals: Context::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct KyaClass {
+    pub name: String,
+    pub body: Vec<Box<ASTNode>>,
+}
+
+impl KyaClass {
+    pub fn new(name: String, body: Vec<Box<ASTNode>>) -> Self {
+        KyaClass { name, body }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct KyaInstanceObject {
+    pub attributes: Context,
+}
+
+impl KyaInstanceObject {
+    pub fn new(attributes: Context) -> Self {
+        KyaInstanceObject { attributes }
+    }
+
+    pub fn get_attribute(&self, name: &str) -> Option<Rc<KyaObject>> {
+        if let Some(object) = self.attributes.get(name) {
+            Some(object.clone())
+        } else {
+            None
         }
     }
 }
@@ -109,6 +143,10 @@ impl Context {
 
     pub fn register(&mut self, name: String, object: Rc<KyaObject>) {
         self.objects.insert(name, object);
+    }
+
+    pub fn keys(&self) -> Vec<String> {
+        self.objects.keys().cloned().collect()
     }
 }
 
@@ -154,9 +192,8 @@ mod tests {
     }
 
     #[test]
-    fn test_kya_function_frame() {
-        let kya_function = KyaFunction::new(String::from("test_function"), vec![], vec![]);
-        let kya_function_frame = KyaFunctionFrame::new(kya_function.clone());
-        assert_eq!(kya_function_frame.function.name, kya_function.name);
+    fn test_kya_frame() {
+        let kya_frame = KyaFrame::new();
+        assert_eq!(kya_frame.locals.objects.len(), 0);
     }
 }

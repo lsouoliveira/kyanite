@@ -14,6 +14,8 @@ pub enum ASTNode {
     MethodCall(MethodCall),
     Assignment(Assignment),
     MethodDef(MethodDef),
+    ClassDef(ClassDef),
+    Attribute(Attribute),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -46,12 +48,12 @@ impl MethodCall {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Assignment {
-    pub name: String,
+    pub name: Box<ASTNode>,
     pub value: Box<ASTNode>,
 }
 
 impl Assignment {
-    pub fn new(name: String, value: Box<ASTNode>) -> Self {
+    pub fn new(name: Box<ASTNode>, value: Box<ASTNode>) -> Self {
         Assignment { name, value }
     }
 }
@@ -73,6 +75,30 @@ impl MethodDef {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct ClassDef {
+    pub name: String,
+    pub body: Vec<Box<ASTNode>>,
+}
+
+impl ClassDef {
+    pub fn new(name: String, body: Vec<Box<ASTNode>>) -> Self {
+        ClassDef { name, body }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Attribute {
+    pub name: Box<ASTNode>,
+    pub value: String,
+}
+
+impl Attribute {
+    pub fn new(name: Box<ASTNode>, value: String) -> Self {
+        Attribute { name, value }
+    }
+}
+
 impl ASTNode {
     pub fn accept(&self, visitor: &mut dyn Visitor) {
         match self {
@@ -83,6 +109,8 @@ impl ASTNode {
             ASTNode::Assignment(assignment) => visitor.visit_assignment(&assignment),
             ASTNode::NumberLiteral(number_literal) => visitor.visit_number_literal(&number_literal),
             ASTNode::MethodDef(method_def) => visitor.visit_method_def(&method_def),
+            ASTNode::ClassDef(class_def) => visitor.visit_class_def(&class_def),
+            ASTNode::Attribute(attribute) => visitor.visit_attribute(&attribute),
         }
     }
 
@@ -97,6 +125,8 @@ impl ASTNode {
                 evaluator.eval_number_literal(&number_literal)
             }
             ASTNode::MethodDef(method_def) => evaluator.eval_method_def(&method_def),
+            ASTNode::ClassDef(class_def) => evaluator.eval_class_def(&class_def),
+            ASTNode::Attribute(attribute) => evaluator.eval_attribute(&attribute),
         }
     }
 }

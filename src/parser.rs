@@ -36,6 +36,8 @@ impl Parser {
 
         let stmt = if self.accept(TokenType::Def).is_some() {
             self.parse_method_def()?
+        } else if self.accept(TokenType::Class).is_some() {
+            self.parse_class_def()?
         } else {
             self.parse_expression()?
         };
@@ -48,6 +50,30 @@ impl Parser {
         self.skip_newlines();
 
         Ok(stmt)
+    }
+
+    fn parse_class_def(&mut self) -> Result<Box<ast::ASTNode>, Error> {
+        let identifier = self.expect(TokenType::Identifier)?;
+        self.expect(TokenType::Newline)?;
+
+        let mut body = Vec::new();
+
+        while self.peek().is_some() {
+            if let Some(_) = self.accept(TokenType::End) {
+                break;
+            }
+
+            match self.parse_statement() {
+                Ok(statement) => {
+                    body.push(statement);
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
+        let class_def = ast::ClassDef::new(identifier.value.clone(), body);
+
+        Ok(Box::new(ast::ASTNode::ClassDef(class_def)))
     }
 
     fn parse_method_def(&mut self) -> Result<Box<ast::ASTNode>, Error> {
@@ -97,34 +123,56 @@ impl Parser {
     }
 
     fn parse_expression(&mut self) -> Result<Box<ast::ASTNode>, Error> {
-        if let Some(token) = self.accept(TokenType::Identifier) {
-            let identifier = Box::new(ast::ASTNode::Identifier(ast::Identifier {
-                name: token.value.clone(),
-            }));
+        let primary = self.parse_primary()?;
 
-            if let Some(_) = self.accept(TokenType::LeftParen) {
-                let mut arguments = Vec::new();
+        if let Some(_) = self.accept(TokenType::LeftParen) {
+            let mut arguments = Vec::new();
 
-                if self.accept(TokenType::RightParen).is_none() {
-                    arguments.push(self.parse_expression()?);
-                    self.expect(TokenType::RightParen)?;
-                }
-
-                return Ok(Box::new(ast::ASTNode::MethodCall(ast::MethodCall::new(
-                    identifier, arguments,
-                ))));
-            } else if self.accept(TokenType::Equal).is_some() {
-                let value = self.parse_expression()?;
-                return Ok(Box::new(ast::ASTNode::Assignment(ast::Assignment::new(
-                    token.value.clone(),
-                    value,
-                ))));
+            if self.accept(TokenType::RightParen).is_none() {
+                arguments.push(self.parse_expression()?);
+                self.expect(TokenType::RightParen)?;
             }
 
-            return Ok(identifier);
-        } else if let Some(token) = self.accept(TokenType::StringLiteral) {
+            return Ok(Box::new(ast::ASTNode::MethodCall(ast::MethodCall::new(
+                primary, arguments,
+            ))));
+        } else if self.accept(TokenType::Equal).is_some() {
+            let value = self.parse_expression()?;
+            return Ok(Box::new(ast::ASTNode::Assignment(ast::Assignment::new(
+                primary, value,
+            ))));
+        }
+
+        Ok(primary)
+    }
+
+    fn parse_primary(&mut self) -> Result<Box<ast::ASTNode>, Error> {
+        let atom = self.parse_atom()?;
+
+        if self.accept(TokenType::Dot).is_some() {
+            let identifier = self.expect(TokenType::Identifier)?;
+
+            return Ok(Box::new(ast::ASTNode::Attribute(ast::Attribute::new(
+                atom,
+                identifier.value.clone(),
+            ))));
+        }
+
+        Ok(atom)
+    }
+
+    fn parse_atom(&mut self) -> Result<Box<ast::ASTNode>, Error> {
+        if let Some(token) = self.accept(TokenType::Identifier) {
+            return Ok(Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                name: token.value.clone(),
+            })));
+        }
+
+        if let Some(token) = self.accept(TokenType::StringLiteral) {
             return Ok(Box::new(ast::ASTNode::StringLiteral(token.value.clone())));
-        } else if let Some(token) = self.accept(TokenType::NumberLiteral) {
+        }
+
+        if let Some(token) = self.accept(TokenType::NumberLiteral) {
             return Ok(Box::new(ast::ASTNode::NumberLiteral(
                 token.value.parse::<f64>().map_err(|_| {
                     Error::ParserError(format!(
@@ -135,11 +183,11 @@ impl Parser {
             )));
         }
 
-        let token = self.peek().unwrap();
-
         Err(Error::ParserError(format!(
             "Unexpected token {} at line {}, column {}",
-            token.value, token.line, token.column
+            self.peek().unwrap().value,
+            self.peek().unwrap().line,
+            self.peek().unwrap().column
         )))
     }
 
@@ -332,7 +380,9 @@ mod tests {
 
         let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
             ast::ASTNode::Assignment(ast::Assignment {
-                name: "my_variable".to_string(),
+                name: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                    name: "my_variable".to_string(),
+                })),
                 value: Box::new(ast::ASTNode::StringLiteral("42".to_string())),
             }),
         )]));
@@ -406,7 +456,9 @@ mod tests {
                 name: "my_method".to_string(),
                 parameters: vec![],
                 body: vec![Box::new(ast::ASTNode::Assignment(ast::Assignment {
-                    name: "my_variable".to_string(),
+                    name: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                        name: "my_variable".to_string(),
+                    })),
                     value: Box::new(ast::ASTNode::StringLiteral("42".to_string())),
                 }))],
             }),
@@ -435,6 +487,67 @@ mod tests {
                     })),
                 ],
                 body: vec![],
+            }),
+        )]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_class_def() {
+        let input = "class MyClass\nend\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::ClassDef(ast::ClassDef {
+                name: "MyClass".to_string(),
+                body: vec![],
+            }),
+        )]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_attribute() {
+        let input = "my_object.my_attribute\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::Attribute(ast::Attribute {
+                name: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                    name: "my_object".to_string(),
+                })),
+                value: "my_attribute".to_string(),
+            }),
+        )]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_instance_method_call() {
+        let input = "my_object.my_attribute()\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::MethodCall(ast::MethodCall {
+                name: Box::new(ast::ASTNode::Attribute(ast::Attribute {
+                    name: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                        name: "my_object".to_string(),
+                    })),
+                    value: "my_attribute".to_string(),
+                })),
+                arguments: vec![],
             }),
         )]));
 

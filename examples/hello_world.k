@@ -11,3 +11,15 @@ def print2(text)
 end
 
 print2("Hello, world!")
+
+class Printer
+    name = "Printer"
+
+    def print(arg)
+        print("a")
+    end
+end
+
+a = Printer()
+
+a.print("test")
