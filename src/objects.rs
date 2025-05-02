@@ -1,5 +1,6 @@
 use crate::ast::ASTNode;
 use crate::errors::Error;
+use crate::interpreter::Interpreter;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -14,6 +15,7 @@ pub enum KyaObject {
     None(KyaNone),
     InstanceObject(KyaInstanceObject),
     Method(KyaMethod),
+    RsMethod(KyaRsMethod),
 }
 
 impl KyaObject {
@@ -28,6 +30,7 @@ impl KyaObject {
             KyaObject::Class(c) => format!("Class({:?})", c.name),
             KyaObject::InstanceObject(i) => format!("InstanceObject({:?})", i.attributes),
             KyaObject::Method(m) => format!("Method({:?})", m.function),
+            KyaObject::RsMethod(m) => format!("RsMethod({:?})", m.function),
         }
     }
 }
@@ -40,7 +43,14 @@ pub struct KyaString {
     pub value: String,
 }
 
-pub type KyaRsFunctionPtr = fn(&Context, Vec<Rc<KyaObject>>) -> Result<Rc<KyaObject>, Error>;
+impl KyaString {
+    pub fn new(value: String) -> Self {
+        KyaString { value }
+    }
+}
+
+pub type KyaRsFunctionPtr =
+    fn(&mut Interpreter, Vec<Rc<KyaObject>>) -> Result<Rc<KyaObject>, Error>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct KyaRsFunction {
@@ -54,10 +64,10 @@ impl KyaRsFunction {
 
     pub fn call(
         &self,
-        context: &Context,
+        interpreter: &mut Interpreter,
         args: Vec<Rc<KyaObject>>,
     ) -> Result<Rc<KyaObject>, Error> {
-        (self.function)(context, args)
+        (self.function)(interpreter, args)
     }
 }
 
@@ -139,6 +149,18 @@ impl KyaMethod {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct KyaRsMethod {
+    pub function: Rc<KyaObject>,
+    pub instance: Rc<KyaObject>,
+}
+
+impl KyaRsMethod {
+    pub fn new(function: Rc<KyaObject>, instance: Rc<KyaObject>) -> Self {
+        KyaRsMethod { function, instance }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Context {
     pub objects: HashMap<String, Rc<KyaObject>>,
 }
@@ -198,7 +220,8 @@ mod tests {
         let function = KyaRsFunction::new(String::from("test_function"), |_, _| {
             Ok(Rc::new(KyaObject::None(KyaNone)))
         });
-        let result = function.call(&Context::new(), vec![]);
+        let mut interpreter = Interpreter::new("".to_string());
+        let result = function.call(&mut interpreter, vec![]);
         assert!(result.is_ok());
     }
 

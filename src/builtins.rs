@@ -1,8 +1,12 @@
 use crate::errors::Error;
-use crate::objects::{Context, KyaNone, KyaObject};
+use crate::interpreter::{self, Interpreter};
+use crate::objects::{Context, KyaClass, KyaMethod, KyaNone, KyaObject, KyaRsMethod, KyaString};
 use std::rc::Rc;
 
-pub fn kya_print(_: &Context, args: Vec<Rc<KyaObject>>) -> Result<Rc<KyaObject>, Error> {
+pub fn kya_print(
+    interpreter: &mut Interpreter,
+    args: Vec<Rc<KyaObject>>,
+) -> Result<Rc<KyaObject>, Error> {
     if args.is_empty() {
         return Err(Error::TypeError(
             "print() requires at least one argument".to_string(),
@@ -12,7 +16,19 @@ pub fn kya_print(_: &Context, args: Vec<Rc<KyaObject>>) -> Result<Rc<KyaObject>,
     let mut output = String::new();
 
     for arg in args {
-        output.push_str(arg.repr().as_str());
+        if let KyaObject::InstanceObject(_) = arg.as_ref() {
+            let result = interpreter.call_instance_method(arg.clone(), "__repr__", vec![])?;
+
+            if let KyaObject::String(result) = result.as_ref() {
+                output.push_str(&result.value);
+            } else {
+                return Err(Error::TypeError(
+                    "__repr__ must return a string".to_string(),
+                ));
+            }
+        } else {
+            output.push_str(&arg.repr());
+        }
     }
 
     println!("{}", output);
@@ -20,10 +36,61 @@ pub fn kya_print(_: &Context, args: Vec<Rc<KyaObject>>) -> Result<Rc<KyaObject>,
     Ok(Rc::new(KyaObject::None(KyaNone {})))
 }
 
-pub fn kya_globals(context: &Context, _: Vec<Rc<KyaObject>>) -> Result<Rc<KyaObject>, Error> {
-    for name in context.keys() {
+pub fn kya_globals(
+    interpreter: &mut Interpreter,
+    _: Vec<Rc<KyaObject>>,
+) -> Result<Rc<KyaObject>, Error> {
+    for name in interpreter.context.keys() {
         println!("{}", name);
     }
 
     Ok(Rc::new(KyaObject::None(KyaNone {})))
+}
+
+pub fn kya_string_repr(
+    interpreter: &mut Interpreter,
+    _: Vec<Rc<KyaObject>>,
+) -> Result<Rc<KyaObject>, Error> {
+    let instance = interpreter.resolve("self").ok_or_else(|| {
+        Error::RuntimeError("String object does not have a self attribute".to_string())
+    })?;
+
+    if let KyaObject::InstanceObject(obj) = instance.as_ref() {
+        if let Some(value) = obj.get_attribute("__value__") {
+            if let KyaObject::String(value) = value.as_ref() {
+                return Ok(Rc::new(KyaObject::String(KyaString {
+                    value: value.value.to_string(),
+                })));
+            } else if let KyaObject::Number(value) = value.as_ref() {
+                return Ok(Rc::new(KyaObject::String(KyaString {
+                    value: value.to_string(),
+                })));
+            }
+        }
+    }
+
+    Err(Error::RuntimeError(
+        "String object does not have a __value__ attribute".to_string(),
+    ))
+}
+
+pub fn kya_string_length(
+    interpreter: &mut Interpreter,
+    _: Vec<Rc<KyaObject>>,
+) -> Result<Rc<KyaObject>, Error> {
+    let instance = interpreter.resolve("self").ok_or_else(|| {
+        Error::RuntimeError("String object does not have a self attribute".to_string())
+    })?;
+
+    if let KyaObject::InstanceObject(obj) = instance.as_ref() {
+        if let Some(value) = obj.get_attribute("__value__") {
+            if let KyaObject::String(value) = value.as_ref() {
+                return Ok(Rc::new(KyaObject::Number(value.value.len() as f64)));
+            }
+        }
+    }
+
+    Err(Error::RuntimeError(
+        "String object does not have a __value__ attribute".to_string(),
+    ))
 }

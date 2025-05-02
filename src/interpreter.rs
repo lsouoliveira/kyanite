@@ -1,10 +1,10 @@
 use crate::ast;
-use crate::builtins::{kya_globals, kya_print};
+use crate::builtins::{kya_globals, kya_print, kya_string_length, kya_string_repr};
 use crate::errors::Error;
 use crate::lexer::Lexer;
 use crate::objects::{
     Context, KyaClass, KyaFrame, KyaFunction, KyaInstanceObject, KyaMethod, KyaNone, KyaObject,
-    KyaRsFunction, KyaString,
+    KyaRsFunction, KyaRsMethod, KyaString,
 };
 use crate::parser;
 use crate::visitor::Evaluator;
@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 pub struct Interpreter {
     input: String,
-    context: Context,
+    pub context: Context,
     frames: Vec<Rc<RefCell<KyaFrame>>>,
 }
 
@@ -31,6 +31,14 @@ fn setup_builtins(context: &mut Context) {
         Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
             String::from("__globals__"),
             kya_globals,
+        ))),
+    );
+
+    context.register(
+        String::from("String"),
+        Rc::new(KyaObject::Class(KyaClass::new(
+            String::from("String"),
+            vec![],
         ))),
     );
 }
@@ -64,7 +72,7 @@ impl Interpreter {
         Ok(())
     }
 
-    fn resolve(&self, name: &str) -> Option<Rc<KyaObject>> {
+    pub fn resolve(&self, name: &str) -> Option<Rc<KyaObject>> {
         if let Some(object) = self.context.get(name) {
             return Some(object.clone());
         }
@@ -95,13 +103,13 @@ impl Interpreter {
         Ok(object)
     }
 
-    fn call(
+    pub fn call(
         &mut self,
         callee: Rc<KyaObject>,
         args: Vec<Rc<KyaObject>>,
     ) -> Result<Rc<KyaObject>, Error> {
         if let KyaObject::RsFunction(func) = callee.as_ref() {
-            return func.call(&self.context, args);
+            return func.call(self, args);
         } else if let KyaObject::Function(func) = callee.as_ref() {
             let frame = Rc::new(RefCell::new(KyaFrame::new()));
 
@@ -179,11 +187,63 @@ impl Interpreter {
 
                 return Ok(result);
             }
+        } else if let KyaObject::RsMethod(method) = callee.as_ref() {
+            if let KyaObject::RsFunction(func) = method.function.as_ref() {
+                let frame = Rc::new(RefCell::new(KyaFrame::new()));
+
+                frame
+                    .borrow_mut()
+                    .locals
+                    .register(String::from("self"), method.instance.clone());
+
+                self.frames.push(frame);
+                let result = func.call(self, args)?;
+                self.frames.pop();
+
+                return Ok(result);
+            }
         }
 
         Err(Error::RuntimeError(format!(
             "Cannot call non-function object: {}",
             callee.repr()
+        )))
+    }
+
+    pub fn call_instance_method(
+        &mut self,
+        instance_object: Rc<KyaObject>,
+        method_name: &str,
+        args: Vec<Rc<KyaObject>>,
+    ) -> Result<Rc<KyaObject>, Error> {
+        if let KyaObject::InstanceObject(instance) = instance_object.as_ref() {
+            let method = instance.get_attribute(method_name);
+
+            if let Some(method) = method {
+                let method = if let KyaObject::Function(_) = method.as_ref() {
+                    Rc::new(KyaObject::Method(KyaMethod {
+                        function: method.clone(),
+                        instance: instance_object.clone(),
+                    }))
+                } else if let KyaObject::RsFunction(_) = method.as_ref() {
+                    Rc::new(KyaObject::RsMethod(KyaRsMethod {
+                        function: method.clone(),
+                        instance: instance_object.clone(),
+                    }))
+                } else {
+                    Err(Error::RuntimeError(format!(
+                        "Invalid method type: {}",
+                        method.repr()
+                    )))?
+                };
+
+                return Ok(self.call(method, args)?);
+            }
+        }
+
+        Err(Error::RuntimeError(format!(
+            "Undefined method: {}",
+            method_name
         )))
     }
 }
@@ -211,9 +271,34 @@ impl Evaluator for Interpreter {
     }
 
     fn eval_string_literal(&mut self, string_literal: &str) -> Result<Rc<KyaObject>, Error> {
-        Ok(Rc::new(KyaObject::String(KyaString {
-            value: string_literal.to_string(),
-        })))
+        let mut locals = Context::new();
+
+        locals.register(
+            String::from("__value__"),
+            Rc::new(KyaObject::String(KyaString::new(
+                string_literal.to_string(),
+            ))),
+        );
+
+        locals.register(
+            String::from("__repr__"),
+            Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                String::from("__repr__"),
+                kya_string_repr,
+            ))),
+        );
+
+        locals.register(
+            String::from("length"),
+            Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                String::from("length"),
+                kya_string_length,
+            ))),
+        );
+
+        Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
+            locals,
+        ))))
     }
 
     fn eval_method_call(&mut self, method_call: &ast::MethodCall) -> Result<Rc<KyaObject>, Error> {
@@ -289,6 +374,11 @@ impl Evaluator for Interpreter {
             if let Some(object) = instance_object.get_attribute(attribute.value.as_str()) {
                 if let KyaObject::Function(_) = object.as_ref() {
                     return Ok(Rc::new(KyaObject::Method(KyaMethod {
+                        function: object.clone(),
+                        instance: name.clone(),
+                    })));
+                } else if let KyaObject::RsFunction(_) = object.as_ref() {
+                    return Ok(Rc::new(KyaObject::RsMethod(KyaRsMethod {
                         function: object.clone(),
                         instance: name.clone(),
                     })));
