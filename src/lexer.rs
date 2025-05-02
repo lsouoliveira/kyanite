@@ -141,7 +141,7 @@ impl Lexer {
     }
 
     fn advance(&mut self) {
-        self.position += 1;
+        self.position += self.peek().unwrap().len_utf8();
         self.column += 1;
     }
 
