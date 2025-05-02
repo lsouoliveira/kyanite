@@ -14,7 +14,8 @@ pub enum TokenType {
     End,
     Comma,
     Class,
-    Dot
+    Dot,
+    Comment,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -62,6 +63,10 @@ fn is_keyword(identifier: &str) -> bool {
     symbols().contains_key(identifier)
 }
 
+fn is_comment(c: char) -> bool {
+    c == '#'
+}
+
 // TODO: Replace with a static map
 fn symbols() -> HashMap<String, TokenType> {
     let mut symbols = HashMap::new();
@@ -102,6 +107,11 @@ impl Lexer {
 
             if is_newline(c) {
                 return Ok(Some(self.read_newline()));
+            }
+
+            if is_comment(c) {
+                self.read_comment();
+                continue;
             }
 
             if is_symbol(c) {
@@ -275,6 +285,29 @@ impl Lexer {
             line: self.line,
             column: column_start,
         }))
+    }
+
+    fn read_comment(&mut self) -> Token {
+        let mut comment = String::new();
+        let column_start = self.column;
+
+        self.advance();
+
+        while let Some(c) = self.peek() {
+            if is_newline(c) {
+                break;
+            } else {
+                comment.push(c);
+                self.advance();
+            }
+        }
+
+        Token {
+            kind: TokenType::Comment,
+            value: comment,
+            line: self.line,
+            column: column_start,
+        }
     }
 
     fn skip_whitespace(&mut self) {
@@ -511,6 +544,17 @@ mod tests {
 
         assert_eq!(token.kind, TokenType::Dot);
         assert_eq!(token.value, ".");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 1);
+    }
+
+    fn test_comment() {
+        let mut lexer = Lexer::new("# This is a comment\n".to_string());
+
+        let token = lexer.next_token().unwrap().unwrap();
+
+        assert_eq!(token.kind, TokenType::Comment);
+        assert_eq!(token.value, " This is a comment");
         assert_eq!(token.line, 1);
         assert_eq!(token.column, 1);
     }
