@@ -1,6 +1,5 @@
 use crate::ast::ASTNode;
 use crate::errors::Error;
-use crate::interpreter::Interpreter;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -14,6 +13,7 @@ pub enum KyaObject {
     Class(KyaClass),
     None(KyaNone),
     InstanceObject(KyaInstanceObject),
+    Method(KyaMethod),
 }
 
 impl KyaObject {
@@ -27,6 +27,7 @@ impl KyaObject {
             KyaObject::Frame(f) => format!("Frame({:?})", f.locals),
             KyaObject::Class(c) => format!("Class({:?})", c.name),
             KyaObject::InstanceObject(i) => format!("InstanceObject({:?})", i.attributes),
+            KyaObject::Method(m) => format!("Method({:?})", m.function),
         }
     }
 }
@@ -118,6 +119,22 @@ impl KyaInstanceObject {
         } else {
             None
         }
+    }
+
+    pub fn set_attribute(&mut self, name: String, object: Rc<KyaObject>) {
+        self.attributes.register(name, object);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct KyaMethod {
+    pub function: Rc<KyaObject>,
+    pub instance: Rc<KyaObject>,
+}
+
+impl KyaMethod {
+    pub fn new(function: Rc<KyaObject>, instance: Rc<KyaObject>) -> Self {
+        KyaMethod { function, instance }
     }
 }
 

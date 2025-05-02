@@ -3,8 +3,8 @@ use crate::builtins::{kya_globals, kya_print};
 use crate::errors::Error;
 use crate::lexer::Lexer;
 use crate::objects::{
-    Context, KyaClass, KyaFrame, KyaFunction, KyaInstanceObject, KyaNone, KyaObject, KyaRsFunction,
-    KyaString,
+    Context, KyaClass, KyaFrame, KyaFunction, KyaInstanceObject, KyaMethod, KyaNone, KyaObject,
+    KyaRsFunction, KyaString,
 };
 use crate::parser;
 use crate::visitor::Evaluator;
@@ -124,14 +124,7 @@ impl Interpreter {
             let mut result = Rc::new(KyaObject::None(KyaNone {}));
 
             for stmt in &func.body {
-                result = if let Ok(returned_value) = stmt.eval(self) {
-                    returned_value
-                } else {
-                    return Err(Error::RuntimeError(format!(
-                        "Error evaluating method: {}",
-                        func.name
-                    )));
-                };
+                result = stmt.eval(self)?;
             }
 
             self.frames.pop();
@@ -148,9 +141,44 @@ impl Interpreter {
 
             self.frames.pop();
 
-            let instance = KyaInstanceObject::new(frame.borrow().locals.clone());
+            return Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
+                frame.borrow().locals.clone(),
+            ))));
+        } else if let KyaObject::Method(method) = callee.as_ref() {
+            if let KyaObject::Function(func) = method.function.as_ref() {
+                let frame = Rc::new(RefCell::new(KyaFrame::new()));
 
-            return Ok(Rc::new(KyaObject::InstanceObject(instance.clone())));
+                frame
+                    .borrow_mut()
+                    .locals
+                    .register(String::from("self"), method.instance.clone());
+
+                if func.parameters.len() != args.len() {
+                    return Err(Error::RuntimeError(format!(
+                        "{}() takes {} argument(s) but {} were given",
+                        func.name,
+                        func.parameters.len(),
+                        args.len()
+                    )));
+                }
+
+                for (i, param) in func.parameters.iter().enumerate() {
+                    let arg = args[i].clone();
+                    frame.borrow_mut().locals.register(param.clone(), arg);
+                }
+
+                self.frames.push(frame);
+
+                let mut result = Rc::new(KyaObject::None(KyaNone {}));
+
+                for stmt in &func.body {
+                    result = stmt.eval(self)?;
+                }
+
+                self.frames.pop();
+
+                return Ok(result);
+            }
         }
 
         Err(Error::RuntimeError(format!(
@@ -259,7 +287,14 @@ impl Evaluator for Interpreter {
 
         if let KyaObject::InstanceObject(instance_object) = name.as_ref() {
             if let Some(object) = instance_object.get_attribute(attribute.value.as_str()) {
-                return Ok(object);
+                if let KyaObject::Function(_) = object.as_ref() {
+                    return Ok(Rc::new(KyaObject::Method(KyaMethod {
+                        function: object.clone(),
+                        instance: name.clone(),
+                    })));
+                } else {
+                    return Ok(object);
+                }
             } else {
                 return Err(Error::RuntimeError(format!(
                     "Undefined attribute: {}",

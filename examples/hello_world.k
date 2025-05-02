@@ -12,11 +12,15 @@ end
 
 print2("Hello, world!")
 
+class Test
+    name = "Test"
+end
+
 class Printer
-    name = "Printer"
+    name = Test()
 
     def print(arg)
-        print("a")
+        print(self.name)
     end
 end
 
