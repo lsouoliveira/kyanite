@@ -6,6 +6,7 @@ Kyanite is a toy programming language based on Python and Ruby. The repository c
 
 - [Hello world](examples/hello_world.k)
 - [Classes](examples/classes.k)
+- [Strings](examples/strings.k)
 
 ## Usage
 
