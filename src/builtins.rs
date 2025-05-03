@@ -1,6 +1,9 @@
 use crate::errors::Error;
 use crate::interpreter::{self, Interpreter};
-use crate::objects::{Context, KyaClass, KyaMethod, KyaNone, KyaObject, KyaRsMethod, KyaString};
+use crate::objects::{
+    Context, KyaClass, KyaInstanceObject, KyaMethod, KyaNone, KyaObject, KyaRsFunction,
+    KyaRsMethod, KyaString,
+};
 use std::rc::Rc;
 
 pub fn kya_print(
@@ -93,4 +96,33 @@ pub fn kya_string_length(
     Err(Error::RuntimeError(
         "String object does not have a __value__ attribute".to_string(),
     ))
+}
+
+pub fn kya_string_new(value: &str) -> Result<Rc<KyaObject>, Error> {
+    let mut locals = Context::new();
+
+    locals.register(
+        String::from("__value__"),
+        Rc::new(KyaObject::String(KyaString::new(value.to_string()))),
+    );
+
+    locals.register(
+        String::from("__repr__"),
+        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+            String::from("__repr__"),
+            kya_string_repr,
+        ))),
+    );
+
+    locals.register(
+        String::from("length"),
+        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+            String::from("length"),
+            kya_string_length,
+        ))),
+    );
+
+    Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
+        locals,
+    ))))
 }

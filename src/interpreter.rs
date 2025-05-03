@@ -1,5 +1,5 @@
 use crate::ast;
-use crate::builtins::{kya_globals, kya_print, kya_string_length, kya_string_repr};
+use crate::builtins::{kya_globals, kya_print, kya_string_length, kya_string_new, kya_string_repr};
 use crate::errors::Error;
 use crate::lexer::Lexer;
 use crate::objects::{
@@ -271,34 +271,7 @@ impl Evaluator for Interpreter {
     }
 
     fn eval_string_literal(&mut self, string_literal: &str) -> Result<Rc<KyaObject>, Error> {
-        let mut locals = Context::new();
-
-        locals.register(
-            String::from("__value__"),
-            Rc::new(KyaObject::String(KyaString::new(
-                string_literal.to_string(),
-            ))),
-        );
-
-        locals.register(
-            String::from("__repr__"),
-            Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-                String::from("__repr__"),
-                kya_string_repr,
-            ))),
-        );
-
-        locals.register(
-            String::from("length"),
-            Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-                String::from("length"),
-                kya_string_length,
-            ))),
-        );
-
-        Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
-            locals,
-        ))))
+        Ok(kya_string_new(string_literal)?)
     }
 
     fn eval_method_call(&mut self, method_call: &ast::MethodCall) -> Result<Rc<KyaObject>, Error> {
