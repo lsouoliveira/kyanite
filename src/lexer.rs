@@ -9,6 +9,7 @@ pub enum TokenType {
     LeftParen,
     RightParen,
     Equal,
+    EqEqual,
     NumberLiteral,
     Def,
     End,
@@ -73,6 +74,7 @@ fn symbols() -> HashMap<String, TokenType> {
     symbols.insert("(".to_string(), TokenType::LeftParen);
     symbols.insert(")".to_string(), TokenType::RightParen);
     symbols.insert("=".to_string(), TokenType::Equal);
+    symbols.insert("==".to_string(), TokenType::EqEqual);
     symbols.insert("def".to_string(), TokenType::Def);
     symbols.insert("end".to_string(), TokenType::End);
     symbols.insert(",".to_string(), TokenType::Comma);
@@ -166,15 +168,31 @@ impl Lexer {
     }
 
     fn read_symbol(&mut self) -> Token {
-        let c = self.peek().unwrap();
-        let kind = self.symbols.get(&c.to_string()).unwrap().clone();
+        let mut symbol = String::new();
+        let mut c = self.peek().unwrap();
         let column_start = self.column;
 
-        self.advance();
+        while self
+            .symbols
+            .get(&(symbol.clone() + &c.to_string()))
+            .is_some()
+        {
+            symbol.push(c);
+
+            self.advance();
+
+            if let Some(next_c) = self.peek() {
+                c = next_c;
+            } else {
+                break;
+            }
+        }
+
+        let kind = self.symbols.get(&symbol).unwrap().clone();
 
         Token {
             kind,
-            value: c.to_string(),
+            value: symbol,
             line: self.line,
             column: column_start,
         }
