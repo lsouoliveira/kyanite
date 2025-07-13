@@ -117,12 +117,17 @@ impl KyaClass {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct KyaInstanceObject {
+    name: String,
     pub attributes: Context,
 }
 
 impl KyaInstanceObject {
-    pub fn new(attributes: Context) -> Self {
-        KyaInstanceObject { attributes }
+    pub fn new(name: String, attributes: Context) -> Self {
+        KyaInstanceObject { name, attributes }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn get_attribute(&self, name: &str) -> Option<Rc<KyaObject>> {
@@ -137,6 +142,15 @@ impl KyaInstanceObject {
         if let Some(object) = self.get_attribute(name) {
             if let KyaObject::String(s) = object.as_ref() {
                 return Some(s.value.clone());
+            }
+        }
+        None
+    }
+
+    pub fn get_number_attribute(&self, name: &str) -> Option<f64> {
+        if let Some(object) = self.get_attribute(name) {
+            if let KyaObject::Number(n) = object.as_ref() {
+                return Some(*n);
             }
         }
         None

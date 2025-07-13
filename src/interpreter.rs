@@ -1,5 +1,5 @@
 use crate::ast;
-use crate::builtins::{kya_bool_new, kya_globals, kya_print, kya_string_new};
+use crate::builtins::{kya_bool_new, kya_globals, kya_number_new, kya_print, kya_string_new};
 use crate::errors::Error;
 use crate::lexer::Lexer;
 use crate::objects::{
@@ -158,6 +158,7 @@ impl Interpreter {
             self.frames.pop();
 
             return Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
+                class.name.clone(),
                 frame.borrow().locals.clone(),
             ))));
         } else if let KyaObject::Method(method) = callee.as_ref() {
@@ -324,7 +325,7 @@ impl Evaluator for Interpreter {
     }
 
     fn eval_number_literal(&mut self, number_literal: &f64) -> Result<Rc<KyaObject>, Error> {
-        Ok(Rc::new(KyaObject::Number(*number_literal)))
+        Ok(kya_number_new(*number_literal)?)
     }
 
     fn eval_method_def(&mut self, method_def: &ast::MethodDef) -> Result<Rc<KyaObject>, Error> {
