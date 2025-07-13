@@ -6,12 +6,6 @@ statement = simple_stmt newline
 
 simple_stmt = expression ;
 
-expression = variable
-           | assignment
-           | method_call
-           | binary_expr
-           | unary_expr ;
-
 compound_stmt = function_def
               | class_def ;
 
@@ -19,10 +13,16 @@ function_def = "def" identifier "(" { params } ")" NEWLINE block "end" ;
 
 class_def = "class" identifier NEWLINE block "end" ;
 
-method_call = primary "(" params "}" ;
+# Expressions
 
-variable = primary ;
+expression = comparison ;
+comparison = primary { compare_op } 
+           | primary ;
+compare_op = eq ;
+eq = "==" primary ;
+
 primary = primary "." identifier
+        | primary "(" params "}"
         | atom ;
 
 atom = identifier

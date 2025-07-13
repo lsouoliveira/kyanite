@@ -125,40 +125,42 @@ impl Parser {
     fn parse_expression(&mut self) -> Result<Box<ast::ASTNode>, Error> {
         let primary = self.parse_primary()?;
 
-        if let Some(_) = self.accept(TokenType::LeftParen) {
-            let mut arguments = Vec::new();
-
-            if self.accept(TokenType::RightParen).is_none() {
-                arguments.push(self.parse_expression()?);
-                self.expect(TokenType::RightParen)?;
-            }
-
-            return Ok(Box::new(ast::ASTNode::MethodCall(ast::MethodCall::new(
-                primary, arguments,
-            ))));
-        } else if self.accept(TokenType::Equal).is_some() {
-            let value = self.parse_expression()?;
-            return Ok(Box::new(ast::ASTNode::Assignment(ast::Assignment::new(
-                primary, value,
-            ))));
-        }
-
         Ok(primary)
     }
 
     fn parse_primary(&mut self) -> Result<Box<ast::ASTNode>, Error> {
-        let atom = self.parse_atom()?;
+        let mut primary = self.parse_atom()?;
 
-        if self.accept(TokenType::Dot).is_some() {
-            let identifier = self.expect(TokenType::Identifier)?;
+        loop {
+            if self.accept(TokenType::LeftParen).is_some() {
+                let mut arguments = Vec::new();
 
-            return Ok(Box::new(ast::ASTNode::Attribute(ast::Attribute::new(
-                atom,
-                identifier.value.clone(),
-            ))));
+                if self.accept(TokenType::RightParen).is_none() {
+                    arguments.push(self.parse_expression()?);
+                    self.expect(TokenType::RightParen)?;
+                }
+
+                primary = Box::new(ast::ASTNode::MethodCall(ast::MethodCall::new(
+                    primary, arguments,
+                )));
+            } else if self.accept(TokenType::Equal).is_some() {
+                let value = self.parse_expression()?;
+                primary = Box::new(ast::ASTNode::Assignment(ast::Assignment::new(
+                    primary, value,
+                )));
+            } else if self.accept(TokenType::Dot).is_some() {
+                let identifier = self.expect(TokenType::Identifier)?;
+
+                primary = Box::new(ast::ASTNode::Attribute(ast::Attribute::new(
+                    primary,
+                    identifier.value.clone(),
+                )));
+            } else {
+                break;
+            }
         }
 
-        Ok(atom)
+        Ok(primary)
     }
 
     fn parse_atom(&mut self) -> Result<Box<ast::ASTNode>, Error> {
