@@ -155,6 +155,15 @@ impl KyaInstanceObject {
         }
         None
     }
+
+    pub fn get_bool_attribute(&self, name: &str) -> Option<bool> {
+        if let Some(object) = self.get_attribute(name) {
+            if let KyaObject::Bool(b) = object.as_ref() {
+                return Some(*b);
+            }
+        }
+        None
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
