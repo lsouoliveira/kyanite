@@ -123,7 +123,25 @@ impl Parser {
     }
 
     fn parse_expression(&mut self) -> Result<Box<ast::ASTNode>, Error> {
+        Ok(self.parse_comparison()?)
+    }
+
+    fn parse_comparison(&mut self) -> Result<Box<ast::ASTNode>, Error> {
         let primary = self.parse_primary()?;
+
+        loop {
+            if self.accept(TokenType::EqEqual).is_some() {
+                let right = self.parse_primary()?;
+
+                return Ok(Box::new(ast::ASTNode::Compare(ast::Compare {
+                    left: primary.clone(),
+                    operator: ast::Operator::Equal,
+                    right,
+                })));
+            } else {
+                break;
+            }
+        }
 
         Ok(primary)
     }
@@ -550,6 +568,29 @@ mod tests {
                     value: "my_attribute".to_string(),
                 })),
                 arguments: vec![],
+            }),
+        )]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_equal_operator() {
+        let input = "a == b\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::Compare(ast::Compare {
+                left: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                    name: "a".to_string(),
+                })),
+                operator: ast::Operator::Equal,
+                right: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                    name: "b".to_string(),
+                })),
             }),
         )]));
 

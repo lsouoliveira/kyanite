@@ -133,8 +133,13 @@ impl KyaInstanceObject {
         }
     }
 
-    pub fn set_attribute(&mut self, name: String, object: Rc<KyaObject>) {
-        self.attributes.register(name, object);
+    pub fn get_string_attribute(&self, name: &str) -> Option<String> {
+        if let Some(object) = self.get_attribute(name) {
+            if let KyaObject::String(s) = object.as_ref() {
+                return Some(s.value.clone());
+            }
+        }
+        None
     }
 }
 
@@ -144,11 +149,7 @@ pub struct KyaMethod {
     pub instance: Rc<KyaObject>,
 }
 
-impl KyaMethod {
-    pub fn new(function: Rc<KyaObject>, instance: Rc<KyaObject>) -> Self {
-        KyaMethod { function, instance }
-    }
-}
+impl KyaMethod {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct KyaRsMethod {
@@ -156,11 +157,7 @@ pub struct KyaRsMethod {
     pub instance: Rc<KyaObject>,
 }
 
-impl KyaRsMethod {
-    pub fn new(function: Rc<KyaObject>, instance: Rc<KyaObject>) -> Self {
-        KyaRsMethod { function, instance }
-    }
-}
+impl KyaRsMethod {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Context {

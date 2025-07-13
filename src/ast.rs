@@ -16,6 +16,7 @@ pub enum ASTNode {
     MethodDef(MethodDef),
     ClassDef(ClassDef),
     Attribute(Attribute),
+    Compare(Compare),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -99,6 +100,18 @@ impl Attribute {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum Operator {
+    Equal,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Compare {
+    pub left: Box<ASTNode>,
+    pub operator: Operator,
+    pub right: Box<ASTNode>,
+}
+
 impl ASTNode {
     pub fn accept(&self, visitor: &mut dyn Visitor) {
         match self {
@@ -111,6 +124,7 @@ impl ASTNode {
             ASTNode::MethodDef(method_def) => visitor.visit_method_def(&method_def),
             ASTNode::ClassDef(class_def) => visitor.visit_class_def(&class_def),
             ASTNode::Attribute(attribute) => visitor.visit_attribute(&attribute),
+            ASTNode::Compare(compare) => visitor.visit_compare(&compare),
         }
     }
 
@@ -127,6 +141,7 @@ impl ASTNode {
             ASTNode::MethodDef(method_def) => evaluator.eval_method_def(&method_def),
             ASTNode::ClassDef(class_def) => evaluator.eval_class_def(&class_def),
             ASTNode::Attribute(attribute) => evaluator.eval_attribute(&attribute),
+            ASTNode::Compare(compare) => evaluator.eval_compare(&compare),
         }
     }
 }

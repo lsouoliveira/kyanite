@@ -99,4 +99,15 @@ impl Visitor for ASTDumper {
         self.push(&format!("\"{}\"", attribute.value));
         self.push(")");
     }
+
+    fn visit_compare(&mut self, compare: &ast::Compare) {
+        self.push("Compare(");
+        self.concat("left: ");
+        compare.left.accept(self);
+        self.concat("operator: ");
+        self.push(&format!("{:?}", compare.operator));
+        self.concat("right: ");
+        compare.right.accept(self);
+        self.push(")");
+    }
 }

@@ -89,6 +89,11 @@ impl Interpreter {
         None
     }
 
+    pub fn get_self(&self) -> Result<Rc<KyaObject>, Error> {
+        self.resolve("self")
+            .ok_or_else(|| Error::RuntimeError("Undefined identifier: self".to_string()))
+    }
+
     fn register_local(
         &mut self,
         name: String,
@@ -249,6 +254,14 @@ impl Interpreter {
             method_name
         )))
     }
+
+    pub fn true_object(&self) -> Rc<KyaObject> {
+        self.context.get("true").unwrap().clone()
+    }
+
+    pub fn false_object(&self) -> Rc<KyaObject> {
+        self.context.get("false").unwrap().clone()
+    }
 }
 
 impl Evaluator for Interpreter {
@@ -380,5 +393,30 @@ impl Evaluator for Interpreter {
             "Invalid attribute assignment: {}",
             attribute.value
         )))
+    }
+
+    fn eval_compare(&mut self, compare: &ast::Compare) -> Result<Rc<KyaObject>, Error> {
+        let left = compare.left.eval(self)?;
+        let right = compare.right.eval(self)?;
+
+        if let KyaObject::InstanceObject(_) = left.as_ref() {
+            if let KyaObject::InstanceObject(_) = right.as_ref() {
+                let args = vec![right.clone()];
+
+                return Ok(self.call_instance_method(left.clone(), "__eq__", args)?);
+            } else {
+                Err(Error::RuntimeError(format!(
+                    "Invalid right operand for comparison: {}",
+                    right.repr()
+                )))?;
+            }
+        } else {
+            Err(Error::RuntimeError(format!(
+                "Invalid left operand for comparison: {}",
+                left.repr()
+            )))?;
+        }
+
+        Ok(self.context.get("false").unwrap().clone())
     }
 }

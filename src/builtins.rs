@@ -119,9 +119,55 @@ pub fn kya_string_new(value: &str) -> Result<Rc<KyaObject>, Error> {
         ))),
     );
 
+    locals.register(
+        String::from("__eq__"),
+        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+            String::from("__eq__"),
+            kya_string_eq,
+        ))),
+    );
+
     Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         locals,
     ))))
+}
+
+fn kya_string_get_value(interpreter: &mut Interpreter) -> Result<String, Error> {
+    let instance = interpreter.get_self()?;
+
+    if let KyaObject::InstanceObject(obj) = instance.as_ref() {
+        return Ok(obj.get_string_attribute("__value__").unwrap());
+    }
+
+    Err(Error::RuntimeError(
+        "String object does not have a __value__ attribute".to_string(),
+    ))
+}
+
+pub fn kya_string_eq(
+    interpreter: &mut Interpreter,
+    args: Vec<Rc<KyaObject>>,
+) -> Result<Rc<KyaObject>, Error> {
+    if args.len() != 1 {
+        return Err(Error::TypeError(
+            "eq() requires exactly one argument".to_string(),
+        ));
+    }
+
+    if let KyaObject::InstanceObject(obj) = args[0].as_ref() {
+        let self_value = kya_string_get_value(interpreter)?;
+        let other_value = obj.get_string_attribute("__value__").unwrap();
+
+        if self_value == other_value {
+            return Ok(interpreter.true_object());
+        } else {
+            return Ok(interpreter.false_object());
+        }
+    }
+
+    Err(Error::RuntimeError(
+        "String object does not have a __value__ attribute".to_string(),
+    ))
 }
 
 pub fn kya_bool_new(value: bool) -> Result<Rc<KyaObject>, Error> {
