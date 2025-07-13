@@ -263,6 +263,38 @@ impl Interpreter {
     pub fn false_object(&self) -> Rc<KyaObject> {
         self.context.get("false").unwrap().clone()
     }
+
+    fn is_true(&self, object: &KyaObject) -> bool {
+        match object {
+            KyaObject::Bool(value) => *value,
+            KyaObject::Number(value) => *value != 0.0,
+            KyaObject::String(value) => !value.value.is_empty(),
+            KyaObject::InstanceObject(instance) => {
+                if instance.name() == "Bool" {
+                    instance.get_bool_attribute("__value__").unwrap()
+                } else if instance.name() == "String" {
+                    !instance
+                        .get_string_attribute("__value__")
+                        .unwrap()
+                        .is_empty()
+                } else {
+                    true
+                }
+            }
+            KyaObject::None(_) => false,
+            _ => true,
+        }
+    }
+
+    pub fn eval_body(&mut self, body: &[Box<ast::ASTNode>]) -> Result<Rc<KyaObject>, Error> {
+        let mut result = Rc::new(KyaObject::None(KyaNone {}));
+
+        for statement in body {
+            result = statement.eval(self)?;
+        }
+
+        Ok(result)
+    }
 }
 
 impl Evaluator for Interpreter {
@@ -419,5 +451,15 @@ impl Evaluator for Interpreter {
         }
 
         Ok(self.context.get("false").unwrap().clone())
+    }
+
+    fn eval_if(&mut self, if_node: &ast::If) -> Result<Rc<KyaObject>, Error> {
+        let test = if_node.test.eval(self)?;
+
+        if self.is_true(&test) {
+            return self.eval_body(&if_node.body);
+        }
+
+        Ok(Rc::new(KyaObject::None(KyaNone {})))
     }
 }

@@ -110,4 +110,16 @@ impl Visitor for ASTDumper {
         compare.right.accept(self);
         self.push(")");
     }
+
+    fn visit_if(&mut self, if_statement: &ast::If) {
+        self.push("If(");
+        self.concat("test: ");
+        if_statement.test.accept(self);
+        self.concat("body: [");
+        for statement in &if_statement.body {
+            statement.accept(self);
+        }
+        self.push("]");
+        self.push(")");
+    }
 }

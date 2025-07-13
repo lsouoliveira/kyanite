@@ -38,6 +38,8 @@ impl Parser {
             self.parse_method_def()?
         } else if self.accept(TokenType::Class).is_some() {
             self.parse_class_def()?
+        } else if self.accept(TokenType::If).is_some() {
+            self.parse_if_statement()?
         } else {
             self.parse_expression()?
         };
@@ -74,6 +76,31 @@ impl Parser {
         let class_def = ast::ClassDef::new(identifier.value.clone(), body);
 
         Ok(Box::new(ast::ASTNode::ClassDef(class_def)))
+    }
+
+    fn parse_if_statement(&mut self) -> Result<Box<ast::ASTNode>, Error> {
+        let test = self.parse_expression()?;
+
+        self.expect(TokenType::Newline)?;
+
+        let mut body = Vec::new();
+
+        while self.peek().is_some() {
+            if let Some(_) = self.accept(TokenType::End) {
+                break;
+            }
+
+            match self.parse_statement() {
+                Ok(statement) => {
+                    body.push(statement);
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
+        let if_node = ast::If::new(test, body);
+
+        Ok(Box::new(ast::ASTNode::If(if_node)))
     }
 
     fn parse_method_def(&mut self) -> Result<Box<ast::ASTNode>, Error> {
@@ -622,6 +649,31 @@ mod tests {
                 })),
             }),
         )]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_if_statement() {
+        let input = "if condition\nmy_variable = \"42\"\nend\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(ast::ASTNode::If(
+            ast::If {
+                test: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                    name: "condition".to_string(),
+                })),
+                body: vec![Box::new(ast::ASTNode::Assignment(ast::Assignment {
+                    name: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                        name: "my_variable".to_string(),
+                    })),
+                    value: Box::new(ast::ASTNode::StringLiteral("42".to_string())),
+                }))],
+            },
+        ))]));
 
         assert_eq!(result, expected);
     }

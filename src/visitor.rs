@@ -1,5 +1,5 @@
 use crate::ast::{
-    Assignment, Attribute, ClassDef, Compare, Identifier, MethodCall, MethodDef, Module,
+    Assignment, Attribute, ClassDef, Compare, Identifier, If, MethodCall, MethodDef, Module,
 };
 use crate::errors::Error;
 use crate::objects;
@@ -16,6 +16,7 @@ pub trait Visitor {
     fn visit_class_def(&mut self, class_def: &ClassDef);
     fn visit_attribute(&mut self, attribute: &Attribute);
     fn visit_compare(&mut self, compare: &Compare);
+    fn visit_if(&mut self, if_node: &If);
 }
 
 pub trait Evaluator {
@@ -40,4 +41,5 @@ pub trait Evaluator {
     fn eval_class_def(&mut self, class_def: &ClassDef) -> Result<Rc<objects::KyaObject>, Error>;
     fn eval_attribute(&mut self, attribute: &Attribute) -> Result<Rc<objects::KyaObject>, Error>;
     fn eval_compare(&mut self, compare: &Compare) -> Result<Rc<objects::KyaObject>, Error>;
+    fn eval_if(&mut self, if_node: &If) -> Result<Rc<objects::KyaObject>, Error>;
 }

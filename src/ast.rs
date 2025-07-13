@@ -17,6 +17,7 @@ pub enum ASTNode {
     ClassDef(ClassDef),
     Attribute(Attribute),
     Compare(Compare),
+    If(If),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -112,6 +113,18 @@ pub struct Compare {
     pub right: Box<ASTNode>,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct If {
+    pub test: Box<ASTNode>,
+    pub body: Vec<Box<ASTNode>>,
+}
+
+impl If {
+    pub fn new(test: Box<ASTNode>, body: Vec<Box<ASTNode>>) -> Self {
+        If { test, body }
+    }
+}
+
 impl ASTNode {
     pub fn accept(&self, visitor: &mut dyn Visitor) {
         match self {
@@ -125,6 +138,7 @@ impl ASTNode {
             ASTNode::ClassDef(class_def) => visitor.visit_class_def(&class_def),
             ASTNode::Attribute(attribute) => visitor.visit_attribute(&attribute),
             ASTNode::Compare(compare) => visitor.visit_compare(&compare),
+            ASTNode::If(if_node) => visitor.visit_if(&if_node),
         }
     }
 
@@ -142,6 +156,7 @@ impl ASTNode {
             ASTNode::ClassDef(class_def) => evaluator.eval_class_def(&class_def),
             ASTNode::Attribute(attribute) => evaluator.eval_attribute(&attribute),
             ASTNode::Compare(compare) => evaluator.eval_compare(&compare),
+            ASTNode::If(if_node) => evaluator.eval_if(&if_node),
         }
     }
 }

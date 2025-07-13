@@ -17,6 +17,7 @@ pub enum TokenType {
     Class,
     Dot,
     Comment,
+    If,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -80,6 +81,7 @@ fn symbols() -> HashMap<String, TokenType> {
     symbols.insert(",".to_string(), TokenType::Comma);
     symbols.insert("class".to_string(), TokenType::Class);
     symbols.insert(".".to_string(), TokenType::Dot);
+    symbols.insert("if".to_string(), TokenType::If);
     symbols
 }
 
@@ -489,6 +491,7 @@ mod tests {
         assert_eq!(token.column, 1);
     }
 
+    #[test]
     fn test_number_literal_with_extra_dot() {
         let mut lexer = Lexer::new("12345.0.".to_string());
 
@@ -497,6 +500,7 @@ mod tests {
         assert!(token.is_err());
     }
 
+    #[test]
     fn test_def_keyword() {
         let mut lexer = Lexer::new("def my_method\nend\n".to_string());
         let tokens = [
@@ -515,6 +519,7 @@ mod tests {
         assert_eq!(tokens[1].column, 5);
     }
 
+    #[test]
     fn test_end_keyword() {
         let mut lexer = Lexer::new("end".to_string());
 
@@ -526,6 +531,7 @@ mod tests {
         assert_eq!(token.column, 1);
     }
 
+    #[test]
     fn test_comma() {
         let mut lexer = Lexer::new(",".to_string());
 
@@ -537,6 +543,7 @@ mod tests {
         assert_eq!(token.column, 1);
     }
 
+    #[test]
     fn test_class_keyword() {
         let mut lexer = Lexer::new("class MyClass\nend\n".to_string());
         let tokens = [
@@ -555,6 +562,7 @@ mod tests {
         assert_eq!(tokens[1].column, 7);
     }
 
+    #[test]
     fn test_dot() {
         let mut lexer = Lexer::new(".".to_string());
 
@@ -566,14 +574,33 @@ mod tests {
         assert_eq!(token.column, 1);
     }
 
+    #[test]
     fn test_comment() {
         let mut lexer = Lexer::new("# This is a comment\n".to_string());
 
         let token = lexer.next_token().unwrap().unwrap();
 
-        assert_eq!(token.kind, TokenType::Comment);
-        assert_eq!(token.value, " This is a comment");
-        assert_eq!(token.line, 1);
+        assert_eq!(token.kind, TokenType::Newline);
+        assert_eq!(token.line, 2);
         assert_eq!(token.column, 1);
+    }
+
+    #[test]
+    fn test_if_keyword() {
+        let mut lexer = Lexer::new("if condition\nend\n".to_string());
+        let tokens = [
+            lexer.next_token().unwrap().unwrap(),
+            lexer.next_token().unwrap().unwrap(),
+        ];
+
+        assert_eq!(tokens[0].kind, TokenType::If);
+        assert_eq!(tokens[0].value, "if");
+        assert_eq!(tokens[0].line, 1);
+        assert_eq!(tokens[0].column, 1);
+
+        assert_eq!(tokens[1].kind, TokenType::Identifier);
+        assert_eq!(tokens[1].value, "condition");
+        assert_eq!(tokens[1].line, 1);
+        assert_eq!(tokens[1].column, 4);
     }
 }

@@ -7,10 +7,12 @@ statement = simple_stmt newline
 simple_stmt = expression ;
 
 compound_stmt = function_def
+              | if_stmt
               | class_def ;
 
 function_def = "def" identifier "(" { params } ")" NEWLINE block "end" ;
 
+if_stmt = "if" expression NEWLINE block NEWLINE "end" ;
 class_def = "class" identifier NEWLINE block "end" ;
 
 # Expressions
