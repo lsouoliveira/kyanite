@@ -1,10 +1,10 @@
 use crate::ast;
-use crate::builtins::{kya_globals, kya_print, kya_string_length, kya_string_new, kya_string_repr};
+use crate::builtins::{kya_bool_new, kya_globals, kya_print, kya_string_new};
 use crate::errors::Error;
 use crate::lexer::Lexer;
 use crate::objects::{
     Context, KyaClass, KyaFrame, KyaFunction, KyaInstanceObject, KyaMethod, KyaNone, KyaObject,
-    KyaRsFunction, KyaRsMethod, KyaString,
+    KyaRsFunction, KyaRsMethod,
 };
 use crate::parser;
 use crate::visitor::Evaluator;
@@ -41,6 +41,9 @@ fn setup_builtins(context: &mut Context) {
             vec![],
         ))),
     );
+
+    context.register(String::from("true"), kya_bool_new(true).unwrap());
+    context.register(String::from("false"), kya_bool_new(false).unwrap());
 }
 
 impl Interpreter {
@@ -289,6 +292,13 @@ impl Evaluator for Interpreter {
         let value = assignment.value.eval(self)?;
 
         if let ast::ASTNode::Identifier(identifier) = &*assignment.name {
+            if identifier.name == "true" || identifier.name == "false" {
+                return Err(Error::RuntimeError(format!(
+                    "Cannot assign to reserved keyword: {}",
+                    identifier.name
+                )));
+            }
+
             self.register_local(identifier.name.clone(), value.clone())?;
         } else {
             return Err(Error::RuntimeError(format!(

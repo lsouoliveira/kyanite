@@ -16,6 +16,7 @@ pub enum KyaObject {
     InstanceObject(KyaInstanceObject),
     Method(KyaMethod),
     RsMethod(KyaRsMethod),
+    Bool(bool),
 }
 
 impl KyaObject {
@@ -31,6 +32,7 @@ impl KyaObject {
             KyaObject::InstanceObject(i) => format!("InstanceObject({:?})", i.attributes),
             KyaObject::Method(m) => format!("Method({:?})", m.function),
             KyaObject::RsMethod(m) => format!("RsMethod({:?})", m.function),
+            KyaObject::Bool(b) => b.to_string(),
         }
     }
 }
@@ -235,5 +237,15 @@ mod tests {
     fn test_kya_frame() {
         let kya_frame = KyaFrame::new();
         assert_eq!(kya_frame.locals.objects.len(), 0);
+    }
+
+    #[test]
+    fn test_boolean_object() {
+        let kya_bool = KyaObject::Bool(true);
+        if let KyaObject::Bool(value) = kya_bool {
+            assert!(value);
+        } else {
+            panic!("Expected a boolean object");
+        }
     }
 }

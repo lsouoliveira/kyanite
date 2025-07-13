@@ -1,9 +1,6 @@
 use crate::errors::Error;
-use crate::interpreter::{self, Interpreter};
-use crate::objects::{
-    Context, KyaClass, KyaInstanceObject, KyaMethod, KyaNone, KyaObject, KyaRsFunction,
-    KyaRsMethod, KyaString,
-};
+use crate::interpreter::Interpreter;
+use crate::objects::{Context, KyaInstanceObject, KyaNone, KyaObject, KyaRsFunction, KyaString};
 use std::rc::Rc;
 
 pub fn kya_print(
@@ -125,4 +122,46 @@ pub fn kya_string_new(value: &str) -> Result<Rc<KyaObject>, Error> {
     Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         locals,
     ))))
+}
+
+pub fn kya_bool_new(value: bool) -> Result<Rc<KyaObject>, Error> {
+    let mut locals = Context::new();
+    let obj = KyaObject::Bool(value);
+
+    locals.register(String::from("__value__"), Rc::new(obj.clone()));
+
+    locals.register(
+        String::from("__repr__"),
+        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+            String::from("__repr__"),
+            kya_bool_repr,
+        ))),
+    );
+
+    Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
+        locals,
+    ))))
+}
+
+pub fn kya_bool_repr(
+    interpreter: &mut Interpreter,
+    _: Vec<Rc<KyaObject>>,
+) -> Result<Rc<KyaObject>, Error> {
+    let instance = interpreter.resolve("self").ok_or_else(|| {
+        Error::RuntimeError("Bool object does not have a self attribute".to_string())
+    })?;
+
+    if let KyaObject::InstanceObject(obj) = instance.as_ref() {
+        if let Some(value) = obj.get_attribute("__value__") {
+            if let KyaObject::Bool(value) = value.as_ref() {
+                return Ok(Rc::new(KyaObject::String(KyaString::new(
+                    value.to_string(),
+                ))));
+            }
+        }
+    }
+
+    Err(Error::RuntimeError(
+        "Bool object does not have a __value__ attribute".to_string(),
+    ))
 }
