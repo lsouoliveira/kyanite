@@ -17,6 +17,7 @@ pub enum KyaObject {
     Method(KyaMethod),
     RsMethod(KyaRsMethod),
     Bool(bool),
+    Module(KyaModule),
 }
 
 impl KyaObject {
@@ -33,6 +34,7 @@ impl KyaObject {
             KyaObject::Method(m) => format!("Method({:?})", m.function),
             KyaObject::RsMethod(m) => format!("RsMethod({:?})", m.function),
             KyaObject::Bool(b) => b.to_string(),
+            KyaObject::Module(m) => format!("Module({:?})", m.name),
         }
     }
 }
@@ -181,6 +183,22 @@ pub struct KyaRsMethod {
 }
 
 impl KyaRsMethod {}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct KyaModule {
+    pub name: String,
+    pub objects: Context,
+}
+
+impl KyaModule {
+    pub fn new(name: String, objects: Context) -> Self {
+        KyaModule { name, objects }
+    }
+
+    pub fn resolve(&self, name: &str) -> Option<Rc<KyaObject>> {
+        self.objects.get(name)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Context {

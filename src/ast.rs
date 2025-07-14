@@ -18,6 +18,7 @@ pub enum ASTNode {
     Attribute(Attribute),
     Compare(Compare),
     If(If),
+    Import(Import),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -125,6 +126,17 @@ impl If {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct Import {
+    pub name: String,
+}
+
+impl Import {
+    pub fn new(name: String) -> Self {
+        Import { name }
+    }
+}
+
 impl ASTNode {
     pub fn accept(&self, visitor: &mut dyn Visitor) {
         match self {
@@ -139,6 +151,7 @@ impl ASTNode {
             ASTNode::Attribute(attribute) => visitor.visit_attribute(&attribute),
             ASTNode::Compare(compare) => visitor.visit_compare(&compare),
             ASTNode::If(if_node) => visitor.visit_if(&if_node),
+            ASTNode::Import(import) => visitor.visit_import(&import),
         }
     }
 
@@ -157,6 +170,7 @@ impl ASTNode {
             ASTNode::Attribute(attribute) => evaluator.eval_attribute(&attribute),
             ASTNode::Compare(compare) => evaluator.eval_compare(&compare),
             ASTNode::If(if_node) => evaluator.eval_if(&if_node),
+            ASTNode::Import(import) => evaluator.eval_import(&import),
         }
     }
 }

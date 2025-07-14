@@ -29,8 +29,8 @@ fn dump(input: &str) {
     }
 }
 
-fn interpret(input: &str) -> Result<(), String> {
-    let mut interpreter = Interpreter::new(input.to_string());
+fn interpret(filename: &str) -> Result<(), String> {
+    let mut interpreter = Interpreter::new(filename.to_string());
 
     match interpreter.evaluate() {
         Ok(_) => {}
@@ -63,6 +63,6 @@ fn main() {
     if cli.dump {
         dump(&input);
     } else {
-        interpret(&input).unwrap();
+        interpret(&cli.file).unwrap()
     }
 }

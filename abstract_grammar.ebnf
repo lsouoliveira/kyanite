@@ -8,7 +8,10 @@ simple_stmt = expression ;
 
 compound_stmt = function_def
               | if_stmt
+              | import_stmt
               | class_def ;
+
+import_stmt = "import" identifier
 
 function_def = "def" identifier "(" { params } ")" NEWLINE block "end" ;
 

@@ -122,4 +122,11 @@ impl Visitor for ASTDumper {
         self.push("]");
         self.push(")");
     }
+
+    fn visit_import(&mut self, import: &ast::Import) {
+        self.push("Import(");
+        self.concat("name: ");
+        self.push(&format!("\"{}\"", import.name));
+        self.push(")");
+    }
 }

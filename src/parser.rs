@@ -40,6 +40,8 @@ impl Parser {
             self.parse_class_def()?
         } else if self.accept(TokenType::If).is_some() {
             self.parse_if_statement()?
+        } else if self.accept(TokenType::Import).is_some() {
+            self.parse_import()?
         } else {
             self.parse_expression()?
         };
@@ -101,6 +103,19 @@ impl Parser {
         let if_node = ast::If::new(test, body);
 
         Ok(Box::new(ast::ASTNode::If(if_node)))
+    }
+
+    fn parse_import(&mut self) -> Result<Box<ast::ASTNode>, Error> {
+        let mut module_name = String::new();
+
+        while self.peek().is_some() && self.peek().unwrap().kind != TokenType::Newline {
+            module_name.push_str(&self.peek().unwrap().value);
+            self.next_token().unwrap();
+        }
+
+        Ok(Box::new(ast::ASTNode::Import(ast::Import {
+            name: module_name,
+        })))
     }
 
     fn parse_method_def(&mut self) -> Result<Box<ast::ASTNode>, Error> {
@@ -674,6 +689,23 @@ mod tests {
                 }))],
             },
         ))]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_import_statement() {
+        let input = "import my_module\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::Import(ast::Import {
+                name: "my_module".to_string(),
+            }),
+        )]));
 
         assert_eq!(result, expected);
     }

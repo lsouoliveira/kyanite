@@ -18,6 +18,7 @@ pub enum TokenType {
     Dot,
     Comment,
     If,
+    Import,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -82,6 +83,7 @@ fn symbols() -> HashMap<String, TokenType> {
     symbols.insert("class".to_string(), TokenType::Class);
     symbols.insert(".".to_string(), TokenType::Dot);
     symbols.insert("if".to_string(), TokenType::If);
+    symbols.insert("import".to_string(), TokenType::Import);
     symbols
 }
 
@@ -602,5 +604,24 @@ mod tests {
         assert_eq!(tokens[1].value, "condition");
         assert_eq!(tokens[1].line, 1);
         assert_eq!(tokens[1].column, 4);
+    }
+
+    #[test]
+    fn test_import_keyword() {
+        let mut lexer = Lexer::new("import module_name\n".to_string());
+        let tokens = [
+            lexer.next_token().unwrap().unwrap(),
+            lexer.next_token().unwrap().unwrap(),
+        ];
+
+        assert_eq!(tokens[0].kind, TokenType::Import);
+        assert_eq!(tokens[0].value, "import");
+        assert_eq!(tokens[0].line, 1);
+        assert_eq!(tokens[0].column, 1);
+
+        assert_eq!(tokens[1].kind, TokenType::Identifier);
+        assert_eq!(tokens[1].value, "module_name");
+        assert_eq!(tokens[1].line, 1);
+        assert_eq!(tokens[1].column, 8);
     }
 }

@@ -3,15 +3,17 @@ use crate::builtins::{kya_bool_new, kya_globals, kya_number_new, kya_print, kya_
 use crate::errors::Error;
 use crate::lexer::Lexer;
 use crate::objects::{
-    Context, KyaClass, KyaFrame, KyaFunction, KyaInstanceObject, KyaMethod, KyaNone, KyaObject,
-    KyaRsFunction, KyaRsMethod,
+    Context, KyaClass, KyaFrame, KyaFunction, KyaInstanceObject, KyaMethod, KyaModule, KyaNone,
+    KyaObject, KyaRsFunction, KyaRsMethod,
 };
 use crate::parser;
 use crate::visitor::Evaluator;
 use std::cell::RefCell;
+use std::fs;
 use std::rc::Rc;
 
 pub struct Interpreter {
+    filename: String,
     input: String,
     pub context: Context,
     frames: Vec<Rc<RefCell<KyaFrame>>>,
@@ -46,13 +48,31 @@ fn setup_builtins(context: &mut Context) {
     context.register(String::from("false"), kya_bool_new(false).unwrap());
 }
 
+fn import_module(root: &str, module_name: &str) -> Result<KyaObject, Error> {
+    let dir = std::path::Path::new(root)
+        .parent()
+        .ok_or_else(|| Error::RuntimeError("Failed to get parent directory".to_string()))?;
+    let module_path = dir.join(format!("{}.k", module_name));
+
+    let mut interpreter = Interpreter::new(module_path.to_string_lossy().to_string());
+    interpreter.evaluate()?;
+
+    Ok(KyaObject::Module(KyaModule::new(
+        module_name.to_string(),
+        interpreter.context.clone(),
+    )))
+}
+
 impl Interpreter {
-    pub fn new(input: String) -> Self {
+    pub fn new(filename: String) -> Self {
+        let input = fs::read_to_string(&filename)
+            .unwrap_or_else(|_| panic!("Failed to read file: {}", filename));
         let mut context = Context::new();
 
         setup_builtins(&mut context);
 
         Interpreter {
+            filename,
             input,
             context,
             frames: vec![],
@@ -77,6 +97,12 @@ impl Interpreter {
 
     pub fn resolve(&self, name: &str) -> Option<Rc<KyaObject>> {
         if let Some(object) = self.context.get(name) {
+            if let KyaObject::Module(module) = object.as_ref() {
+                if let Some(module_object) = module.resolve(name) {
+                    return Some(module_object);
+                }
+            }
+
             return Some(object.clone());
         }
 
@@ -420,6 +446,15 @@ impl Evaluator for Interpreter {
                     attribute.value
                 )));
             }
+        } else if let KyaObject::Module(module) = name.as_ref() {
+            if let Some(object) = module.resolve(attribute.value.as_str()) {
+                return Ok(object);
+            } else {
+                return Err(Error::RuntimeError(format!(
+                    "Undefined attribute in module: {}",
+                    attribute.value
+                )));
+            }
         }
 
         Err(Error::RuntimeError(format!(
@@ -461,5 +496,13 @@ impl Evaluator for Interpreter {
         }
 
         Ok(Rc::new(KyaObject::None(KyaNone {})))
+    }
+
+    fn eval_import(&mut self, import: &ast::Import) -> Result<Rc<KyaObject>, Error> {
+        let module = import_module(&self.filename, &import.name)?;
+
+        self.context.register(import.name.clone(), Rc::new(module));
+
+        return Ok(Rc::new(KyaObject::None(KyaNone {})));
     }
 }
