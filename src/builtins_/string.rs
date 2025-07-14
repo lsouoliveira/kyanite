@@ -1,7 +1,9 @@
+use crate::builtins_::list::kya_list_new;
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
 use crate::objects::{
-    kya_string_as_string, Context, KyaInstanceObject, KyaObject, KyaRsFunction, KyaString,
+    kya_string_as_string, unpack_string, Context, KyaInstanceObject, KyaObject, KyaRsFunction,
+    KyaString,
 };
 
 use std::rc::Rc;
@@ -75,6 +77,14 @@ pub fn kya_string_new(value: &str) -> Result<Rc<KyaObject>, Error> {
         ))),
     );
 
+    locals.register(
+        String::from("split"),
+        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+            String::from("split"),
+            kya_string_split,
+        ))),
+    );
+
     Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         "String".to_string(),
         locals,
@@ -137,4 +147,20 @@ pub fn kya_string_add(
     let self_value = kya_string_get_value(interpreter)?;
 
     Ok(kya_string_new(&(self_value + &other_value)).unwrap())
+}
+
+pub fn kya_string_split(
+    interpreter: &mut Interpreter,
+    args: Vec<Rc<KyaObject>>,
+) -> Result<Rc<KyaObject>, Error> {
+    let separator = unpack_string(&args, 0, 1)?;
+    let separator_value = kya_string_as_string(&separator)?;
+    let instance = interpreter.get_self()?;
+    let value = kya_string_as_string(&instance)?;
+    let items = value
+        .split(&separator_value)
+        .map(|s| kya_string_new(s).unwrap())
+        .collect::<Vec<Rc<KyaObject>>>();
+
+    Ok(kya_list_new(items).unwrap())
 }

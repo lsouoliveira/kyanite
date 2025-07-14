@@ -15,7 +15,9 @@ pub fn kya_list_repr(
     let values = kya_list_as_vec(&instance)?;
     let mut output = String::new();
 
-    for (_, value) in values.iter().enumerate() {
+    output.push('[');
+
+    for (i, value) in values.iter().enumerate() {
         if let KyaObject::InstanceObject(_) = value.as_ref() {
             let repr = interpreter.call_instance_method(value.clone(), "__repr__", vec![])?;
 
@@ -23,7 +25,13 @@ pub fn kya_list_repr(
         } else {
             output.push_str(&value.repr());
         }
+
+        if i < values.len() - 1 {
+            output.push_str(", ");
+        }
     }
+
+    output.push(']');
 
     Ok(kya_string_new(&output)?)
 }
