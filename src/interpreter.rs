@@ -1,6 +1,7 @@
 use crate::ast;
-use crate::builtins::{kya_bool_new, kya_globals, kya_number_new, kya_print};
+use crate::builtins::{kya_bool_new, kya_globals, kya_print};
 use crate::builtins_::modules::math;
+use crate::builtins_::number::kya_number_new;
 use crate::builtins_::string::kya_string_new;
 use crate::errors::Error;
 use crate::lexer::Lexer;

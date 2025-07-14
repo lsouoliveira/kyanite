@@ -1,4 +1,4 @@
-use crate::builtins::kya_number_new;
+use crate::builtins_::number::kya_number_new;
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
 use crate::objects::{
