@@ -18,6 +18,7 @@ pub enum KyaObject {
     RsMethod(KyaRsMethod),
     Bool(bool),
     Module(KyaModule),
+    List(KyaList),
 }
 
 impl KyaObject {
@@ -35,6 +36,10 @@ impl KyaObject {
             KyaObject::RsMethod(m) => format!("RsMethod({:?})", m.function),
             KyaObject::Bool(b) => b.to_string(),
             KyaObject::Module(m) => format!("Module({:?})", m.name),
+            KyaObject::List(l) => {
+                let items: Vec<String> = l.items.iter().map(|item| item.repr()).collect();
+                format!("List([{}])", items.join(", "))
+            }
         }
     }
 }
@@ -229,6 +234,25 @@ impl Context {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct KyaList {
+    items: Vec<Rc<KyaObject>>,
+}
+
+impl KyaList {
+    pub fn new(items: Vec<Rc<KyaObject>>) -> Self {
+        KyaList { items }
+    }
+
+    pub fn get(&self, index: usize) -> Option<&Rc<KyaObject>> {
+        self.items.get(index)
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+}
+
 pub fn unpack_number(
     args: &[Rc<KyaObject>],
     index: usize,
@@ -274,6 +298,20 @@ pub fn kya_string_as_string(object: &KyaObject) -> Result<String, Error> {
     };
 
     return Err(Error::TypeError("Expected a String instance".to_string()));
+}
+
+pub fn kya_list_as_vec(object: &KyaObject) -> Result<Vec<Rc<KyaObject>>, Error> {
+    if let KyaObject::InstanceObject(obj) = object {
+        if obj.name() == "List" {
+            if let Some(items) = obj.get_attribute("__items__") {
+                if let KyaObject::List(list) = items.as_ref() {
+                    return Ok(list.items.clone());
+                }
+            }
+        }
+    }
+
+    Err(Error::TypeError("Expected a List instance".to_string()))
 }
 
 #[cfg(test)]
