@@ -1,5 +1,6 @@
 use crate::ast;
 use crate::builtins::{kya_bool_new, kya_globals, kya_number_new, kya_print, kya_string_new};
+use crate::builtins_::math;
 use crate::errors::Error;
 use crate::lexer::Lexer;
 use crate::objects::{
@@ -9,6 +10,7 @@ use crate::objects::{
 use crate::parser;
 use crate::visitor::Evaluator;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fs;
 use std::rc::Rc;
 
@@ -17,6 +19,7 @@ pub struct Interpreter {
     input: String,
     pub context: Context,
     frames: Vec<Rc<RefCell<KyaFrame>>>,
+    builtin_modules: HashMap<String, KyaObject>,
 }
 
 fn setup_builtins(context: &mut Context) {
@@ -71,11 +74,17 @@ impl Interpreter {
 
         setup_builtins(&mut context);
 
+        let builtin_modules = vec![("math", math::pack_module())];
+
         Interpreter {
             filename,
             input,
             context,
             frames: vec![],
+            builtin_modules: builtin_modules
+                .into_iter()
+                .map(|(name, module)| (name.to_string(), module))
+                .collect(),
         }
     }
 
@@ -499,6 +508,13 @@ impl Evaluator for Interpreter {
     }
 
     fn eval_import(&mut self, import: &ast::Import) -> Result<Rc<KyaObject>, Error> {
+        if let Some(module) = self.builtin_modules.get(&import.name) {
+            self.context
+                .register(import.name.clone(), Rc::new(module.clone()));
+
+            return Ok(Rc::new(KyaObject::None(KyaNone {})));
+        }
+
         let module = import_module(&self.filename, &import.name)?;
 
         self.context.register(import.name.clone(), Rc::new(module));

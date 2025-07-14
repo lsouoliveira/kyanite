@@ -229,6 +229,43 @@ impl Context {
     }
 }
 
+pub fn unpack_number(
+    args: &[Rc<KyaObject>],
+    index: usize,
+    args_count: usize,
+) -> Result<Rc<KyaObject>, Error> {
+    if index >= args_count {
+        return Err(Error::TypeError(format!(
+            "Expected at least {} arguments, but got {}",
+            index + 1,
+            args_count
+        )));
+    }
+
+    if let Some(arg) = args.get(index) {
+        if let KyaObject::InstanceObject(obj) = arg.as_ref() {
+            if obj.name() == "Number" {
+                return Ok(arg.clone());
+            }
+        }
+    }
+
+    Err(Error::TypeError(format!(
+        "Expected a Number at index {}, found {:?}",
+        index, args[index]
+    )))
+}
+
+pub fn kya_number_as_float(object: &KyaObject) -> Result<f64, Error> {
+    if let KyaObject::InstanceObject(obj) = object {
+        if obj.name() == "Number" {
+            return Ok(obj.get_number_attribute("__value__").unwrap());
+        }
+    };
+
+    return Err(Error::TypeError("Expected a Number instance".to_string()));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
