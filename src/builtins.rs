@@ -1,6 +1,9 @@
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
-use crate::objects::{Context, KyaInstanceObject, KyaNone, KyaObject, KyaRsFunction, KyaString};
+use crate::objects::{
+    kya_number_as_float, unpack_number, Context, KyaInstanceObject, KyaNone, KyaObject,
+    KyaRsFunction, KyaString,
+};
 use std::rc::Rc;
 
 pub fn kya_print(
@@ -333,6 +336,16 @@ pub fn kya_number_eq(
     ))
 }
 
+pub fn kya_number_add(
+    interpreter: &mut Interpreter,
+    args: Vec<Rc<KyaObject>>,
+) -> Result<Rc<KyaObject>, Error> {
+    let other_value = kya_number_as_float(&args[0])?;
+    let self_value = kya_number_as_float(&interpreter.get_self().unwrap())?;
+
+    Ok(kya_number_new(self_value + other_value).unwrap())
+}
+
 pub fn kya_number_new(value: f64) -> Result<Rc<KyaObject>, Error> {
     let mut locals = Context::new();
     let obj = KyaObject::Number(value);
@@ -352,6 +365,14 @@ pub fn kya_number_new(value: f64) -> Result<Rc<KyaObject>, Error> {
         Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
             String::from("__eq__"),
             kya_number_eq,
+        ))),
+    );
+
+    locals.register(
+        String::from("__add__"),
+        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+            String::from("__add__"),
+            kya_number_add,
         ))),
     );
 

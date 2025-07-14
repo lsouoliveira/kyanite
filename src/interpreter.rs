@@ -3,6 +3,7 @@ use crate::builtins::{kya_bool_new, kya_globals, kya_number_new, kya_print, kya_
 use crate::builtins_::math;
 use crate::errors::Error;
 use crate::lexer::Lexer;
+use crate::lexer::TokenType;
 use crate::objects::{
     Context, KyaClass, KyaFrame, KyaFunction, KyaInstanceObject, KyaMethod, KyaModule, KyaNone,
     KyaObject, KyaRsFunction, KyaRsMethod,
@@ -520,5 +521,38 @@ impl Evaluator for Interpreter {
         self.context.register(import.name.clone(), Rc::new(module));
 
         return Ok(Rc::new(KyaObject::None(KyaNone {})));
+    }
+
+    fn eval_bin_op(&mut self, bin_op: &ast::BinOp) -> Result<Rc<KyaObject>, Error> {
+        let left = bin_op.left.eval(self)?;
+        let right = bin_op.right.eval(self)?;
+
+        if !matches!(left.as_ref(), KyaObject::InstanceObject(_)) {
+            return Err(Error::RuntimeError(format!(
+                "Invalid left operand for binary operation: {}",
+                left.repr()
+            )));
+        }
+
+        if !matches!(right.as_ref(), KyaObject::InstanceObject(_)) {
+            return Err(Error::RuntimeError(format!(
+                "Invalid right operand for binary operation: {}",
+                right.repr()
+            )));
+        }
+
+        match bin_op.operator {
+            TokenType::Plus => {
+                let args = vec![right];
+
+                return self.call_instance_method(left, "__add__", args);
+            }
+            _ => {
+                return Err(Error::RuntimeError(format!(
+                    "Unsupported binary operator: {:?}",
+                    bin_op.operator
+                )));
+            }
+        }
     }
 }

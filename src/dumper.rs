@@ -129,4 +129,15 @@ impl Visitor for ASTDumper {
         self.push(&format!("\"{}\"", import.name));
         self.push(")");
     }
+
+    fn visit_bin_op(&mut self, bin_op: &ast::BinOp) {
+        self.push("BinOp(");
+        self.concat("left: ");
+        bin_op.left.accept(self);
+        self.concat("operator: ");
+        self.push(&format!("{:?}", bin_op.operator));
+        self.concat("right: ");
+        bin_op.right.accept(self);
+        self.push(")");
+    }
 }

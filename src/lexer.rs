@@ -19,6 +19,7 @@ pub enum TokenType {
     Comment,
     If,
     Import,
+    Plus,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -58,8 +59,8 @@ fn is_string_literal(c: char) -> bool {
     c == '"' || c == '\''
 }
 
-fn is_number_literal(c: char) -> bool {
-    c.is_digit(10) || c == '+' || c == '-'
+fn is_number_literal(c: char, next_c: Option<char>) -> bool {
+    c.is_digit(10) || ((c == '+' || c == '-') && next_c.is_some() && next_c.unwrap().is_digit(10))
 }
 
 fn is_keyword(identifier: &str) -> bool {
@@ -84,6 +85,7 @@ fn symbols() -> HashMap<String, TokenType> {
     symbols.insert(".".to_string(), TokenType::Dot);
     symbols.insert("if".to_string(), TokenType::If);
     symbols.insert("import".to_string(), TokenType::Import);
+    symbols.insert("+".to_string(), TokenType::Plus);
     symbols
 }
 
@@ -120,16 +122,16 @@ impl Lexer {
                 continue;
             }
 
-            if is_symbol(c) {
-                return Ok(Some(self.read_symbol()));
-            }
-
             if is_string_literal(c) {
                 return self.read_string_literal();
             }
 
-            if is_number_literal(c) {
+            if is_number_literal(c, self.peek_ahead(1)) {
                 return self.read_number_literal();
+            }
+
+            if is_symbol(c) {
+                return Ok(Some(self.read_symbol()));
             }
 
             if is_identifier_start(c) {
@@ -153,6 +155,10 @@ impl Lexer {
 
     fn peek(&self) -> Option<char> {
         self.input[self.position..].chars().next()
+    }
+
+    fn peek_ahead(&self, offset: usize) -> Option<char> {
+        self.input[self.position + offset..].chars().next()
     }
 
     fn read_newline(&mut self) -> Token {

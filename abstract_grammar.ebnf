@@ -21,10 +21,14 @@ class_def = "class" identifier NEWLINE block "end" ;
 # Expressions
 
 expression = comparison ;
-comparison = primary { compare_op } 
-           | primary ;
+comparison = sum { compare_op } 
+           | sum ;
 compare_op = eq ;
-eq = "==" primary ;
+eq = "==" sum ;
+
+sum = sum "+" primary
+    | sum "-" primary
+    | primary
 
 primary = primary "." identifier
         | primary "(" params "}"

@@ -169,11 +169,11 @@ impl Parser {
     }
 
     fn parse_comparison(&mut self) -> Result<Box<ast::ASTNode>, Error> {
-        let mut primary = self.parse_primary()?;
+        let mut primary = self.parse_sum()?;
 
         loop {
             if self.accept(TokenType::EqEqual).is_some() {
-                let right = self.parse_primary()?;
+                let right = self.parse_sum()?;
 
                 primary = Box::new(ast::ASTNode::Compare(ast::Compare {
                     left: primary,
@@ -181,6 +181,33 @@ impl Parser {
                     right,
                 }));
             } else {
+                break;
+            }
+        }
+
+        Ok(primary)
+    }
+
+    fn parse_sum(&mut self) -> Result<Box<ast::ASTNode>, Error> {
+        let mut primary = self.parse_primary()?;
+        let operators = [TokenType::Plus];
+
+        loop {
+            let mut check = false;
+
+            for operator in &operators {
+                if let Some(_) = self.accept(operator.clone()) {
+                    let right = self.parse_primary()?;
+                    primary = Box::new(ast::ASTNode::BinOp(ast::BinOp {
+                        left: primary,
+                        operator: operator.clone(),
+                        right,
+                    }));
+                    check = true;
+                }
+            }
+
+            if !check {
                 break;
             }
         }
@@ -706,6 +733,29 @@ mod tests {
                 name: "my_module".to_string(),
             }),
         )]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_bin_op() {
+        let input = "a + b\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(ast::ASTNode::BinOp(
+            ast::BinOp {
+                left: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                    name: "a".to_string(),
+                })),
+                operator: TokenType::Plus,
+                right: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                    name: "b".to_string(),
+                })),
+            },
+        ))]));
 
         assert_eq!(result, expected);
     }
