@@ -1,7 +1,7 @@
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
 use crate::objects::{
-    kya_number_as_float, unpack_number, Context, KyaInstanceObject, KyaNone, KyaObject,
+    kya_number_as_float, kya_string_as_string, Context, KyaInstanceObject, KyaNone, KyaObject,
     KyaRsFunction, KyaString,
 };
 use std::rc::Rc;
@@ -130,6 +130,14 @@ pub fn kya_string_new(value: &str) -> Result<Rc<KyaObject>, Error> {
         ))),
     );
 
+    locals.register(
+        String::from("__add__"),
+        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+            String::from("__add__"),
+            kya_string_add,
+        ))),
+    );
+
     Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         "String".to_string(),
         locals,
@@ -176,6 +184,22 @@ pub fn kya_string_eq(
     Err(Error::RuntimeError(
         "String object does not have a __value__ attribute".to_string(),
     ))
+}
+
+pub fn kya_string_add(
+    interpreter: &mut Interpreter,
+    args: Vec<Rc<KyaObject>>,
+) -> Result<Rc<KyaObject>, Error> {
+    if args.len() != 1 {
+        return Err(Error::TypeError(
+            "add() requires exactly one argument".to_string(),
+        ));
+    }
+
+    let other_value = kya_string_as_string(&args[0])?;
+    let self_value = kya_string_get_value(interpreter)?;
+
+    Ok(kya_string_new(&(self_value + &other_value)).unwrap())
 }
 
 pub fn kya_bool_get_value(interpreter: &mut Interpreter) -> Result<bool, Error> {

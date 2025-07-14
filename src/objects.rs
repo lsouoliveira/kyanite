@@ -266,6 +266,16 @@ pub fn kya_number_as_float(object: &KyaObject) -> Result<f64, Error> {
     return Err(Error::TypeError("Expected a Number instance".to_string()));
 }
 
+pub fn kya_string_as_string(object: &KyaObject) -> Result<String, Error> {
+    if let KyaObject::InstanceObject(obj) = object {
+        if obj.name() == "String" {
+            return Ok(obj.get_string_attribute("__value__").unwrap());
+        }
+    };
+
+    return Err(Error::TypeError("Expected a String instance".to_string()));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
