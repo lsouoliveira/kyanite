@@ -1,3 +1,4 @@
+use crate::builtins_::string::kya_string_new;
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
 use crate::objects::{
@@ -17,9 +18,7 @@ pub fn kya_number_repr(
     if let KyaObject::InstanceObject(obj) = instance.as_ref() {
         if let Some(value) = obj.get_attribute("__value__") {
             if let KyaObject::Number(value) = value.as_ref() {
-                return Ok(Rc::new(KyaObject::String(KyaString::new(
-                    value.to_string(),
-                ))));
+                return kya_string_new(&value.to_string());
             }
         }
     }
