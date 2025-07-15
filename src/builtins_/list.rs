@@ -2,8 +2,8 @@ use crate::builtins_::string::kya_string_new;
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
 use crate::objects::{
-    kya_list_as_vec, kya_string_as_string, Context, KyaInstanceObject, KyaList, KyaObject,
-    KyaRsFunction,
+    kya_list_as_vec, kya_string_as_string, Context, KyaInstanceObject, KyaList, KyaMethod,
+    KyaObject, KyaRsFunction,
 };
 
 use std::cell::RefCell;
@@ -65,24 +65,34 @@ pub fn kya_list_new(items: Vec<Rc<KyaObject>>) -> Result<Rc<KyaObject>, Error> {
         Rc::new(KyaObject::List(KyaList::new(items))),
     );
 
-    locals.register(
-        String::from("__repr__"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("__repr__"),
-            kya_list_repr,
-        ))),
-    );
-
-    locals.register(
-        String::from("length"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("length"),
-            kya_list_length,
-        ))),
-    );
-
-    Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
+    let instance = Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         "List".to_string(),
         RefCell::new(locals),
-    ))))
+    )));
+
+    if let KyaObject::InstanceObject(instance_obj) = instance.as_ref() {
+        instance_obj.set_attribute(
+            String::from("__repr__"),
+            Rc::new(KyaObject::Method(KyaMethod {
+                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                    String::from("__repr__"),
+                    kya_list_repr,
+                ))),
+                instance: instance.clone(),
+            })),
+        );
+
+        instance_obj.set_attribute(
+            String::from("length"),
+            Rc::new(KyaObject::Method(KyaMethod {
+                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                    String::from("length"),
+                    kya_list_length,
+                ))),
+                instance: instance.clone(),
+            })),
+        );
+    }
+
+    Ok(instance)
 }
