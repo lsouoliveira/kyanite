@@ -5,6 +5,8 @@ use crate::objects::{
     kya_list_as_vec, kya_string_as_string, Context, KyaInstanceObject, KyaList, KyaObject,
     KyaRsFunction,
 };
+
+use std::cell::RefCell;
 use std::rc::Rc;
 
 pub fn kya_list_repr(
@@ -81,6 +83,6 @@ pub fn kya_list_new(items: Vec<Rc<KyaObject>>) -> Result<Rc<KyaObject>, Error> {
 
     Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         "List".to_string(),
-        locals,
+        RefCell::new(locals),
     ))))
 }

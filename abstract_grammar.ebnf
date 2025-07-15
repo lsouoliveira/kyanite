@@ -16,7 +16,7 @@ import_stmt = "import" identifier
 function_def = "def" identifier "(" { params } ")" NEWLINE block "end" ;
 
 if_stmt = "if" expression NEWLINE block NEWLINE "end" ;
-class_def = "class" identifier NEWLINE block "end" ;
+class_def = "class" ( "(" ( params ) ")" ) identifier NEWLINE block "end" ;
 
 # Expressions
 
@@ -31,10 +31,12 @@ sum = sum "+" primary
     | primary
 
 primary = primary "." identifier
-        | primary "(" params "}"
+        | primary "(" arguments "}"
         | atom ;
 
 atom = identifier
+
+arguments = { expression }
 
 params = { parameter }
 parameter = param ","

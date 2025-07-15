@@ -6,7 +6,9 @@ use crate::objects::{
     KyaString,
 };
 
+use std::cell::RefCell;
 use std::rc::Rc;
+
 pub fn kya_string_repr(
     interpreter: &mut Interpreter,
     _: Vec<Rc<KyaObject>>,
@@ -87,7 +89,7 @@ pub fn kya_string_new(value: &str) -> Result<Rc<KyaObject>, Error> {
 
     Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         "String".to_string(),
-        locals,
+        RefCell::new(locals),
     ))))
 }
 

@@ -1,6 +1,8 @@
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
 use crate::objects::{Context, KyaInstanceObject, KyaObject, KyaRsFunction, KyaString};
+
+use std::cell::RefCell;
 use std::rc::Rc;
 
 pub fn kya_bool_get_value(interpreter: &mut Interpreter) -> Result<bool, Error> {
@@ -69,7 +71,7 @@ pub fn kya_bool_new(value: bool) -> Result<Rc<KyaObject>, Error> {
 
     Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         "Bool".to_string(),
-        locals,
+        RefCell::new(locals),
     ))))
 }
 

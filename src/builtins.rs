@@ -1,9 +1,10 @@
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
 use crate::objects::{
-    kya_number_as_float, kya_string_as_string, Context, KyaInstanceObject, KyaNone, KyaObject,
-    KyaRsFunction, KyaString,
+    kya_string_as_string, Context, KyaInstanceObject, KyaNone, KyaObject, KyaRsFunction, KyaString,
 };
+
+use std::cell::RefCell;
 use std::rc::Rc;
 
 pub fn kya_print(
@@ -111,7 +112,7 @@ pub fn kya_bool_new(value: bool) -> Result<Rc<KyaObject>, Error> {
 
     Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         "Bool".to_string(),
-        locals,
+        RefCell::new(locals),
     ))))
 }
 

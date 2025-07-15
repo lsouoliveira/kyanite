@@ -198,7 +198,7 @@ impl Interpreter {
 
             return Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
                 class.name.clone(),
-                frame.borrow().locals.clone(),
+                RefCell::new(frame.borrow().locals.clone()),
             ))));
         } else if let KyaObject::Method(method) = callee.as_ref() {
             if let KyaObject::Function(func) = method.function.as_ref() {
@@ -385,6 +385,12 @@ impl Evaluator for Interpreter {
             }
 
             self.register_local(identifier.name.clone(), value.clone())?;
+        } else if let ast::ASTNode::Attribute(attribute) = &*assignment.name {
+            let instance = attribute.name.eval(self)?;
+
+            if let KyaObject::InstanceObject(instance_object) = instance.as_ref() {
+                instance_object.set_attribute(attribute.value.clone(), value.clone());
+            }
         } else {
             return Err(Error::RuntimeError(format!(
                 "Invalid assignment target: {:?}",

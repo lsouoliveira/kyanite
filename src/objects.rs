@@ -1,6 +1,7 @@
 use crate::ast::ASTNode;
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -125,11 +126,11 @@ impl KyaClass {
 #[derive(Debug, Clone, PartialEq)]
 pub struct KyaInstanceObject {
     name: String,
-    pub attributes: Context,
+    pub attributes: RefCell<Context>,
 }
 
 impl KyaInstanceObject {
-    pub fn new(name: String, attributes: Context) -> Self {
+    pub fn new(name: String, attributes: RefCell<Context>) -> Self {
         KyaInstanceObject { name, attributes }
     }
 
@@ -138,11 +139,15 @@ impl KyaInstanceObject {
     }
 
     pub fn get_attribute(&self, name: &str) -> Option<Rc<KyaObject>> {
-        if let Some(object) = self.attributes.get(name) {
+        if let Some(object) = self.attributes.borrow().get(name) {
             Some(object.clone())
         } else {
             None
         }
+    }
+
+    pub fn set_attribute(&self, name: String, value: Rc<KyaObject>) {
+        self.attributes.borrow_mut().register(name, value);
     }
 
     pub fn get_string_attribute(&self, name: &str) -> Option<String> {
@@ -207,18 +212,18 @@ impl KyaModule {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Context {
-    pub objects: HashMap<String, Rc<KyaObject>>,
+    pub objects: RefCell<HashMap<String, Rc<KyaObject>>>,
 }
 
 impl Context {
     pub fn new() -> Self {
         Context {
-            objects: HashMap::new(),
+            objects: RefCell::new(HashMap::new()),
         }
     }
 
     pub fn get(&self, name: &str) -> Option<Rc<KyaObject>> {
-        if let Some(object) = self.objects.get(name) {
+        if let Some(object) = self.objects.borrow().get(name) {
             Some(object.clone())
         } else {
             None
@@ -226,11 +231,11 @@ impl Context {
     }
 
     pub fn register(&mut self, name: String, object: Rc<KyaObject>) {
-        self.objects.insert(name, object);
+        self.objects.borrow_mut().insert(name, object);
     }
 
     pub fn keys(&self) -> Vec<String> {
-        self.objects.keys().cloned().collect()
+        self.objects.borrow().keys().cloned().collect()
     }
 }
 

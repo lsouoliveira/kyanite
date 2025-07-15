@@ -3,6 +3,7 @@ use crate::interpreter::Interpreter;
 use crate::objects::{
     kya_number_as_float, Context, KyaInstanceObject, KyaObject, KyaRsFunction, KyaString,
 };
+use std::cell::RefCell;
 use std::rc::Rc;
 
 pub fn kya_number_repr(
@@ -112,6 +113,6 @@ pub fn kya_number_new(value: f64) -> Result<Rc<KyaObject>, Error> {
 
     Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         "Number".to_string(),
-        locals,
+        RefCell::new(locals),
     ))))
 }
