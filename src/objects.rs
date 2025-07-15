@@ -11,13 +11,11 @@ pub enum KyaObject {
     Number(f64),
     RsFunction(KyaRsFunction),
     Function(KyaFunction),
-    Frame(KyaFrame),
     Class(KyaClass),
     RsClass(KyaRsClass),
     None(KyaNone),
     InstanceObject(KyaInstanceObject),
     Method(KyaMethod),
-    RsMethod(KyaRsMethod),
     Bool(bool),
     Module(KyaModule),
     List(KyaList),
@@ -31,11 +29,9 @@ impl KyaObject {
             KyaObject::None(_) => "None".to_string(),
             KyaObject::Number(n) => n.to_string(),
             KyaObject::Function(f) => format!("Function({:?})", f.name),
-            KyaObject::Frame(f) => format!("Frame({:?})", f.locals),
             KyaObject::Class(c) => format!("Class({:?})", c.name),
             KyaObject::InstanceObject(i) => format!("InstanceObject({:?})", i.attributes),
             KyaObject::Method(m) => format!("Method({:?})", m.function),
-            KyaObject::RsMethod(m) => format!("RsMethod({:?})", m.function),
             KyaObject::Bool(b) => b.to_string(),
             KyaObject::Module(m) => format!("Module({:?})", m.name),
             KyaObject::List(l) => {
@@ -45,6 +41,59 @@ impl KyaObject {
             KyaObject::RsClass(c) => format!("RsClass({:?})", c.name),
         }
     }
+
+    pub fn as_callable(&self) -> Option<&dyn Callable> {
+        match self {
+            KyaObject::RsFunction(f) => Some(f),
+            KyaObject::Function(f) => Some(f),
+            KyaObject::Class(c) => Some(c),
+            KyaObject::RsClass(c) => Some(c),
+            KyaObject::Method(m) => Some(m),
+            _ => None,
+        }
+    }
+
+    pub fn as_get_attribute(&self) -> Option<&dyn GetAttribute> {
+        match self {
+            KyaObject::InstanceObject(i) => Some(i),
+            _ => None,
+        }
+    }
+
+    pub fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        args: Vec<Rc<KyaObject>>,
+    ) -> Result<Rc<KyaObject>, Error> {
+        if let Some(callable) = self.as_callable() {
+            return callable.call(interpreter, args);
+        }
+
+        Err(Error::TypeError(format!(
+            "Object of type {} is not callable",
+            self.repr()
+        )))
+    }
+
+    pub fn get_attribute(&self, name: &str) -> Rc<KyaObject> {
+        if let Some(getter) = self.as_get_attribute() {
+            return getter.get_attribute(name);
+        }
+
+        Rc::new(KyaObject::None(KyaNone {}))
+    }
+}
+
+pub trait Callable {
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        args: Vec<Rc<KyaObject>>,
+    ) -> Result<Rc<KyaObject>, Error>;
+}
+
+pub trait GetAttribute {
+    fn get_attribute(&self, name: &str) -> Rc<KyaObject>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -69,12 +118,15 @@ pub struct KyaRsFunction {
     pub name: String,
     pub function: KyaRsFunctionPtr,
 }
+
 impl KyaRsFunction {
     pub fn new(name: String, function: KyaRsFunctionPtr) -> Self {
         KyaRsFunction { name, function }
     }
+}
 
-    pub fn call(
+impl Callable for KyaRsFunction {
+    fn call(
         &self,
         interpreter: &mut Interpreter,
         args: Vec<Rc<KyaObject>>,
@@ -97,6 +149,42 @@ impl KyaFunction {
             parameters,
             body,
         }
+    }
+}
+
+impl Callable for KyaFunction {
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        args: Vec<Rc<KyaObject>>,
+    ) -> Result<Rc<KyaObject>, Error> {
+        let frame = Rc::new(RefCell::new(KyaFrame::new()));
+
+        if self.parameters.len() != args.len() {
+            return Err(Error::RuntimeError(format!(
+                "{}() takes {} argument(s) but {} were given",
+                self.name,
+                self.parameters.len(),
+                args.len()
+            )));
+        }
+
+        for (i, param) in self.parameters.iter().enumerate() {
+            let arg = args[i].clone();
+            frame.borrow_mut().locals.register(param.clone(), arg);
+        }
+
+        interpreter.frames.push(frame);
+
+        let mut result = Rc::new(KyaObject::None(KyaNone {}));
+
+        for stmt in &self.body {
+            result = stmt.eval(interpreter)?;
+        }
+
+        interpreter.frames.pop();
+
+        return Ok(result);
     }
 }
 
@@ -125,6 +213,33 @@ impl KyaClass {
     }
 }
 
+impl Callable for KyaClass {
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        args: Vec<Rc<KyaObject>>,
+    ) -> Result<Rc<KyaObject>, Error> {
+        let frame = Rc::new(RefCell::new(KyaFrame::new()));
+
+        interpreter.frames.push(frame.clone());
+
+        self.body.iter().for_each(|stmt| {
+            stmt.eval(interpreter).unwrap();
+        });
+
+        interpreter.frames.pop();
+
+        let instance = Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
+            self.name.clone(),
+            RefCell::new(frame.borrow().locals.clone()),
+        )));
+
+        call_constructor(interpreter, instance.clone(), args)?;
+
+        Ok(instance)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct KyaRsClass {
     pub name: String,
@@ -150,10 +265,34 @@ impl KyaRsClass {
     }
 }
 
+impl Callable for KyaRsClass {
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        args: Vec<Rc<KyaObject>>,
+    ) -> Result<Rc<KyaObject>, Error> {
+        let instance = self.instantiate(interpreter, args.clone())?;
+
+        call_constructor(interpreter, instance.clone(), args)?;
+
+        return Ok(instance);
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct KyaInstanceObject {
     name: String,
     pub attributes: RefCell<Context>,
+}
+
+impl GetAttribute for KyaInstanceObject {
+    fn get_attribute(&self, name: &str) -> Rc<KyaObject> {
+        if let Some(object) = self.attributes.borrow().get(name) {
+            return object.clone();
+        }
+
+        Rc::new(KyaObject::None(KyaNone {}))
+    }
 }
 
 impl KyaInstanceObject {
@@ -213,13 +352,28 @@ pub struct KyaMethod {
 
 impl KyaMethod {}
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct KyaRsMethod {
-    pub function: Rc<KyaObject>,
-    pub instance: Rc<KyaObject>,
-}
+impl Callable for KyaMethod {
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        args: Vec<Rc<KyaObject>>,
+    ) -> Result<Rc<KyaObject>, Error> {
+        let frame = Rc::new(RefCell::new(KyaFrame::new()));
 
-impl KyaRsMethod {}
+        frame
+            .borrow_mut()
+            .locals
+            .register(String::from("self"), self.instance.clone());
+
+        interpreter.frames.push(frame);
+
+        let result = self.function.call(interpreter, args)?;
+
+        interpreter.frames.pop();
+
+        return Ok(result);
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct KyaModule {

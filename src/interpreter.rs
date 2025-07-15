@@ -8,8 +8,8 @@ use crate::errors::Error;
 use crate::lexer::Lexer;
 use crate::lexer::TokenType;
 use crate::objects::{
-    call_constructor, Context, KyaClass, KyaFrame, KyaFunction, KyaInstanceObject, KyaMethod,
-    KyaModule, KyaNone, KyaObject, KyaRsClass, KyaRsFunction, KyaRsMethod,
+    Context, KyaClass, KyaFrame, KyaFunction, KyaMethod, KyaModule, KyaNone, KyaObject, KyaRsClass,
+    KyaRsFunction,
 };
 use crate::parser;
 use crate::visitor::Evaluator;
@@ -23,7 +23,7 @@ pub struct Interpreter {
     root: PathBuf,
     input: String,
     pub context: Context,
-    frames: Vec<Rc<RefCell<KyaFrame>>>,
+    pub frames: Vec<Rc<RefCell<KyaFrame>>>,
     builtin_modules: HashMap<String, KyaObject>,
 }
 
@@ -158,124 +158,6 @@ impl Interpreter {
         Ok(object)
     }
 
-    pub fn call(
-        &mut self,
-        callee: Rc<KyaObject>,
-        args: Vec<Rc<KyaObject>>,
-    ) -> Result<Rc<KyaObject>, Error> {
-        if let KyaObject::RsFunction(func) = callee.as_ref() {
-            return func.call(self, args);
-        } else if let KyaObject::Function(func) = callee.as_ref() {
-            let frame = Rc::new(RefCell::new(KyaFrame::new()));
-
-            if func.parameters.len() != args.len() {
-                return Err(Error::RuntimeError(format!(
-                    "{}() takes {} argument(s) but {} were given",
-                    func.name,
-                    func.parameters.len(),
-                    args.len()
-                )));
-            }
-
-            for (i, param) in func.parameters.iter().enumerate() {
-                let arg = args[i].clone();
-                frame.borrow_mut().locals.register(param.clone(), arg);
-            }
-
-            self.frames.push(frame);
-
-            let mut result = Rc::new(KyaObject::None(KyaNone {}));
-
-            for stmt in &func.body {
-                result = stmt.eval(self)?;
-            }
-
-            self.frames.pop();
-
-            return Ok(result);
-        } else if let KyaObject::Class(class) = callee.as_ref() {
-            let frame = Rc::new(RefCell::new(KyaFrame::new()));
-
-            self.frames.push(frame.clone());
-
-            class.body.iter().for_each(|stmt| {
-                stmt.eval(self).unwrap();
-            });
-
-            self.frames.pop();
-
-            let instance = Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
-                class.name.clone(),
-                RefCell::new(frame.borrow().locals.clone()),
-            )));
-
-            call_constructor(self, instance.clone(), args)?;
-
-            return Ok(instance);
-        } else if let KyaObject::RsClass(class) = callee.as_ref() {
-            let instance = class.instantiate(self, args.clone())?;
-
-            call_constructor(self, instance.clone(), args)?;
-
-            return Ok(instance);
-        } else if let KyaObject::Method(method) = callee.as_ref() {
-            if let KyaObject::Function(func) = method.function.as_ref() {
-                let frame = Rc::new(RefCell::new(KyaFrame::new()));
-
-                frame
-                    .borrow_mut()
-                    .locals
-                    .register(String::from("self"), method.instance.clone());
-
-                if func.parameters.len() != args.len() {
-                    return Err(Error::RuntimeError(format!(
-                        "{}() takes {} argument(s) but {} were given",
-                        func.name,
-                        func.parameters.len(),
-                        args.len()
-                    )));
-                }
-
-                for (i, param) in func.parameters.iter().enumerate() {
-                    let arg = args[i].clone();
-                    frame.borrow_mut().locals.register(param.clone(), arg);
-                }
-
-                self.frames.push(frame);
-
-                let mut result = Rc::new(KyaObject::None(KyaNone {}));
-
-                for stmt in &func.body {
-                    result = stmt.eval(self)?;
-                }
-
-                self.frames.pop();
-
-                return Ok(result);
-            }
-        } else if let KyaObject::RsMethod(method) = callee.as_ref() {
-            if let KyaObject::RsFunction(func) = method.function.as_ref() {
-                let frame = Rc::new(RefCell::new(KyaFrame::new()));
-
-                frame
-                    .borrow_mut()
-                    .locals
-                    .register(String::from("self"), method.instance.clone());
-
-                self.frames.push(frame);
-                let result = func.call(self, args)?;
-                self.frames.pop();
-
-                return Ok(result);
-            }
-        }
-
-        Err(Error::RuntimeError(format!(
-            "Cannot call non-function object: {}",
-            callee.repr()
-        )))
-    }
-
     pub fn call_instance_method(
         &mut self,
         instance_object: Rc<KyaObject>,
@@ -292,7 +174,7 @@ impl Interpreter {
                         instance: instance_object.clone(),
                     }))
                 } else if let KyaObject::RsFunction(_) = method.as_ref() {
-                    Rc::new(KyaObject::RsMethod(KyaRsMethod {
+                    Rc::new(KyaObject::Method(KyaMethod {
                         function: method.clone(),
                         instance: instance_object.clone(),
                     }))
@@ -303,7 +185,7 @@ impl Interpreter {
                     )))?
                 };
 
-                return Ok(self.call(method, args)?);
+                return Ok(method.call(self, args)?);
             }
         }
 
@@ -388,7 +270,7 @@ impl Evaluator for Interpreter {
             .map(|arg| arg.eval(self))
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(self.call(callee.clone(), args)?)
+        Ok(callee.call(self, args)?)
     }
 
     fn eval_assignment(&mut self, assignment: &ast::Assignment) -> Result<Rc<KyaObject>, Error> {
@@ -470,7 +352,7 @@ impl Evaluator for Interpreter {
                         instance: name.clone(),
                     })));
                 } else if let KyaObject::RsFunction(_) = object.as_ref() {
-                    return Ok(Rc::new(KyaObject::RsMethod(KyaRsMethod {
+                    return Ok(Rc::new(KyaObject::Method(KyaMethod {
                         function: object.clone(),
                         instance: name.clone(),
                     })));
@@ -504,25 +386,7 @@ impl Evaluator for Interpreter {
         let left = compare.left.eval(self)?;
         let right = compare.right.eval(self)?;
 
-        if let KyaObject::InstanceObject(_) = left.as_ref() {
-            if let KyaObject::InstanceObject(_) = right.as_ref() {
-                let args = vec![right.clone()];
-
-                return Ok(self.call_instance_method(left.clone(), "__eq__", args)?);
-            } else {
-                Err(Error::RuntimeError(format!(
-                    "Invalid right operand for comparison: {}",
-                    right.repr()
-                )))?;
-            }
-        } else {
-            Err(Error::RuntimeError(format!(
-                "Invalid left operand for comparison: {}",
-                left.repr()
-            )))?;
-        }
-
-        Ok(self.context.get("false").unwrap().clone())
+        return left.get_attribute("__eq__").call(self, vec![right.clone()]);
     }
 
     fn eval_if(&mut self, if_node: &ast::If) -> Result<Rc<KyaObject>, Error> {
