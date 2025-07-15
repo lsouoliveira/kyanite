@@ -10,6 +10,7 @@ class MyClass
         self.attribute = "1"
 
         print("Attribute: " + self.attribute)
+        print("Attribute2: " + self.attribute2)
     end
 end
 

@@ -58,7 +58,15 @@ impl Parser {
 
     fn parse_class_def(&mut self) -> Result<Box<ast::ASTNode>, Error> {
         let identifier = self.expect(TokenType::Identifier)?;
+        let mut parameters = vec![];
+
         self.expect(TokenType::Newline)?;
+
+        if self.accept(TokenType::LeftParen).is_some() {
+            parameters = self.parse_parameters()?;
+
+            self.expect(TokenType::RightParen)?;
+        }
 
         let mut body = Vec::new();
 
@@ -75,7 +83,7 @@ impl Parser {
             }
         }
 
-        let class_def = ast::ClassDef::new(identifier.value.clone(), body);
+        let class_def = ast::ClassDef::new(identifier.value.clone(), body, parameters);
 
         Ok(Box::new(ast::ASTNode::ClassDef(class_def)))
     }
@@ -594,6 +602,7 @@ mod tests {
             ast::ASTNode::ClassDef(ast::ClassDef {
                 name: "MyClass".to_string(),
                 body: vec![],
+                parameters: vec![],
             }),
         )]));
 

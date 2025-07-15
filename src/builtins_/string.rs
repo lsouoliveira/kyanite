@@ -2,8 +2,8 @@ use crate::builtins_::list::kya_list_new;
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
 use crate::objects::{
-    kya_string_as_string, unpack_string, Context, KyaInstanceObject, KyaObject, KyaRsFunction,
-    KyaString,
+    kya_string_as_string, unpack_string, Context, KyaInstanceObject, KyaNone, KyaObject,
+    KyaRsFunction, KyaString,
 };
 
 use std::cell::RefCell;
@@ -39,12 +39,39 @@ pub fn kya_string_length(
     ))
 }
 
+pub fn kya_string_init(
+    interpreter: &mut Interpreter,
+    args: Vec<Rc<KyaObject>>,
+) -> Result<Rc<KyaObject>, Error> {
+    let instance = interpreter.get_self()?;
+    let arg = unpack_string(&args, 0, 1)
+        .unwrap_or_else(|_| Rc::new(KyaObject::String(KyaString::new("".to_string()))));
+    let value = kya_string_as_string(&arg)?;
+
+    if let KyaObject::InstanceObject(obj) = instance.as_ref() {
+        obj.set_attribute(
+            "__value__".to_string(),
+            Rc::new(KyaObject::String(KyaString::new(value))),
+        );
+    }
+
+    Ok(Rc::new(KyaObject::None(KyaNone {})))
+}
+
 pub fn kya_string_new(value: &str) -> Result<Rc<KyaObject>, Error> {
     let mut locals = Context::new();
 
     locals.register(
         String::from("__value__"),
         Rc::new(KyaObject::String(KyaString::new(value.to_string()))),
+    );
+
+    locals.register(
+        String::from("constructor"),
+        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+            String::from("constructor"),
+            kya_string_init,
+        ))),
     );
 
     locals.register(

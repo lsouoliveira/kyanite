@@ -115,11 +115,16 @@ impl KyaFrame {
 pub struct KyaClass {
     pub name: String,
     pub body: Vec<Box<ASTNode>>,
+    pub parameters: Vec<String>,
 }
 
 impl KyaClass {
-    pub fn new(name: String, body: Vec<Box<ASTNode>>) -> Self {
-        KyaClass { name, body }
+    pub fn new(name: String, body: Vec<Box<ASTNode>>, parameters: Vec<String>) -> Self {
+        KyaClass {
+            name,
+            body,
+            parameters,
+        }
     }
 }
 
@@ -353,7 +358,7 @@ mod tests {
     #[test]
     fn test_context() {
         let context = Context::new();
-        assert_eq!(context.objects.len(), 0);
+        assert_eq!(context.objects.borrow().len(), 0);
     }
 
     #[test]
@@ -391,7 +396,7 @@ mod tests {
     #[test]
     fn test_kya_frame() {
         let kya_frame = KyaFrame::new();
-        assert_eq!(kya_frame.locals.objects.len(), 0);
+        assert_eq!(kya_frame.locals.objects.borrow().len(), 0);
     }
 
     #[test]

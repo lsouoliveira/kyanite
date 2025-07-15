@@ -48,6 +48,7 @@ fn setup_builtins(context: &mut Context) {
         Rc::new(KyaObject::Class(KyaClass::new(
             String::from("String"),
             vec![],
+            vec![String::from("value")],
         ))),
     );
 
@@ -196,10 +197,25 @@ impl Interpreter {
 
             self.frames.pop();
 
-            return Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
+            let instance = Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
                 class.name.clone(),
                 RefCell::new(frame.borrow().locals.clone()),
-            ))));
+            )));
+
+            if let KyaObject::InstanceObject(instance_object) = instance.as_ref() {
+                if let Some(_) = instance_object.get_attribute("constructor") {
+                    let init_args = args.clone();
+
+                    self.call_instance_method(instance.clone(), "constructor", init_args)?;
+                } else if !class.parameters.is_empty() {
+                    return Err(Error::RuntimeError(format!(
+                        "Class {} requires constructor arguments",
+                        class.name
+                    )));
+                }
+            }
+
+            return Ok(instance);
         } else if let KyaObject::Method(method) = callee.as_ref() {
             if let KyaObject::Function(func) = method.function.as_ref() {
                 let frame = Rc::new(RefCell::new(KyaFrame::new()));
@@ -431,9 +447,23 @@ impl Evaluator for Interpreter {
     }
 
     fn eval_class_def(&mut self, class_def: &ast::ClassDef) -> Result<Rc<KyaObject>, Error> {
+        let mut parameters = vec![];
+
+        for param in &class_def.parameters {
+            if let ast::ASTNode::Identifier(identifier) = &**param {
+                parameters.push(identifier.name.clone());
+            } else {
+                return Err(Error::RuntimeError(format!(
+                    "Invalid parameter: {:?}",
+                    param
+                )));
+            }
+        }
+
         let class = Rc::new(KyaObject::Class(KyaClass::new(
             class_def.name.clone(),
             class_def.body.clone(),
+            parameters,
         )));
 
         self.register_local(class_def.name.clone(), class.clone())?;
