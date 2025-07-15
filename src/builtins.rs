@@ -1,10 +1,9 @@
+use crate::builtins_::string::kya_string_new;
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
-use crate::objects::{
-    kya_string_as_string, Context, KyaInstanceObject, KyaNone, KyaObject, KyaRsFunction, KyaString,
-};
+use crate::objects::{kya_string_as_string, unpack_string, KyaNone, KyaObject};
 
-use std::cell::RefCell;
+use std::io::Write;
 use std::rc::Rc;
 
 pub fn kya_print(
@@ -46,95 +45,21 @@ pub fn kya_globals(
     Ok(Rc::new(KyaObject::None(KyaNone {})))
 }
 
-pub fn kya_bool_get_value(interpreter: &mut Interpreter) -> Result<bool, Error> {
-    let instance = interpreter.get_self()?;
-
-    if let KyaObject::InstanceObject(obj) = instance.as_ref() {
-        return Ok(obj.get_bool_attribute("__value__").unwrap());
-    }
-
-    Err(Error::RuntimeError(
-        "Bool object does not have a __value__ attribute".to_string(),
-    ))
-}
-
-pub fn kya_bool_eq(
-    interpreter: &mut Interpreter,
+pub fn kya_input(
+    _interpreter: &mut Interpreter,
     args: Vec<Rc<KyaObject>>,
 ) -> Result<Rc<KyaObject>, Error> {
-    if args.len() != 1 {
-        return Err(Error::TypeError(
-            "eq() requires exactly one argument".to_string(),
-        ));
-    }
+    let arg = unpack_string(&args, 0, 1).unwrap_or_else(|_| kya_string_new("").unwrap());
+    let prompt = kya_string_as_string(&arg)?;
 
-    if let KyaObject::InstanceObject(obj) = args[0].as_ref() {
-        if obj.name() != "Bool" {
-            return Ok(interpreter.false_object());
-        }
+    print!("{}", prompt);
 
-        let self_value = kya_bool_get_value(interpreter)?;
-        let other_value = obj.get_bool_attribute("__value__").unwrap();
+    let _ = std::io::stdout().flush();
+    let mut input = String::new();
 
-        if self_value == other_value {
-            return Ok(interpreter.true_object());
-        } else {
-            return Ok(interpreter.false_object());
-        }
-    }
+    std::io::stdin()
+        .read_line(&mut input)
+        .map_err(|_| Error::RuntimeError("Failed to read input".to_string()))?;
 
-    Err(Error::RuntimeError(
-        "Bool object does not have a __value__ attribute".to_string(),
-    ))
-}
-
-pub fn kya_bool_new(value: bool) -> Result<Rc<KyaObject>, Error> {
-    let mut locals = Context::new();
-    let obj = KyaObject::Bool(value);
-
-    locals.register(String::from("__value__"), Rc::new(obj.clone()));
-
-    locals.register(
-        String::from("__repr__"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("__repr__"),
-            kya_bool_repr,
-        ))),
-    );
-
-    locals.register(
-        String::from("__eq__"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("__eq__"),
-            kya_bool_eq,
-        ))),
-    );
-
-    Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
-        "Bool".to_string(),
-        RefCell::new(locals),
-    ))))
-}
-
-pub fn kya_bool_repr(
-    interpreter: &mut Interpreter,
-    _: Vec<Rc<KyaObject>>,
-) -> Result<Rc<KyaObject>, Error> {
-    let instance = interpreter.resolve("self").ok_or_else(|| {
-        Error::RuntimeError("Bool object does not have a self attribute".to_string())
-    })?;
-
-    if let KyaObject::InstanceObject(obj) = instance.as_ref() {
-        if let Some(value) = obj.get_attribute("__value__") {
-            if let KyaObject::Bool(value) = value.as_ref() {
-                return Ok(Rc::new(KyaObject::String(KyaString::new(
-                    value.to_string(),
-                ))));
-            }
-        }
-    }
-
-    Err(Error::RuntimeError(
-        "Bool object does not have a __value__ attribute".to_string(),
-    ))
+    Ok(kya_string_new(&input.trim_end().to_string()).unwrap())
 }

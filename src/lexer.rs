@@ -20,6 +20,7 @@ pub enum TokenType {
     If,
     Import,
     Plus,
+    Minus,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -59,8 +60,8 @@ fn is_string_literal(c: char) -> bool {
     c == '"' || c == '\''
 }
 
-fn is_number_literal(c: char, next_c: Option<char>) -> bool {
-    c.is_digit(10) || ((c == '+' || c == '-') && next_c.is_some() && next_c.unwrap().is_digit(10))
+fn is_number_literal(c: char) -> bool {
+    c.is_digit(10)
 }
 
 fn is_keyword(identifier: &str) -> bool {
@@ -86,6 +87,7 @@ fn symbols() -> HashMap<String, TokenType> {
     symbols.insert("if".to_string(), TokenType::If);
     symbols.insert("import".to_string(), TokenType::Import);
     symbols.insert("+".to_string(), TokenType::Plus);
+    symbols.insert("-".to_string(), TokenType::Minus);
     symbols
 }
 
@@ -126,7 +128,7 @@ impl Lexer {
                 return self.read_string_literal();
             }
 
-            if is_number_literal(c, self.peek_ahead(1)) {
+            if is_number_literal(c) {
                 return self.read_number_literal();
             }
 
@@ -282,14 +284,9 @@ impl Lexer {
         let mut number = String::new();
         let column_start = self.column;
         let mut dot_seen = false;
-        let mut number_seen = false;
 
         while let Some(c) = self.peek() {
             if c.is_digit(10) {
-                number_seen = true;
-                number.push(c);
-                self.advance();
-            } else if c == '+' || c == '-' && !number_seen {
                 number.push(c);
                 self.advance();
             } else if c == '.' && !dot_seen {
@@ -469,10 +466,17 @@ mod tests {
 
         let token = lexer.next_token().unwrap().unwrap();
 
-        assert_eq!(token.kind, TokenType::NumberLiteral);
-        assert_eq!(token.value, "-12345");
+        assert_eq!(token.kind, TokenType::Minus);
+        assert_eq!(token.value, "-");
         assert_eq!(token.line, 1);
         assert_eq!(token.column, 1);
+
+        let token = lexer.next_token().unwrap().unwrap();
+
+        assert_eq!(token.kind, TokenType::NumberLiteral);
+        assert_eq!(token.value, "12345");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 2);
     }
 
     #[test]
@@ -493,10 +497,17 @@ mod tests {
 
         let token = lexer.next_token().unwrap().unwrap();
 
-        assert_eq!(token.kind, TokenType::NumberLiteral);
-        assert_eq!(token.value, "+12345");
+        assert_eq!(token.kind, TokenType::Plus);
+        assert_eq!(token.value, "+");
         assert_eq!(token.line, 1);
         assert_eq!(token.column, 1);
+
+        let token = lexer.next_token().unwrap().unwrap();
+
+        assert_eq!(token.kind, TokenType::NumberLiteral);
+        assert_eq!(token.value, "12345");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 2);
     }
 
     #[test]

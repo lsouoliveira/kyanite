@@ -110,8 +110,30 @@ pub fn kya_number_new(value: f64) -> Result<Rc<KyaObject>, Error> {
         ))),
     );
 
+    locals.register(
+        String::from("to_s"),
+        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+            String::from("to_s"),
+            kya_number_to_s,
+        ))),
+    );
+
     Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         "Number".to_string(),
         RefCell::new(locals),
     ))))
+}
+
+pub fn kya_number_to_s(
+    interpreter: &mut Interpreter,
+    args: Vec<Rc<KyaObject>>,
+) -> Result<Rc<KyaObject>, Error> {
+    if args.len() != 0 {
+        return Err(Error::TypeError(
+            "to_s() does not take any arguments".to_string(),
+        ));
+    }
+
+    let value = kya_number_get_value(interpreter)?;
+    kya_string_new(&value.to_string())
 }

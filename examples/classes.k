@@ -22,11 +22,3 @@ end
 
 my_class = MyClass("my_attribute2")
 my_class.display()
-
-string = String("My String")
-
-print(string)
-
-calculator = Calculator()
-
-print(calculator.add(5, 10))

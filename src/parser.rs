@@ -61,6 +61,8 @@ impl Parser {
 
         let mut body = Vec::new();
 
+        self.expect(TokenType::Newline)?;
+
         while self.peek().is_some() {
             if let Some(_) = self.accept(TokenType::End) {
                 break;
@@ -598,7 +600,6 @@ mod tests {
             ast::ASTNode::ClassDef(ast::ClassDef {
                 name: "MyClass".to_string(),
                 body: vec![],
-                parameters: vec![],
             }),
         )]));
 

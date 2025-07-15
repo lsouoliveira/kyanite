@@ -3,6 +3,7 @@ mod builtins;
 mod builtins_;
 mod dumper;
 mod errors;
+mod internal;
 mod interpreter;
 mod lexer;
 mod objects;
@@ -31,7 +32,16 @@ fn dump(input: &str) {
 }
 
 fn interpret(filename: &str) -> Result<(), String> {
-    let mut interpreter = Interpreter::new(filename.to_string());
+    let input = std::fs::read_to_string(filename)
+        .map_err(|_| format!("Error: Could not read file {}", filename))?;
+
+    let root_dir = std::path::Path::new(filename)
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .to_str()
+        .unwrap_or(".");
+
+    let mut interpreter = Interpreter::new(input, root_dir.to_string());
 
     match interpreter.evaluate() {
         Ok(_) => {}

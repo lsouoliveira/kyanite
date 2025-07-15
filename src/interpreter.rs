@@ -1,5 +1,5 @@
 use crate::ast;
-use crate::builtins::{kya_globals, kya_print};
+use crate::builtins::{kya_globals, kya_input, kya_print};
 use crate::builtins_::bool::kya_bool_new;
 use crate::builtins_::modules::math;
 use crate::builtins_::number::kya_number_new;
@@ -16,10 +16,11 @@ use crate::visitor::Evaluator;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 pub struct Interpreter {
-    filename: String,
+    root: PathBuf,
     input: String,
     pub context: Context,
     frames: Vec<Rc<RefCell<KyaFrame>>>,
@@ -32,6 +33,14 @@ fn setup_builtins(context: &mut Context) {
         Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
             String::from("print"),
             kya_print,
+        ))),
+    );
+
+    context.register(
+        String::from("input"),
+        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+            String::from("input"),
+            kya_input,
         ))),
     );
 
@@ -56,13 +65,12 @@ fn setup_builtins(context: &mut Context) {
     context.register(String::from("false"), kya_bool_new(false).unwrap());
 }
 
-fn import_module(root: &str, module_name: &str) -> Result<KyaObject, Error> {
-    let dir = std::path::Path::new(root)
-        .parent()
-        .ok_or_else(|| Error::RuntimeError("Failed to get parent directory".to_string()))?;
-    let module_path = dir.join(format!("{}.k", module_name));
+fn import_module(root: &PathBuf, module_name: &str) -> Result<KyaObject, Error> {
+    let module_path = root.join(format!("{}.k", module_name));
+    let input = fs::read_to_string(&module_path)
+        .map_err(|_| Error::RuntimeError(format!("Could not read module: {}", module_name)))?;
+    let mut interpreter = Interpreter::new(input, root.to_string_lossy().to_string());
 
-    let mut interpreter = Interpreter::new(module_path.to_string_lossy().to_string());
     interpreter.evaluate()?;
 
     Ok(KyaObject::Module(KyaModule::new(
@@ -72,17 +80,16 @@ fn import_module(root: &str, module_name: &str) -> Result<KyaObject, Error> {
 }
 
 impl Interpreter {
-    pub fn new(filename: String) -> Self {
-        let input = fs::read_to_string(&filename)
-            .unwrap_or_else(|_| panic!("Failed to read file: {}", filename));
+    pub fn new(input: String, root: String) -> Self {
         let mut context = Context::new();
 
         setup_builtins(&mut context);
 
         let builtin_modules = vec![("math", math::pack_module())];
+        let root_path = PathBuf::from(root);
 
         Interpreter {
-            filename,
+            root: root_path,
             input,
             context,
             frames: vec![],
@@ -536,7 +543,7 @@ impl Evaluator for Interpreter {
             return Ok(Rc::new(KyaObject::None(KyaNone {})));
         }
 
-        let module = import_module(&self.filename, &import.name)?;
+        let module = import_module(&self.root, &import.name)?;
 
         self.context.register(import.name.clone(), Rc::new(module));
 
@@ -547,32 +554,27 @@ impl Evaluator for Interpreter {
         let left = bin_op.left.eval(self)?;
         let right = bin_op.right.eval(self)?;
 
-        if !matches!(left.as_ref(), KyaObject::InstanceObject(_)) {
-            return Err(Error::RuntimeError(format!(
-                "Invalid left operand for binary operation: {}",
-                left.repr()
-            )));
-        }
+        if let KyaObject::InstanceObject(_) = left.as_ref() {
+            if let KyaObject::InstanceObject(_) = right.as_ref() {
+                match bin_op.operator {
+                    TokenType::Plus => {
+                        let args = vec![right];
 
-        if !matches!(right.as_ref(), KyaObject::InstanceObject(_)) {
-            return Err(Error::RuntimeError(format!(
-                "Invalid right operand for binary operation: {}",
-                right.repr()
-            )));
-        }
-
-        match bin_op.operator {
-            TokenType::Plus => {
-                let args = vec![right];
-
-                return self.call_instance_method(left, "__add__", args);
-            }
-            _ => {
-                return Err(Error::RuntimeError(format!(
-                    "Unsupported binary operator: {:?}",
-                    bin_op.operator
-                )));
+                        return self.call_instance_method(left, "__add__", args);
+                    }
+                    _ => {
+                        return Err(Error::RuntimeError(format!(
+                            "Unsupported binary operator: {:?}",
+                            bin_op.operator
+                        )));
+                    }
+                }
             }
         }
+
+        Err(Error::RuntimeError(format!(
+            "Invalid left operand for binary operation: {}",
+            left.repr()
+        )))
     }
 }

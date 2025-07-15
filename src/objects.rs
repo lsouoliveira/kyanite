@@ -430,7 +430,7 @@ mod tests {
         let function = KyaRsFunction::new(String::from("test_function"), |_, _| {
             Ok(Rc::new(KyaObject::None(KyaNone)))
         });
-        let mut interpreter = Interpreter::new("".to_string());
+        let mut interpreter = Interpreter::new("".to_string(), ".".to_string());
         let result = function.call(&mut interpreter, vec![]);
         assert!(result.is_ok());
     }

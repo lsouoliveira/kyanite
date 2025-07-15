@@ -1,4 +1,5 @@
 use crate::builtins_::list::kya_list_new;
+use crate::builtins_::number::kya_number_new;
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
 use crate::objects::{
@@ -114,6 +115,14 @@ pub fn kya_string_new(value: &str) -> Result<Rc<KyaObject>, Error> {
         ))),
     );
 
+    locals.register(
+        String::from("to_i"),
+        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+            String::from("to_i"),
+            kya_string_to_i,
+        ))),
+    );
+
     Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         "String".to_string(),
         RefCell::new(locals),
@@ -203,4 +212,19 @@ pub fn kya_string_split(
         .collect::<Vec<Rc<KyaObject>>>();
 
     Ok(kya_list_new(items).unwrap())
+}
+
+pub fn kya_string_to_i(
+    interpreter: &mut Interpreter,
+    _: Vec<Rc<KyaObject>>,
+) -> Result<Rc<KyaObject>, Error> {
+    let instance = interpreter.get_self()?;
+    let value = kya_string_as_string(&instance)?;
+
+    match value.parse::<i64>() {
+        Ok(num) => Ok(kya_number_new(num as f64).unwrap()),
+        Err(_) => Err(Error::RuntimeError(
+            "Cannot convert string to integer".to_string(),
+        )),
+    }
 }
