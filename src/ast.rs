@@ -84,16 +84,11 @@ impl MethodDef {
 pub struct ClassDef {
     pub name: String,
     pub body: Vec<Box<ASTNode>>,
-    pub parameters: Vec<Box<ASTNode>>,
 }
 
 impl ClassDef {
-    pub fn new(name: String, body: Vec<Box<ASTNode>>, parameters: Vec<Box<ASTNode>>) -> Self {
-        ClassDef {
-            name,
-            body,
-            parameters,
-        }
+    pub fn new(name: String, body: Vec<Box<ASTNode>>) -> Self {
+        ClassDef { name, body }
     }
 }
 

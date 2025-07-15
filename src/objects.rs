@@ -13,6 +13,7 @@ pub enum KyaObject {
     Function(KyaFunction),
     Frame(KyaFrame),
     Class(KyaClass),
+    RsClass(KyaRsClass),
     None(KyaNone),
     InstanceObject(KyaInstanceObject),
     Method(KyaMethod),
@@ -41,6 +42,7 @@ impl KyaObject {
                 let items: Vec<String> = l.items.iter().map(|item| item.repr()).collect();
                 format!("List([{}])", items.join(", "))
             }
+            KyaObject::RsClass(c) => format!("RsClass({:?})", c.name),
         }
     }
 }
@@ -115,16 +117,36 @@ impl KyaFrame {
 pub struct KyaClass {
     pub name: String,
     pub body: Vec<Box<ASTNode>>,
-    pub parameters: Vec<String>,
 }
 
 impl KyaClass {
-    pub fn new(name: String, body: Vec<Box<ASTNode>>, parameters: Vec<String>) -> Self {
-        KyaClass {
+    pub fn new(name: String, body: Vec<Box<ASTNode>>) -> Self {
+        KyaClass { name, body }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct KyaRsClass {
+    pub name: String,
+    pub parameters: Vec<String>,
+    pub init_function: KyaRsFunctionPtr,
+}
+
+impl KyaRsClass {
+    pub fn new(name: String, parameters: Vec<String>, init_function: KyaRsFunctionPtr) -> Self {
+        KyaRsClass {
             name,
-            body,
             parameters,
+            init_function,
         }
+    }
+
+    pub fn instantiate(
+        &self,
+        interpreter: &mut Interpreter,
+        args: Vec<Rc<KyaObject>>,
+    ) -> Result<Rc<KyaObject>, Error> {
+        (self.init_function)(interpreter, args)
     }
 }
 
@@ -349,6 +371,32 @@ pub fn kya_list_as_vec(object: &KyaObject) -> Result<Vec<Rc<KyaObject>>, Error> 
     }
 
     Err(Error::TypeError("Expected a List instance".to_string()))
+}
+
+pub fn call_constructor(
+    interpreter: &mut Interpreter,
+    instance: Rc<KyaObject>,
+    args: Vec<Rc<KyaObject>>,
+) -> Result<Rc<KyaObject>, Error> {
+    if let KyaObject::InstanceObject(instance_object) = instance.as_ref() {
+        if let Some(_) = instance_object.get_attribute("constructor") {
+            let init_args = args.clone();
+
+            return interpreter.call_instance_method(instance.clone(), "constructor", init_args);
+        } else if !args.is_empty() {
+            return Err(Error::TypeError(format!(
+                "{}() takes no arguments, but {} were given",
+                instance_object.name(),
+                args.len()
+            )));
+        }
+    } else {
+        return Err(Error::TypeError(
+            "Expected an instance object to call constructor".to_string(),
+        ));
+    }
+
+    Ok(Rc::new(KyaObject::None(KyaNone)))
 }
 
 #[cfg(test)]

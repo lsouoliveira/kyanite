@@ -3,13 +3,13 @@ use crate::builtins::{kya_globals, kya_print};
 use crate::builtins_::bool::kya_bool_new;
 use crate::builtins_::modules::math;
 use crate::builtins_::number::kya_number_new;
-use crate::builtins_::string::kya_string_new;
+use crate::builtins_::string::{instantiate_string, kya_string_new};
 use crate::errors::Error;
 use crate::lexer::Lexer;
 use crate::lexer::TokenType;
 use crate::objects::{
-    Context, KyaClass, KyaFrame, KyaFunction, KyaInstanceObject, KyaMethod, KyaModule, KyaNone,
-    KyaObject, KyaRsFunction, KyaRsMethod,
+    call_constructor, Context, KyaClass, KyaFrame, KyaFunction, KyaInstanceObject, KyaMethod,
+    KyaModule, KyaNone, KyaObject, KyaRsClass, KyaRsFunction, KyaRsMethod,
 };
 use crate::parser;
 use crate::visitor::Evaluator;
@@ -45,10 +45,10 @@ fn setup_builtins(context: &mut Context) {
 
     context.register(
         String::from("String"),
-        Rc::new(KyaObject::Class(KyaClass::new(
+        Rc::new(KyaObject::RsClass(KyaRsClass::new(
             String::from("String"),
-            vec![],
             vec![String::from("value")],
+            instantiate_string,
         ))),
     );
 
@@ -202,18 +202,13 @@ impl Interpreter {
                 RefCell::new(frame.borrow().locals.clone()),
             )));
 
-            if let KyaObject::InstanceObject(instance_object) = instance.as_ref() {
-                if let Some(_) = instance_object.get_attribute("constructor") {
-                    let init_args = args.clone();
+            call_constructor(self, instance.clone(), args)?;
 
-                    self.call_instance_method(instance.clone(), "constructor", init_args)?;
-                } else if !class.parameters.is_empty() {
-                    return Err(Error::RuntimeError(format!(
-                        "Class {} requires constructor arguments",
-                        class.name
-                    )));
-                }
-            }
+            return Ok(instance);
+        } else if let KyaObject::RsClass(class) = callee.as_ref() {
+            let instance = class.instantiate(self, args.clone())?;
+
+            call_constructor(self, instance.clone(), args)?;
 
             return Ok(instance);
         } else if let KyaObject::Method(method) = callee.as_ref() {
@@ -447,23 +442,9 @@ impl Evaluator for Interpreter {
     }
 
     fn eval_class_def(&mut self, class_def: &ast::ClassDef) -> Result<Rc<KyaObject>, Error> {
-        let mut parameters = vec![];
-
-        for param in &class_def.parameters {
-            if let ast::ASTNode::Identifier(identifier) = &**param {
-                parameters.push(identifier.name.clone());
-            } else {
-                return Err(Error::RuntimeError(format!(
-                    "Invalid parameter: {:?}",
-                    param
-                )));
-            }
-        }
-
         let class = Rc::new(KyaObject::Class(KyaClass::new(
             class_def.name.clone(),
             class_def.body.clone(),
-            parameters,
         )));
 
         self.register_local(class_def.name.clone(), class.clone())?;

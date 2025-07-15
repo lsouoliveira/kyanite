@@ -120,6 +120,17 @@ pub fn kya_string_new(value: &str) -> Result<Rc<KyaObject>, Error> {
     ))))
 }
 
+pub fn instantiate_string(
+    _: &mut Interpreter,
+    args: Vec<Rc<KyaObject>>,
+) -> Result<Rc<KyaObject>, Error> {
+    let arg = unpack_string(&args, 0, 1)
+        .unwrap_or_else(|_| Rc::new(KyaObject::String(KyaString::new("".to_string()))));
+    let value = kya_string_as_string(&arg)?;
+
+    kya_string_new(&value)
+}
+
 fn kya_string_get_value(interpreter: &mut Interpreter) -> Result<String, Error> {
     let instance = interpreter.get_self()?;
 

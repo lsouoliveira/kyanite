@@ -58,15 +58,6 @@ impl Parser {
 
     fn parse_class_def(&mut self) -> Result<Box<ast::ASTNode>, Error> {
         let identifier = self.expect(TokenType::Identifier)?;
-        let mut parameters = vec![];
-
-        self.expect(TokenType::Newline)?;
-
-        if self.accept(TokenType::LeftParen).is_some() {
-            parameters = self.parse_parameters()?;
-
-            self.expect(TokenType::RightParen)?;
-        }
 
         let mut body = Vec::new();
 
@@ -83,7 +74,7 @@ impl Parser {
             }
         }
 
-        let class_def = ast::ClassDef::new(identifier.value.clone(), body, parameters);
+        let class_def = ast::ClassDef::new(identifier.value.clone(), body);
 
         Ok(Box::new(ast::ASTNode::ClassDef(class_def)))
     }
@@ -230,10 +221,15 @@ impl Parser {
             if self.accept(TokenType::LeftParen).is_some() {
                 let mut arguments = Vec::new();
 
-                if self.accept(TokenType::RightParen).is_none() {
+                while self.peek().is_some() && self.peek().unwrap().kind != TokenType::RightParen {
                     arguments.push(self.parse_expression()?);
-                    self.expect(TokenType::RightParen)?;
+
+                    if self.accept(TokenType::Comma).is_none() {
+                        break;
+                    }
                 }
+
+                self.expect(TokenType::RightParen)?;
 
                 primary = Box::new(ast::ASTNode::MethodCall(ast::MethodCall::new(
                     primary, arguments,
