@@ -20,7 +20,7 @@ pub fn kya_print(
 
     for arg in args {
         if let KyaObject::InstanceObject(_) = arg.as_ref() {
-            let result = interpreter.call_instance_method(arg.clone(), "__repr__", vec![])?;
+            let result = arg.get_attribute("__repr__").call(interpreter, vec![])?;
             let value = kya_string_as_string(&result)?;
 
             output.push_str(value.as_str());

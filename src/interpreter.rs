@@ -158,43 +158,6 @@ impl Interpreter {
         Ok(object)
     }
 
-    pub fn call_instance_method(
-        &mut self,
-        instance_object: Rc<KyaObject>,
-        method_name: &str,
-        args: Vec<Rc<KyaObject>>,
-    ) -> Result<Rc<KyaObject>, Error> {
-        if let KyaObject::InstanceObject(instance) = instance_object.as_ref() {
-            let method = instance.get_attribute(method_name);
-
-            if let Some(method) = method {
-                let method = if let KyaObject::Function(_) = method.as_ref() {
-                    Rc::new(KyaObject::Method(KyaMethod {
-                        function: method.clone(),
-                        instance: instance_object.clone(),
-                    }))
-                } else if let KyaObject::RsFunction(_) = method.as_ref() {
-                    Rc::new(KyaObject::Method(KyaMethod {
-                        function: method.clone(),
-                        instance: instance_object.clone(),
-                    }))
-                } else {
-                    Err(Error::RuntimeError(format!(
-                        "Invalid method type: {}",
-                        method.repr()
-                    )))?
-                };
-
-                return Ok(method.call(self, args)?);
-            }
-        }
-
-        Err(Error::RuntimeError(format!(
-            "Undefined method: {}",
-            method_name
-        )))
-    }
-
     pub fn true_object(&self) -> Rc<KyaObject> {
         self.context.get("true").unwrap().clone()
     }
@@ -424,7 +387,7 @@ impl Evaluator for Interpreter {
                     TokenType::Plus => {
                         let args = vec![right];
 
-                        return self.call_instance_method(left, "__add__", args);
+                        return left.get_attribute("__add__").call(self, args);
                     }
                     _ => {
                         return Err(Error::RuntimeError(format!(
@@ -440,5 +403,21 @@ impl Evaluator for Interpreter {
             "Invalid left operand for binary operation: {}",
             left.repr()
         )))
+    }
+
+    fn eval_unary_op(&mut self, unary_op: &ast::UnaryOp) -> Result<Rc<KyaObject>, Error> {
+        let operand = unary_op.operand.eval(self)?;
+
+        match unary_op.operator {
+            TokenType::Minus => {
+                return operand.get_attribute("__neg__").call(self, vec![]);
+            }
+            _ => {
+                return Err(Error::RuntimeError(format!(
+                    "Unsupported unary operator: {:?}",
+                    unary_op.operator
+                )));
+            }
+        }
     }
 }

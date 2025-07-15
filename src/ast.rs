@@ -21,6 +21,7 @@ pub enum ASTNode {
     If(If),
     Import(Import),
     BinOp(BinOp),
+    UnaryOp(UnaryOp),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -146,6 +147,12 @@ pub struct BinOp {
     pub right: Box<ASTNode>,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct UnaryOp {
+    pub operator: TokenType,
+    pub operand: Box<ASTNode>,
+}
+
 impl ASTNode {
     pub fn accept(&self, visitor: &mut dyn Visitor) {
         match self {
@@ -162,6 +169,7 @@ impl ASTNode {
             ASTNode::If(if_node) => visitor.visit_if(&if_node),
             ASTNode::Import(import) => visitor.visit_import(&import),
             ASTNode::BinOp(bin_op) => visitor.visit_bin_op(&bin_op),
+            ASTNode::UnaryOp(unary_op) => visitor.visit_unary_op(&unary_op),
         }
     }
 
@@ -182,6 +190,7 @@ impl ASTNode {
             ASTNode::If(if_node) => evaluator.eval_if(&if_node),
             ASTNode::Import(import) => evaluator.eval_import(&import),
             ASTNode::BinOp(bin_op) => evaluator.eval_bin_op(&bin_op),
+            ASTNode::UnaryOp(unary_op) => evaluator.eval_unary_op(&unary_op),
         }
     }
 }

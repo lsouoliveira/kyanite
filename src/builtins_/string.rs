@@ -3,7 +3,7 @@ use crate::builtins_::number::kya_number_new;
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
 use crate::objects::{
-    kya_string_as_string, unpack_string, Context, KyaInstanceObject, KyaNone, KyaObject,
+    kya_string_as_string, unpack_string, Context, KyaInstanceObject, KyaMethod, KyaNone, KyaObject,
     KyaRsFunction, KyaString,
 };
 
@@ -67,66 +67,91 @@ pub fn kya_string_new(value: &str) -> Result<Rc<KyaObject>, Error> {
         Rc::new(KyaObject::String(KyaString::new(value.to_string()))),
     );
 
-    locals.register(
-        String::from("constructor"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("constructor"),
-            kya_string_init,
-        ))),
-    );
-
-    locals.register(
-        String::from("__repr__"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("__repr__"),
-            kya_string_repr,
-        ))),
-    );
-
-    locals.register(
-        String::from("length"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("length"),
-            kya_string_length,
-        ))),
-    );
-
-    locals.register(
-        String::from("__eq__"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("__eq__"),
-            kya_string_eq,
-        ))),
-    );
-
-    locals.register(
-        String::from("__add__"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("__add__"),
-            kya_string_add,
-        ))),
-    );
-
-    locals.register(
-        String::from("split"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("split"),
-            kya_string_split,
-        ))),
-    );
-
-    locals.register(
-        String::from("to_i"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("to_i"),
-            kya_string_to_i,
-        ))),
-    );
-
-    Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
+    let instance = Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         "String".to_string(),
         RefCell::new(locals),
-    ))))
+    )));
+
+    if let KyaObject::InstanceObject(instance_obj) = instance.as_ref() {
+        instance_obj.set_attribute(
+            String::from("constructor"),
+            Rc::new(KyaObject::Method(KyaMethod {
+                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                    String::from("constructor"),
+                    kya_string_init,
+                ))),
+                instance: instance.clone(),
+            })),
+        );
+
+        instance_obj.set_attribute(
+            String::from("__repr__"),
+            Rc::new(KyaObject::Method(KyaMethod {
+                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                    String::from("__repr__"),
+                    kya_string_repr,
+                ))),
+                instance: instance.clone(),
+            })),
+        );
+
+        instance_obj.set_attribute(
+            String::from("length"),
+            Rc::new(KyaObject::Method(KyaMethod {
+                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                    String::from("length"),
+                    kya_string_length,
+                ))),
+                instance: instance.clone(),
+            })),
+        );
+
+        instance_obj.set_attribute(
+            String::from("__eq__"),
+            Rc::new(KyaObject::Method(KyaMethod {
+                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                    String::from("__eq__"),
+                    kya_string_eq,
+                ))),
+                instance: instance.clone(),
+            })),
+        );
+
+        instance_obj.set_attribute(
+            String::from("__add__"),
+            Rc::new(KyaObject::Method(KyaMethod {
+                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                    String::from("__add__"),
+                    kya_string_add,
+                ))),
+                instance: instance.clone(),
+            })),
+        );
+
+        instance_obj.set_attribute(
+            String::from("split"),
+            Rc::new(KyaObject::Method(KyaMethod {
+                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                    String::from("split"),
+                    kya_string_split,
+                ))),
+                instance: instance.clone(),
+            })),
+        );
+
+        instance_obj.set_attribute(
+            String::from("to_i"),
+            Rc::new(KyaObject::Method(KyaMethod {
+                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                    String::from("to_i"),
+                    kya_string_to_i,
+                ))),
+                instance: instance.clone(),
+            })),
+        );
+    }
+
+    Ok(instance)
 }
 
 pub fn instantiate_string(

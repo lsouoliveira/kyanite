@@ -21,7 +21,7 @@ pub fn kya_list_repr(
 
     for (i, value) in values.iter().enumerate() {
         if let KyaObject::InstanceObject(_) = value.as_ref() {
-            let repr = interpreter.call_instance_method(value.clone(), "__repr__", vec![])?;
+            let repr = value.get_attribute("__repr__").call(interpreter, vec![])?;
 
             output.push_str(&kya_string_as_string(&repr)?);
         } else {

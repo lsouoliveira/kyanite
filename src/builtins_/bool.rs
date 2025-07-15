@@ -1,6 +1,6 @@
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
-use crate::objects::{Context, KyaInstanceObject, KyaObject, KyaRsFunction, KyaString};
+use crate::objects::{Context, KyaInstanceObject, KyaMethod, KyaObject, KyaRsFunction, KyaString};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -49,30 +49,40 @@ pub fn kya_bool_eq(
 
 pub fn kya_bool_new(value: bool) -> Result<Rc<KyaObject>, Error> {
     let mut locals = Context::new();
-    let obj = KyaObject::Bool(value);
+    let obj = Rc::new(KyaObject::Bool(value));
 
-    locals.register(String::from("__value__"), Rc::new(obj.clone()));
+    locals.register(String::from("__value__"), obj.clone());
 
-    locals.register(
-        String::from("__repr__"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("__repr__"),
-            kya_bool_repr,
-        ))),
-    );
-
-    locals.register(
-        String::from("__eq__"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("__eq__"),
-            kya_bool_eq,
-        ))),
-    );
-
-    Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
+    let instance = Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         "Bool".to_string(),
         RefCell::new(locals),
-    ))))
+    )));
+
+    if let KyaObject::InstanceObject(instance_obj) = instance.as_ref() {
+        instance_obj.set_attribute(
+            String::from("__repr__"),
+            Rc::new(KyaObject::Method(KyaMethod {
+                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                    String::from("__repr__"),
+                    kya_bool_repr,
+                ))),
+                instance: instance.clone(),
+            })),
+        );
+
+        instance_obj.set_attribute(
+            String::from("__eq__"),
+            Rc::new(KyaObject::Method(KyaMethod {
+                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                    String::from("__eq__"),
+                    kya_bool_eq,
+                ))),
+                instance: instance.clone(),
+            })),
+        );
+    }
+
+    Ok(instance)
 }
 
 pub fn kya_bool_repr(

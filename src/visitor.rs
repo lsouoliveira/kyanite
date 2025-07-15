@@ -1,6 +1,6 @@
 use crate::ast::{
     Assignment, Attribute, BinOp, ClassDef, Compare, Identifier, If, Import, MethodCall, MethodDef,
-    Module,
+    Module, UnaryOp,
 };
 use crate::errors::Error;
 use crate::objects;
@@ -20,6 +20,7 @@ pub trait Visitor {
     fn visit_if(&mut self, if_node: &If);
     fn visit_import(&mut self, import: &Import);
     fn visit_bin_op(&mut self, bin_op: &BinOp);
+    fn visit_unary_op(&mut self, unary_op: &UnaryOp);
 }
 
 pub trait Evaluator {
@@ -47,4 +48,5 @@ pub trait Evaluator {
     fn eval_if(&mut self, if_node: &If) -> Result<Rc<objects::KyaObject>, Error>;
     fn eval_import(&mut self, import: &Import) -> Result<Rc<objects::KyaObject>, Error>;
     fn eval_bin_op(&mut self, bin_op: &BinOp) -> Result<Rc<objects::KyaObject>, Error>;
+    fn eval_unary_op(&mut self, unary_op: &UnaryOp) -> Result<Rc<objects::KyaObject>, Error>;
 }

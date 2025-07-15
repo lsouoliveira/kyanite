@@ -2,7 +2,7 @@ use crate::builtins_::string::kya_string_new;
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
 use crate::objects::{
-    kya_number_as_float, Context, KyaInstanceObject, KyaObject, KyaRsFunction, KyaString,
+    kya_number_as_float, Context, KyaInstanceObject, KyaMethod, KyaObject, KyaRsFunction, KyaString,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -81,47 +81,73 @@ pub fn kya_number_add(
 }
 
 pub fn kya_number_new(value: f64) -> Result<Rc<KyaObject>, Error> {
-    let mut locals = Context::new();
     let obj = KyaObject::Number(value);
 
-    locals.register(String::from("__value__"), Rc::new(obj.clone()));
-
-    locals.register(
-        String::from("__repr__"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("__repr__"),
-            kya_number_repr,
-        ))),
-    );
-
-    locals.register(
-        String::from("__eq__"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("__eq__"),
-            kya_number_eq,
-        ))),
-    );
-
-    locals.register(
-        String::from("__add__"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("__add__"),
-            kya_number_add,
-        ))),
-    );
-
-    locals.register(
-        String::from("to_s"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("to_s"),
-            kya_number_to_s,
-        ))),
-    );
-
-    Ok(Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
+    let instance = Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         "Number".to_string(),
-        RefCell::new(locals),
-    ))))
+        RefCell::new(Context::new()),
+    )));
+
+    if let KyaObject::InstanceObject(instance_obj) = instance.as_ref() {
+        instance_obj.set_attribute("__value__".to_string(), Rc::new(obj.clone()));
+
+        instance_obj.set_attribute(
+            "__repr__".to_string(),
+            Rc::new(KyaObject::Method(KyaMethod {
+                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                    "__repr__".to_string(),
+                    kya_number_repr,
+                ))),
+                instance: instance.clone(),
+            })),
+        );
+
+        instance_obj.set_attribute(
+            "__eq__".to_string(),
+            Rc::new(KyaObject::Method(KyaMethod {
+                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                    "__eq__".to_string(),
+                    kya_number_eq,
+                ))),
+                instance: instance.clone(),
+            })),
+        );
+
+        instance_obj.set_attribute(
+            "__add__".to_string(),
+            Rc::new(KyaObject::Method(KyaMethod {
+                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                    "__add__".to_string(),
+                    kya_number_add,
+                ))),
+                instance: instance.clone(),
+            })),
+        );
+
+        instance_obj.set_attribute(
+            "to_s".to_string(),
+            Rc::new(KyaObject::Method(KyaMethod {
+                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                    "to_s".to_string(),
+                    kya_number_to_s,
+                ))),
+                instance: instance.clone(),
+            })),
+        );
+
+        instance_obj.set_attribute(
+            "__neg__".to_string(),
+            Rc::new(KyaObject::Method(KyaMethod {
+                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                    "__neg__".to_string(),
+                    kya_number_to_neg,
+                ))),
+                instance: instance.clone(),
+            })),
+        );
+    }
+
+    Ok(instance)
 }
 
 pub fn kya_number_to_s(
@@ -136,4 +162,19 @@ pub fn kya_number_to_s(
 
     let value = kya_number_get_value(interpreter)?;
     kya_string_new(&value.to_string())
+}
+
+pub fn kya_number_to_neg(
+    interpreter: &mut Interpreter,
+    args: Vec<Rc<KyaObject>>,
+) -> Result<Rc<KyaObject>, Error> {
+    if args.len() != 0 {
+        return Err(Error::TypeError(
+            "to_neg() does not take any arguments".to_string(),
+        ));
+    }
+
+    let value = kya_number_get_value(interpreter)?;
+
+    kya_number_new(-value)
 }

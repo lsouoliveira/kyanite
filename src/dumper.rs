@@ -140,4 +140,13 @@ impl Visitor for ASTDumper {
         bin_op.right.accept(self);
         self.push(")");
     }
+
+    fn visit_unary_op(&mut self, unary_op: &ast::UnaryOp) {
+        self.push("UnaryOp(");
+        self.concat("operator: ");
+        self.push(&format!("{:?}", unary_op.operator));
+        self.concat("operand: ");
+        unary_op.operand.accept(self);
+        self.push(")");
+    }
 }

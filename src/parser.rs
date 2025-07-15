@@ -267,6 +267,24 @@ impl Parser {
             return Ok(Box::new(ast::ASTNode::StringLiteral(token.value.clone())));
         }
 
+        if let Some(token) = self.accept(TokenType::Plus) {
+            let operand = self.parse_atom()?;
+
+            return Ok(Box::new(ast::ASTNode::UnaryOp(ast::UnaryOp {
+                operator: token.kind,
+                operand,
+            })));
+        }
+
+        if let Some(token) = self.accept(TokenType::Minus) {
+            let operand = self.parse_atom()?;
+
+            return Ok(Box::new(ast::ASTNode::UnaryOp(ast::UnaryOp {
+                operator: token.kind,
+                operand,
+            })));
+        }
+
         if let Some(token) = self.accept(TokenType::NumberLiteral) {
             return Ok(Box::new(ast::ASTNode::NumberLiteral(
                 token.value.parse::<f64>().map_err(|_| {

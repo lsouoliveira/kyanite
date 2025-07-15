@@ -350,7 +350,11 @@ pub struct KyaMethod {
     pub instance: Rc<KyaObject>,
 }
 
-impl KyaMethod {}
+impl KyaMethod {
+    pub fn new(function: Rc<KyaObject>, instance: Rc<KyaObject>) -> Self {
+        KyaMethod { function, instance }
+    }
+}
 
 impl Callable for KyaMethod {
     fn call(
@@ -536,7 +540,9 @@ pub fn call_constructor(
         if let Some(_) = instance_object.get_attribute("constructor") {
             let init_args = args.clone();
 
-            return interpreter.call_instance_method(instance.clone(), "constructor", init_args);
+            return instance
+                .get_attribute("constructor")
+                .call(interpreter, init_args);
         } else if !args.is_empty() {
             return Err(Error::TypeError(format!(
                 "{}() takes no arguments, but {} were given",

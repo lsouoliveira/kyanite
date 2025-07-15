@@ -159,10 +159,6 @@ impl Lexer {
         self.input[self.position..].chars().next()
     }
 
-    fn peek_ahead(&self, offset: usize) -> Option<char> {
-        self.input[self.position + offset..].chars().next()
-    }
-
     fn read_newline(&mut self) -> Token {
         let c = self.peek().unwrap();
 
