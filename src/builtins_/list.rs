@@ -1,10 +1,8 @@
+use crate::builtins_::number::kya_number_new;
 use crate::builtins_::string::kya_string_new;
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
-use crate::objects::{
-    kya_list_as_vec, kya_string_as_string, Context, KyaInstanceObject, KyaList, KyaMethod,
-    KyaObject, KyaRsFunction,
-};
+use crate::objects::{Context, KyaInstanceObject, KyaList, KyaMethod, KyaObject, KyaRsFunction};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -14,21 +12,17 @@ pub fn kya_list_repr(
     _: Vec<Rc<KyaObject>>,
 ) -> Result<Rc<KyaObject>, Error> {
     let instance = interpreter.get_self()?;
-    let values = kya_list_as_vec(&instance)?;
+    let items = instance.as_vector()?;
     let mut output = String::new();
 
     output.push('[');
 
-    for (i, value) in values.iter().enumerate() {
-        if let KyaObject::InstanceObject(_) = value.as_ref() {
-            let repr = value.get_attribute("__repr__").call(interpreter, vec![])?;
+    for (i, value) in items.iter().enumerate() {
+        let repr = value.get_attribute("__repr__")?.call(interpreter, vec![])?;
 
-            output.push_str(&kya_string_as_string(&repr)?);
-        } else {
-            output.push_str(&value.repr());
-        }
+        output.push_str(repr.as_string()?.as_str());
 
-        if i < values.len() - 1 {
+        if i < items.len() - 1 {
             output.push_str(", ");
         }
     }
@@ -43,56 +37,43 @@ pub fn kya_list_length(
     _: Vec<Rc<KyaObject>>,
 ) -> Result<Rc<KyaObject>, Error> {
     let instance = interpreter.get_self()?;
+    let items = instance.as_vector()?;
 
-    if let KyaObject::InstanceObject(obj) = instance.as_ref() {
-        if let Some(items) = obj.get_attribute("__items__") {
-            if let KyaObject::List(list) = items.as_ref() {
-                return Ok(Rc::new(KyaObject::Number(list.len() as f64)));
-            }
-        }
-    }
-
-    Err(Error::RuntimeError(
-        "List object does not have a __items__ attribute".to_string(),
-    ))
+    return Ok(kya_number_new(items.len() as f64)?);
 }
 
 pub fn kya_list_new(items: Vec<Rc<KyaObject>>) -> Result<Rc<KyaObject>, Error> {
-    let mut locals = Context::new();
-
-    locals.register(
-        String::from("__items__"),
-        Rc::new(KyaObject::List(KyaList::new(items))),
-    );
-
     let instance = Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         "List".to_string(),
-        RefCell::new(locals),
+        RefCell::new(Context::new()),
     )));
 
-    if let KyaObject::InstanceObject(instance_obj) = instance.as_ref() {
-        instance_obj.set_attribute(
-            String::from("__repr__"),
-            Rc::new(KyaObject::Method(KyaMethod {
-                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-                    String::from("__repr__"),
-                    kya_list_repr,
-                ))),
-                instance: instance.clone(),
-            })),
-        );
+    let object = Rc::new(KyaObject::List(KyaList {
+        items: RefCell::new(items),
+        instance: instance.clone(),
+    }));
 
-        instance_obj.set_attribute(
-            String::from("length"),
-            Rc::new(KyaObject::Method(KyaMethod {
-                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-                    String::from("length"),
-                    kya_list_length,
-                ))),
-                instance: instance.clone(),
-            })),
-        );
-    }
+    instance.set_attribute(
+        String::from("__repr__"),
+        Rc::new(KyaObject::Method(KyaMethod {
+            function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                String::from("__repr__"),
+                kya_list_repr,
+            ))),
+            instance: object.clone(),
+        })),
+    );
 
-    Ok(instance)
+    instance.set_attribute(
+        String::from("length"),
+        Rc::new(KyaObject::Method(KyaMethod {
+            function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                String::from("length"),
+                kya_list_length,
+            ))),
+            instance: object.clone(),
+        })),
+    );
+
+    Ok(object)
 }

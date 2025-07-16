@@ -14,96 +14,92 @@ impl std::fmt::Display for SocketError {
     }
 }
 
-pub trait Socket {
+#[derive(Debug, Clone, PartialEq)]
+pub enum Socket {
+    Tcp(TcpSocket),
+}
+
+impl Socket {
+    fn as_socketable(&mut self) -> &mut dyn Socketable {
+        match self {
+            Socket::Tcp(tcp_socket) => tcp_socket,
+        }
+    }
+
+    pub fn bind(&mut self, host: &str, port: u16) -> Result<(), SocketError> {
+        self.as_socketable().bind(host, port)
+    }
+}
+
+pub trait Socketable {
     fn bind(&mut self, host: &str, port: u16) -> Result<(), SocketError>;
-    fn accept(&mut self) -> Result<Box<dyn Connection>, SocketError>;
+    fn accept(&mut self) -> Result<Connection, SocketError>;
 }
 
+#[derive(Debug)]
 pub struct TcpSocket {
-    listener: Option<TcpListener>,
+    pub listener: Option<TcpListener>,
 }
 
-impl TcpSocket {
-    pub fn new() -> Self {
+impl PartialEq for TcpSocket {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl Clone for TcpSocket {
+    fn clone(&self) -> Self {
         TcpSocket { listener: None }
     }
 }
 
-impl Socket for TcpSocket {
+impl Socketable for TcpSocket {
     fn bind(&mut self, host: &str, port: u16) -> Result<(), SocketError> {
-        let addr = format!("{}:{}", host, port);
+        let address = format!("{}:{}", host, port);
 
-        match TcpListener::bind(&addr) {
+        match TcpListener::bind(&address) {
             Ok(listener) => {
                 self.listener = Some(listener);
+
                 Ok(())
             }
-            Err(_) => Err(SocketError::BindError(format!(
-                "Failed to bind to {}",
-                addr
-            ))),
+            Err(e) => Err(SocketError::BindError(e.to_string())),
         }
     }
 
-    fn accept(&mut self) -> Result<Box<dyn Connection>, SocketError> {
+    fn accept(&mut self) -> Result<Connection, SocketError> {
         if let Some(listener) = &self.listener {
             match listener.accept() {
-                Ok((stream, addr)) => {
-                    let connection = TcpConnection {
-                        stream,
-                        address: addr,
-                    };
-                    Ok(Box::new(connection))
-                }
-                Err(_) => Err(SocketError::AcceptError(
-                    "Failed to accept connection".to_string(),
-                )),
+                Ok((stream, _)) => Ok(Connection::Tcp(TcpConnection { stream })),
+                Err(e) => Err(SocketError::AcceptError(e.to_string())),
             }
         } else {
-            Err(SocketError::BindError("Socket not bound".to_string()))
+            Err(SocketError::AcceptError(
+                "Listener is not initialized".to_string(),
+            ))
         }
     }
+}
+
+pub enum Connection {
+    Tcp(TcpConnection),
+}
+
+pub trait Connectionable {
+    fn read(&mut self, buffer: usize) -> Result<Vec<u8>, SocketError>;
 }
 
 pub struct TcpConnection {
-    stream: std::net::TcpStream,
-    address: std::net::SocketAddr,
+    pub stream: std::net::TcpStream,
 }
 
-pub trait Connection {
-    fn address(&self) -> &std::net::SocketAddr;
-    fn receive(&mut self, buffer_size: usize) -> Result<Vec<u8>, SocketError>;
-}
-
-impl Connection for TcpConnection {
-    fn address(&self) -> &std::net::SocketAddr {
-        &self.address
-    }
-
-    fn receive(&mut self, buffer_size: usize) -> Result<Vec<u8>, SocketError> {
+impl Connectionable for TcpConnection {
+    fn read(&mut self, buffer_size: usize) -> Result<Vec<u8>, SocketError> {
         let mut buffer = vec![0; buffer_size];
 
         match self.stream.read(&mut buffer) {
             Ok(_) => Ok(buffer),
-            Err(_) => Err(SocketError::ReadError(
-                "Failed to read from connection".to_string(),
-            )),
+            Err(e) => Err(SocketError::ReadError(e.to_string())),
         }
-    }
-}
-
-pub fn socket() -> Box<dyn Socket> {
-    Box::new(TcpSocket::new())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_socket_creation() {
-        let mut socket = socket();
-
-        assert!(socket.bind("localhost", 12000).is_ok());
     }
 }

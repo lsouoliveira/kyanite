@@ -1,6 +1,8 @@
 use crate::ast::ASTNode;
 use crate::errors::Error;
+use crate::internal::socket::Socket;
 use crate::interpreter::Interpreter;
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -8,7 +10,7 @@ use std::rc::Rc;
 #[derive(Debug, Clone, PartialEq)]
 pub enum KyaObject {
     String(KyaString),
-    Number(f64),
+    Number(KyaNumber),
     RsFunction(KyaRsFunction),
     Function(KyaFunction),
     Class(KyaClass),
@@ -16,29 +18,31 @@ pub enum KyaObject {
     None(KyaNone),
     InstanceObject(KyaInstanceObject),
     Method(KyaMethod),
-    Bool(bool),
+    Bool(KyaBool),
     Module(KyaModule),
     List(KyaList),
+    Socket(KyaSocket),
 }
 
 impl KyaObject {
     pub fn repr(&self) -> String {
         match self {
-            KyaObject::String(s) => s.value.clone(),
+            KyaObject::String(s) => format!("String({})", s.value.borrow()),
             KyaObject::RsFunction(f) => f.name.clone(),
             KyaObject::None(_) => "None".to_string(),
-            KyaObject::Number(n) => n.to_string(),
+            KyaObject::Number(n) => format!("Number({})", n.value.borrow()),
             KyaObject::Function(f) => format!("Function({:?})", f.name),
             KyaObject::Class(c) => format!("Class({:?})", c.name),
-            KyaObject::InstanceObject(i) => format!("InstanceObject({:?})", i.attributes),
+            KyaObject::InstanceObject(i) => format!("InstanceObject({:?})", i.name),
             KyaObject::Method(m) => format!("Method({:?})", m.function),
-            KyaObject::Bool(b) => b.to_string(),
-            KyaObject::Module(m) => format!("Module({:?})", m.name),
+            KyaObject::Bool(b) => b.value.borrow().to_string(),
+            KyaObject::Module(m) => format!("Module({})", m.name),
             KyaObject::List(l) => {
-                let items: Vec<String> = l.items.iter().map(|item| item.repr()).collect();
+                let items: Vec<String> = l.items.borrow().iter().map(|item| item.repr()).collect();
                 format!("List([{}])", items.join(", "))
             }
             KyaObject::RsClass(c) => format!("RsClass({:?})", c.name),
+            KyaObject::Socket(_) => "Socket".to_string(),
         }
     }
 
@@ -53,9 +57,15 @@ impl KyaObject {
         }
     }
 
-    pub fn as_get_attribute(&self) -> Option<&dyn GetAttribute> {
+    pub fn as_object_type(&self) -> Option<&dyn ObjectType> {
         match self {
             KyaObject::InstanceObject(i) => Some(i),
+            KyaObject::Socket(s) => Some(s),
+            KyaObject::Number(n) => Some(n),
+            KyaObject::String(s) => Some(s),
+            KyaObject::Bool(b) => Some(b),
+            KyaObject::List(l) => Some(l),
+            KyaObject::Module(m) => Some(m),
             _ => None,
         }
     }
@@ -75,12 +85,85 @@ impl KyaObject {
         )))
     }
 
-    pub fn get_attribute(&self, name: &str) -> Rc<KyaObject> {
-        if let Some(getter) = self.as_get_attribute() {
+    pub fn get_attribute(&self, name: &str) -> Result<Rc<KyaObject>, Error> {
+        if let Some(getter) = self.as_object_type() {
             return getter.get_attribute(name);
         }
 
-        Rc::new(KyaObject::None(KyaNone {}))
+        Err(Error::RuntimeError(format!(
+            "Object of type {} has no attribute '{}'",
+            self.repr(),
+            name
+        )))
+    }
+
+    pub fn set_attribute(&self, name: String, value: Rc<KyaObject>) {
+        if let Some(setter) = self.as_object_type() {
+            setter.set_attribute(name, value);
+        }
+    }
+
+    pub fn name(&self) -> String {
+        if let Some(object_type) = self.as_object_type() {
+            return object_type.name();
+        }
+
+        "Object".to_string()
+    }
+
+    pub fn assign(&self, value: Rc<KyaObject>) -> Result<Rc<KyaObject>, Error> {
+        if let Some(object_type) = self.as_object_type() {
+            return object_type.assign(value);
+        }
+
+        Err(Error::TypeError(format!(
+            "Cannot assign to object of type {}",
+            self.name()
+        )))
+    }
+
+    pub fn as_bool(&self) -> Result<bool, Error> {
+        if let KyaObject::Bool(b) = self {
+            return Ok(b.value.borrow().clone());
+        }
+
+        Err(Error::TypeError(format!(
+            "Expected a boolean, found {}",
+            self.repr()
+        )))
+    }
+
+    pub fn as_string(&self) -> Result<String, Error> {
+        if let KyaObject::String(s) = self {
+            return Ok(s.value.borrow().clone());
+        }
+
+        Err(Error::TypeError(format!(
+            "Expected a string, found {}",
+            self.repr()
+        )))
+    }
+
+    pub fn as_number(&self) -> Result<f64, Error> {
+        if let KyaObject::Number(n) = self {
+            return Ok(n.value.borrow().clone());
+        }
+
+        Err(Error::TypeError(format!(
+            "Expected a number, found {}",
+            self.repr()
+        )))
+    }
+
+    pub fn as_vector(&self) -> Result<Vec<Rc<KyaObject>>, Error> {
+        if let KyaObject::List(l) = self {
+            return Ok(l.items.borrow().clone());
+        }
+
+        Err(Error::TypeError(format!(
+            "Expected a list, found {}",
+            self.repr()
+        )))
     }
 }
 
@@ -92,8 +175,11 @@ pub trait Callable {
     ) -> Result<Rc<KyaObject>, Error>;
 }
 
-pub trait GetAttribute {
-    fn get_attribute(&self, name: &str) -> Rc<KyaObject>;
+pub trait ObjectType {
+    fn get_attribute(&self, name: &str) -> Result<Rc<KyaObject>, Error>;
+    fn set_attribute(&self, name: String, value: Rc<KyaObject>);
+    fn name(&self) -> String;
+    fn assign(&self, value: Rc<KyaObject>) -> Result<Rc<KyaObject>, Error>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -101,12 +187,67 @@ pub struct KyaNone;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct KyaString {
-    pub value: String,
+    pub value: RefCell<String>,
+    pub instance: Rc<KyaObject>,
 }
 
-impl KyaString {
-    pub fn new(value: String) -> Self {
-        KyaString { value }
+impl ObjectType for KyaString {
+    fn get_attribute(&self, name: &str) -> Result<Rc<KyaObject>, Error> {
+        self.instance.get_attribute(name)
+    }
+
+    fn set_attribute(&self, name: String, value: Rc<KyaObject>) {
+        self.instance.set_attribute(name, value);
+    }
+
+    fn name(&self) -> String {
+        "String".to_string()
+    }
+
+    fn assign(&self, value: Rc<KyaObject>) -> Result<Rc<KyaObject>, Error> {
+        if let KyaObject::String(_) = value.as_ref() {
+            self.value.replace(value.as_string()?.to_string());
+
+            Ok(value)
+        } else {
+            Err(Error::TypeError(format!(
+                "Cannot assign {} to attribute of type String",
+                value.repr()
+            )))
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct KyaNumber {
+    pub value: RefCell<f64>,
+    pub instance: Rc<KyaObject>,
+}
+
+impl ObjectType for KyaNumber {
+    fn get_attribute(&self, name: &str) -> Result<Rc<KyaObject>, Error> {
+        self.instance.get_attribute(name)
+    }
+
+    fn set_attribute(&self, name: String, value: Rc<KyaObject>) {
+        self.instance.set_attribute(name, value);
+    }
+
+    fn name(&self) -> String {
+        "Number".to_string()
+    }
+
+    fn assign(&self, value: Rc<KyaObject>) -> Result<Rc<KyaObject>, Error> {
+        if let KyaObject::Number(_) = value.as_ref() {
+            self.value.replace(value.as_number()?);
+
+            Ok(value)
+        } else {
+            Err(Error::TypeError(format!(
+                "Cannot assign {} to attribute of type Number",
+                value.repr(),
+            )))
+        }
     }
 }
 
@@ -201,6 +342,16 @@ impl KyaFrame {
     }
 }
 
+impl std::fmt::Display for KyaFrame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "KyaFrame(locals: {:?})",
+            self.locals.objects.borrow().keys()
+        )
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct KyaClass {
     pub name: String,
@@ -285,62 +436,38 @@ pub struct KyaInstanceObject {
     pub attributes: RefCell<Context>,
 }
 
-impl GetAttribute for KyaInstanceObject {
-    fn get_attribute(&self, name: &str) -> Rc<KyaObject> {
+impl ObjectType for KyaInstanceObject {
+    fn get_attribute(&self, name: &str) -> Result<Rc<KyaObject>, Error> {
         if let Some(object) = self.attributes.borrow().get(name) {
-            return object.clone();
+            return Ok(object.clone());
         }
 
-        Rc::new(KyaObject::None(KyaNone {}))
+        Err(Error::RuntimeError(format!(
+            "Instance of {} has no attribute '{}'",
+            self.name, name
+        )))
+    }
+
+    fn set_attribute(&self, name: String, value: Rc<KyaObject>) {
+        self.attributes.borrow_mut().register(name, value);
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn assign(&self, value: Rc<KyaObject>) -> Result<Rc<KyaObject>, Error> {
+        Err(Error::TypeError(format!(
+            "Cannot assign {} to instance attribute of type {}",
+            value.repr(),
+            self.name
+        )))
     }
 }
 
 impl KyaInstanceObject {
     pub fn new(name: String, attributes: RefCell<Context>) -> Self {
         KyaInstanceObject { name, attributes }
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn get_attribute(&self, name: &str) -> Option<Rc<KyaObject>> {
-        if let Some(object) = self.attributes.borrow().get(name) {
-            Some(object.clone())
-        } else {
-            None
-        }
-    }
-
-    pub fn set_attribute(&self, name: String, value: Rc<KyaObject>) {
-        self.attributes.borrow_mut().register(name, value);
-    }
-
-    pub fn get_string_attribute(&self, name: &str) -> Option<String> {
-        if let Some(object) = self.get_attribute(name) {
-            if let KyaObject::String(s) = object.as_ref() {
-                return Some(s.value.clone());
-            }
-        }
-        None
-    }
-
-    pub fn get_number_attribute(&self, name: &str) -> Option<f64> {
-        if let Some(object) = self.get_attribute(name) {
-            if let KyaObject::Number(n) = object.as_ref() {
-                return Some(*n);
-            }
-        }
-        None
-    }
-
-    pub fn get_bool_attribute(&self, name: &str) -> Option<bool> {
-        if let Some(object) = self.get_attribute(name) {
-            if let KyaObject::Bool(b) = object.as_ref() {
-                return Some(*b);
-            }
-        }
-        None
     }
 }
 
@@ -380,18 +507,69 @@ impl Callable for KyaMethod {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct KyaModule {
-    pub name: String,
-    pub objects: Context,
+pub struct KyaBool {
+    pub value: RefCell<bool>,
+    pub instance: Rc<KyaObject>,
 }
 
-impl KyaModule {
-    pub fn new(name: String, objects: Context) -> Self {
-        KyaModule { name, objects }
+impl ObjectType for KyaBool {
+    fn get_attribute(&self, name: &str) -> Result<Rc<KyaObject>, Error> {
+        self.instance.get_attribute(name)
     }
 
-    pub fn resolve(&self, name: &str) -> Option<Rc<KyaObject>> {
-        self.objects.get(name)
+    fn set_attribute(&self, name: String, value: Rc<KyaObject>) {
+        self.instance.set_attribute(name, value);
+    }
+
+    fn name(&self) -> String {
+        "Bool".to_string()
+    }
+
+    fn assign(&self, value: Rc<KyaObject>) -> Result<Rc<KyaObject>, Error> {
+        if let KyaObject::Bool(_) = value.as_ref() {
+            self.value.replace(value.as_bool()?);
+
+            Ok(value)
+        } else {
+            Err(Error::TypeError(format!(
+                "Cannot assign {} to attribute of type Bool",
+                value.repr(),
+            )))
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct KyaModule {
+    pub name: String,
+    pub objects: RefCell<Context>,
+}
+
+impl ObjectType for KyaModule {
+    fn get_attribute(&self, name: &str) -> Result<Rc<KyaObject>, Error> {
+        if let Some(object) = self.objects.borrow().get(name) {
+            return Ok(object.clone());
+        }
+
+        Err(Error::RuntimeError(format!(
+            "Module '{}' has no attribute '{}'",
+            self.name, name
+        )))
+    }
+
+    fn set_attribute(&self, name: String, value: Rc<KyaObject>) {
+        self.objects.borrow_mut().register(name, value);
+    }
+
+    fn name(&self) -> String {
+        "Module".to_string()
+    }
+
+    fn assign(&self, value: Rc<KyaObject>) -> Result<Rc<KyaObject>, Error> {
+        Err(Error::TypeError(format!(
+            "Cannot assign {} to module attribute",
+            value.repr()
+        )))
     }
 }
 
@@ -426,48 +604,79 @@ impl Context {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct KyaList {
-    items: Vec<Rc<KyaObject>>,
+    pub items: RefCell<Vec<Rc<KyaObject>>>,
+    pub instance: Rc<KyaObject>,
 }
 
 impl KyaList {
-    pub fn new(items: Vec<Rc<KyaObject>>) -> Self {
-        KyaList { items }
-    }
-
-    pub fn get(&self, index: usize) -> Option<&Rc<KyaObject>> {
-        self.items.get(index)
+    pub fn get(&self, index: usize) -> Option<Rc<KyaObject>> {
+        self.items.borrow().get(index).cloned()
     }
 
     pub fn len(&self) -> usize {
-        self.items.len()
+        self.items.borrow().len()
     }
 }
 
-pub fn unpack_number(
-    args: &[Rc<KyaObject>],
-    index: usize,
-    args_count: usize,
-) -> Result<Rc<KyaObject>, Error> {
-    if index >= args_count {
-        return Err(Error::TypeError(format!(
-            "Expected at least {} arguments, but got {}",
-            index + 1,
-            args_count
-        )));
+impl ObjectType for KyaList {
+    fn get_attribute(&self, name: &str) -> Result<Rc<KyaObject>, Error> {
+        self.instance.get_attribute(name)
     }
 
-    if let Some(arg) = args.get(index) {
-        if let KyaObject::InstanceObject(obj) = arg.as_ref() {
-            if obj.name() == "Number" {
-                return Ok(arg.clone());
-            }
+    fn set_attribute(&self, name: String, value: Rc<KyaObject>) {
+        self.instance.set_attribute(name, value);
+    }
+
+    fn name(&self) -> String {
+        "List".to_string()
+    }
+
+    fn assign(&self, value: Rc<KyaObject>) -> Result<Rc<KyaObject>, Error> {
+        Err(Error::TypeError(format!(
+            "Cannot assign {} to list attribute",
+            value.repr()
+        )))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct KyaSocket {
+    pub socket: Option<Socket>,
+    pub context: RefCell<Context>,
+}
+
+impl KyaSocket {
+    pub fn new(socket: Option<Socket>, context: RefCell<Context>) -> Self {
+        KyaSocket { socket, context }
+    }
+}
+
+impl ObjectType for KyaSocket {
+    fn get_attribute(&self, name: &str) -> Result<Rc<KyaObject>, Error> {
+        if let Some(object) = self.context.borrow().get(name) {
+            return Ok(object.clone());
         }
+
+        Err(Error::RuntimeError(format!(
+            "Socket has no attribute '{}'",
+            name
+        )))
     }
 
-    Err(Error::TypeError(format!(
-        "Expected a Number at index {}, found {:?}",
-        index, args[index]
-    )))
+    fn set_attribute(&self, name: String, value: Rc<KyaObject>) {
+        self.context.borrow_mut().register(name, value);
+    }
+
+    fn name(&self) -> String {
+        "Socket".to_string()
+    }
+
+    fn assign(&self, value: Rc<KyaObject>) -> Result<Rc<KyaObject>, Error> {
+        Err(Error::TypeError(format!(
+            "Cannot assign {} to socket attribute",
+            value.repr()
+        )))
+    }
 }
 
 pub fn unpack_string(
@@ -497,38 +706,27 @@ pub fn unpack_string(
     )))
 }
 
-pub fn kya_number_as_float(object: &KyaObject) -> Result<f64, Error> {
-    if let KyaObject::InstanceObject(obj) = object {
-        if obj.name() == "Number" {
-            return Ok(obj.get_number_attribute("__value__").unwrap());
-        }
-    };
-
-    return Err(Error::TypeError("Expected a Number instance".to_string()));
-}
-
-pub fn kya_string_as_string(object: &KyaObject) -> Result<String, Error> {
-    if let KyaObject::InstanceObject(obj) = object {
-        if obj.name() == "String" {
-            return Ok(obj.get_string_attribute("__value__").unwrap());
-        }
-    };
-
-    return Err(Error::TypeError("Expected a String instance".to_string()));
-}
-
-pub fn kya_list_as_vec(object: &KyaObject) -> Result<Vec<Rc<KyaObject>>, Error> {
-    if let KyaObject::InstanceObject(obj) = object {
-        if obj.name() == "List" {
-            if let Some(items) = obj.get_attribute("__items__") {
-                if let KyaObject::List(list) = items.as_ref() {
-                    return Ok(list.items.clone());
-                }
-            }
-        }
+pub fn unpack_args(
+    args: &[Rc<KyaObject>],
+    index: usize,
+    args_count: usize,
+) -> Result<Rc<KyaObject>, Error> {
+    if index >= args_count {
+        return Err(Error::TypeError(format!(
+            "Expected at least {} arguments, but got {}",
+            index + 1,
+            args_count
+        )));
     }
 
-    Err(Error::TypeError("Expected a List instance".to_string()))
+    if let Some(arg) = args.get(index) {
+        return Ok(arg.clone());
+    }
+
+    Err(Error::TypeError(format!(
+        "Expected an argument at index {}, but none was provided",
+        index
+    )))
 }
 
 pub fn call_constructor(
@@ -536,27 +734,29 @@ pub fn call_constructor(
     instance: Rc<KyaObject>,
     args: Vec<Rc<KyaObject>>,
 ) -> Result<Rc<KyaObject>, Error> {
-    if let KyaObject::InstanceObject(instance_object) = instance.as_ref() {
-        if let Some(_) = instance_object.get_attribute("constructor") {
-            let init_args = args.clone();
+    let init_args = args.clone();
+    let constructor = instance.get_attribute("constructor");
 
-            return instance
-                .get_attribute("constructor")
-                .call(interpreter, init_args);
-        } else if !args.is_empty() {
-            return Err(Error::TypeError(format!(
-                "{}() takes no arguments, but {} were given",
-                instance_object.name(),
-                args.len()
-            )));
+    match constructor {
+        Ok(constructor) => {
+            let method = Rc::new(KyaObject::Method(KyaMethod {
+                function: constructor,
+                instance: instance.clone(),
+            }));
+
+            return method.call(interpreter, init_args);
         }
-    } else {
-        return Err(Error::TypeError(
-            "Expected an instance object to call constructor".to_string(),
-        ));
+        Err(_) => {
+            if args.is_empty() {
+                return Ok(Rc::new(KyaObject::None(KyaNone {})));
+            } else {
+                return Err(Error::TypeError(format!(
+                    "Constructor for {} does not accept arguments",
+                    instance.name()
+                )));
+            }
+        }
     }
-
-    Ok(Rc::new(KyaObject::None(KyaNone)))
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 use crate::builtins_::string::kya_string_new;
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
-use crate::objects::{kya_string_as_string, unpack_string, KyaNone, KyaObject};
+use crate::objects::{unpack_string, KyaNone, KyaObject};
 
 use std::io::Write;
 use std::rc::Rc;
@@ -19,14 +19,15 @@ pub fn kya_print(
     let mut output = String::new();
 
     for arg in args {
-        if let KyaObject::InstanceObject(_) = arg.as_ref() {
-            let result = arg.get_attribute("__repr__").call(interpreter, vec![])?;
-            let value = kya_string_as_string(&result)?;
+        let result = arg.get_attribute("__repr__")?.call(interpreter, vec![]);
 
-            output.push_str(value.as_str());
+        let value = if result.is_ok() {
+            result?.as_string()?
         } else {
-            output.push_str(&arg.repr());
-        }
+            arg.repr()
+        };
+
+        output.push_str(value.as_str());
     }
 
     println!("{}", output);
@@ -50,7 +51,7 @@ pub fn kya_input(
     args: Vec<Rc<KyaObject>>,
 ) -> Result<Rc<KyaObject>, Error> {
     let arg = unpack_string(&args, 0, 1).unwrap_or_else(|_| kya_string_new("").unwrap());
-    let prompt = kya_string_as_string(&arg)?;
+    let prompt = arg.as_string()?.to_string();
 
     print!("{}", prompt);
 

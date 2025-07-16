@@ -1,27 +1,27 @@
 use crate::builtins_::number::kya_number_new;
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
-use crate::objects::{
-    kya_number_as_float, unpack_number, Context, KyaModule, KyaObject, KyaRsFunction,
-};
+use crate::objects::{unpack_args, Context, KyaModule, KyaObject, KyaRsFunction};
+
+use std::cell::RefCell;
 use std::rc::Rc;
 
 pub fn sqrt(
     _interpreter: &mut Interpreter,
     args: Vec<Rc<KyaObject>>,
 ) -> Result<Rc<KyaObject>, Error> {
-    let arg = unpack_number(&args, 0, 1).unwrap();
+    let arg = unpack_args(&args, 0, 1).unwrap();
 
-    Ok(kya_number_new(kya_number_as_float(&arg)?.sqrt())?)
+    Ok(kya_number_new(arg.as_number()?.sqrt())?)
 }
 
 pub fn abs(
     _interpreter: &mut Interpreter,
     args: Vec<Rc<KyaObject>>,
 ) -> Result<Rc<KyaObject>, Error> {
-    let arg = unpack_number(&args, 0, 1).unwrap();
+    let arg = unpack_args(&args, 0, 1).unwrap();
 
-    Ok(kya_number_new(kya_number_as_float(&arg)?.abs())?)
+    Ok(kya_number_new(arg.as_number()?.abs())?)
 }
 
 pub fn pack_module() -> KyaObject {
@@ -45,6 +45,6 @@ pub fn pack_module() -> KyaObject {
 
     KyaObject::Module(KyaModule {
         name: "math".to_string(),
-        objects: objects,
+        objects: RefCell::new(objects),
     })
 }

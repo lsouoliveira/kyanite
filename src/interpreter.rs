@@ -9,7 +9,7 @@ use crate::lexer::Lexer;
 use crate::lexer::TokenType;
 use crate::objects::{
     Context, KyaClass, KyaFrame, KyaFunction, KyaMethod, KyaModule, KyaNone, KyaObject, KyaRsClass,
-    KyaRsFunction,
+    KyaRsFunction, ObjectType,
 };
 use crate::parser;
 use crate::visitor::Evaluator;
@@ -73,10 +73,10 @@ fn import_module(root: &PathBuf, module_name: &str) -> Result<KyaObject, Error> 
 
     interpreter.evaluate()?;
 
-    Ok(KyaObject::Module(KyaModule::new(
-        module_name.to_string(),
-        interpreter.context.clone(),
-    )))
+    Ok(KyaObject::Module(KyaModule {
+        name: module_name.to_string(),
+        objects: RefCell::new(interpreter.context.clone()),
+    }))
 }
 
 impl Interpreter {
@@ -118,16 +118,14 @@ impl Interpreter {
 
     pub fn resolve(&self, name: &str) -> Option<Rc<KyaObject>> {
         if let Some(object) = self.context.get(name) {
-            if let KyaObject::Module(module) = object.as_ref() {
-                if let Some(module_object) = module.resolve(name) {
-                    return Some(module_object);
-                }
+            if let KyaObject::Module(_) = object.as_ref() {
+                return Some(object.get_attribute(name).unwrap());
             }
 
             return Some(object.clone());
         }
 
-        if let Some(frame) = self.frames.last() {
+        for frame in self.frames.iter().rev() {
             if let Some(object) = frame.borrow().locals.get(name) {
                 return Some(object.clone());
             }
@@ -168,15 +166,18 @@ impl Interpreter {
 
     fn is_true(&self, object: &KyaObject) -> bool {
         match object {
-            KyaObject::Bool(value) => *value,
-            KyaObject::Number(value) => *value != 0.0,
-            KyaObject::String(value) => !value.value.is_empty(),
+            KyaObject::Bool(b) => b.value.borrow().clone(),
+            KyaObject::Number(number) => number.value.borrow().abs() == 0.0,
+            KyaObject::String(value) => !value.value.borrow().is_empty(),
+            KyaObject::List(list) => !list.items.borrow().is_empty(),
             KyaObject::InstanceObject(instance) => {
-                if instance.name() == "Bool" {
-                    instance.get_bool_attribute("__value__").unwrap()
+                if object.name() == "Bool" {
+                    object.as_bool().unwrap()
                 } else if instance.name() == "String" {
-                    !instance
-                        .get_string_attribute("__value__")
+                    !object
+                        .get_attribute("__value__")
+                        .unwrap()
+                        .as_string()
                         .unwrap()
                         .is_empty()
                 } else {
@@ -306,50 +307,30 @@ impl Evaluator for Interpreter {
 
     fn eval_attribute(&mut self, attribute: &ast::Attribute) -> Result<Rc<KyaObject>, Error> {
         let name = attribute.name.eval(self)?;
+        let object = name.get_attribute(attribute.value.as_str()).unwrap();
 
-        if let KyaObject::InstanceObject(instance_object) = name.as_ref() {
-            if let Some(object) = instance_object.get_attribute(attribute.value.as_str()) {
-                if let KyaObject::Function(_) = object.as_ref() {
-                    return Ok(Rc::new(KyaObject::Method(KyaMethod {
-                        function: object.clone(),
-                        instance: name.clone(),
-                    })));
-                } else if let KyaObject::RsFunction(_) = object.as_ref() {
-                    return Ok(Rc::new(KyaObject::Method(KyaMethod {
-                        function: object.clone(),
-                        instance: name.clone(),
-                    })));
-                } else {
-                    return Ok(object);
-                }
-            } else {
-                return Err(Error::RuntimeError(format!(
-                    "Undefined attribute: {}",
-                    attribute.value
-                )));
-            }
-        } else if let KyaObject::Module(module) = name.as_ref() {
-            if let Some(object) = module.resolve(attribute.value.as_str()) {
-                return Ok(object);
-            } else {
-                return Err(Error::RuntimeError(format!(
-                    "Undefined attribute in module: {}",
-                    attribute.value
-                )));
-            }
+        if let KyaObject::Function(_) = object.as_ref() {
+            return Ok(Rc::new(KyaObject::Method(KyaMethod {
+                function: object.clone(),
+                instance: name.clone(),
+            })));
+        } else if let KyaObject::RsFunction(_) = object.as_ref() {
+            return Ok(Rc::new(KyaObject::Method(KyaMethod {
+                function: object.clone(),
+                instance: name.clone(),
+            })));
         }
 
-        Err(Error::RuntimeError(format!(
-            "Invalid attribute assignment: {}",
-            attribute.value
-        )))
+        return Ok(object);
     }
 
     fn eval_compare(&mut self, compare: &ast::Compare) -> Result<Rc<KyaObject>, Error> {
         let left = compare.left.eval(self)?;
         let right = compare.right.eval(self)?;
 
-        return left.get_attribute("__eq__").call(self, vec![right.clone()]);
+        return left
+            .get_attribute("__eq__")?
+            .call(self, vec![right.clone()]);
     }
 
     fn eval_if(&mut self, if_node: &ast::If) -> Result<Rc<KyaObject>, Error> {
@@ -381,28 +362,19 @@ impl Evaluator for Interpreter {
         let left = bin_op.left.eval(self)?;
         let right = bin_op.right.eval(self)?;
 
-        if let KyaObject::InstanceObject(_) = left.as_ref() {
-            if let KyaObject::InstanceObject(_) = right.as_ref() {
-                match bin_op.operator {
-                    TokenType::Plus => {
-                        let args = vec![right];
+        match bin_op.operator {
+            TokenType::Plus => {
+                let args = vec![right];
 
-                        return left.get_attribute("__add__").call(self, args);
-                    }
-                    _ => {
-                        return Err(Error::RuntimeError(format!(
-                            "Unsupported binary operator: {:?}",
-                            bin_op.operator
-                        )));
-                    }
-                }
+                return left.get_attribute("__add__")?.call(self, args);
+            }
+            _ => {
+                return Err(Error::RuntimeError(format!(
+                    "Unsupported binary operator: {:?}",
+                    bin_op.operator
+                )));
             }
         }
-
-        Err(Error::RuntimeError(format!(
-            "Invalid left operand for binary operation: {}",
-            left.repr()
-        )))
     }
 
     fn eval_unary_op(&mut self, unary_op: &ast::UnaryOp) -> Result<Rc<KyaObject>, Error> {
@@ -410,7 +382,7 @@ impl Evaluator for Interpreter {
 
         match unary_op.operator {
             TokenType::Minus => {
-                return operand.get_attribute("__neg__").call(self, vec![]);
+                return operand.get_attribute("__neg__")?.call(self, vec![]);
             }
             _ => {
                 return Err(Error::RuntimeError(format!(

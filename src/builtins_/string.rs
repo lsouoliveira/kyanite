@@ -3,7 +3,7 @@ use crate::builtins_::number::kya_number_new;
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
 use crate::objects::{
-    kya_string_as_string, unpack_string, Context, KyaInstanceObject, KyaMethod, KyaNone, KyaObject,
+    unpack_args, unpack_string, Context, KyaInstanceObject, KyaMethod, KyaNone, KyaObject,
     KyaRsFunction, KyaString,
 };
 
@@ -23,21 +23,10 @@ pub fn kya_string_length(
     interpreter: &mut Interpreter,
     _: Vec<Rc<KyaObject>>,
 ) -> Result<Rc<KyaObject>, Error> {
-    let instance = interpreter.resolve("self").ok_or_else(|| {
-        Error::RuntimeError("String object does not have a self attribute".to_string())
-    })?;
+    let instance = interpreter.get_self()?;
+    let value = instance.as_string()?;
 
-    if let KyaObject::InstanceObject(obj) = instance.as_ref() {
-        if let Some(value) = obj.get_attribute("__value__") {
-            if let KyaObject::String(value) = value.as_ref() {
-                return Ok(Rc::new(KyaObject::Number(value.value.len() as f64)));
-            }
-        }
-    }
-
-    Err(Error::RuntimeError(
-        "String object does not have a __value__ attribute".to_string(),
-    ))
+    Ok(kya_number_new(value.len() as f64).unwrap())
 }
 
 pub fn kya_string_init(
@@ -45,136 +34,111 @@ pub fn kya_string_init(
     args: Vec<Rc<KyaObject>>,
 ) -> Result<Rc<KyaObject>, Error> {
     let instance = interpreter.get_self()?;
-    let arg = unpack_string(&args, 0, 1)
-        .unwrap_or_else(|_| Rc::new(KyaObject::String(KyaString::new("".to_string()))));
-    let value = kya_string_as_string(&arg)?;
+    let arg = unpack_string(&args, 0, 1).unwrap_or_else(|_| kya_string_new("").unwrap());
 
-    if let KyaObject::InstanceObject(obj) = instance.as_ref() {
-        obj.set_attribute(
-            "__value__".to_string(),
-            Rc::new(KyaObject::String(KyaString::new(value))),
-        );
-    }
+    let _ = instance.assign(arg);
 
     Ok(Rc::new(KyaObject::None(KyaNone {})))
 }
 
 pub fn kya_string_new(value: &str) -> Result<Rc<KyaObject>, Error> {
-    let mut locals = Context::new();
-
-    locals.register(
-        String::from("__value__"),
-        Rc::new(KyaObject::String(KyaString::new(value.to_string()))),
-    );
-
     let instance = Rc::new(KyaObject::InstanceObject(KyaInstanceObject::new(
         "String".to_string(),
-        RefCell::new(locals),
+        RefCell::new(Context::new()),
     )));
 
-    if let KyaObject::InstanceObject(instance_obj) = instance.as_ref() {
-        instance_obj.set_attribute(
-            String::from("constructor"),
-            Rc::new(KyaObject::Method(KyaMethod {
-                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-                    String::from("constructor"),
-                    kya_string_init,
-                ))),
-                instance: instance.clone(),
-            })),
-        );
+    let object = Rc::new(KyaObject::String(KyaString {
+        value: RefCell::new(value.to_string()),
+        instance: instance.clone(),
+    }));
 
-        instance_obj.set_attribute(
-            String::from("__repr__"),
-            Rc::new(KyaObject::Method(KyaMethod {
-                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-                    String::from("__repr__"),
-                    kya_string_repr,
-                ))),
-                instance: instance.clone(),
-            })),
-        );
+    instance.set_attribute(
+        String::from("constructor"),
+        Rc::new(KyaObject::Method(KyaMethod {
+            function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                String::from("constructor"),
+                kya_string_init,
+            ))),
+            instance: object.clone(),
+        })),
+    );
 
-        instance_obj.set_attribute(
-            String::from("length"),
-            Rc::new(KyaObject::Method(KyaMethod {
-                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-                    String::from("length"),
-                    kya_string_length,
-                ))),
-                instance: instance.clone(),
-            })),
-        );
+    instance.set_attribute(
+        String::from("__repr__"),
+        Rc::new(KyaObject::Method(KyaMethod {
+            function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                String::from("__repr__"),
+                kya_string_repr,
+            ))),
+            instance: object.clone(),
+        })),
+    );
 
-        instance_obj.set_attribute(
-            String::from("__eq__"),
-            Rc::new(KyaObject::Method(KyaMethod {
-                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-                    String::from("__eq__"),
-                    kya_string_eq,
-                ))),
-                instance: instance.clone(),
-            })),
-        );
+    instance.set_attribute(
+        String::from("length"),
+        Rc::new(KyaObject::Method(KyaMethod {
+            function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                String::from("length"),
+                kya_string_length,
+            ))),
+            instance: object.clone(),
+        })),
+    );
 
-        instance_obj.set_attribute(
-            String::from("__add__"),
-            Rc::new(KyaObject::Method(KyaMethod {
-                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-                    String::from("__add__"),
-                    kya_string_add,
-                ))),
-                instance: instance.clone(),
-            })),
-        );
+    instance.set_attribute(
+        String::from("__eq__"),
+        Rc::new(KyaObject::Method(KyaMethod {
+            function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                String::from("__eq__"),
+                kya_string_eq,
+            ))),
+            instance: object.clone(),
+        })),
+    );
 
-        instance_obj.set_attribute(
-            String::from("split"),
-            Rc::new(KyaObject::Method(KyaMethod {
-                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-                    String::from("split"),
-                    kya_string_split,
-                ))),
-                instance: instance.clone(),
-            })),
-        );
+    instance.set_attribute(
+        String::from("__add__"),
+        Rc::new(KyaObject::Method(KyaMethod {
+            function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                String::from("__add__"),
+                kya_string_add,
+            ))),
+            instance: object.clone(),
+        })),
+    );
 
-        instance_obj.set_attribute(
-            String::from("to_i"),
-            Rc::new(KyaObject::Method(KyaMethod {
-                function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-                    String::from("to_i"),
-                    kya_string_to_i,
-                ))),
-                instance: instance.clone(),
-            })),
-        );
-    }
+    instance.set_attribute(
+        String::from("split"),
+        Rc::new(KyaObject::Method(KyaMethod {
+            function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                String::from("split"),
+                kya_string_split,
+            ))),
+            instance: object.clone(),
+        })),
+    );
 
-    Ok(instance)
+    instance.set_attribute(
+        String::from("to_i"),
+        Rc::new(KyaObject::Method(KyaMethod {
+            function: Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
+                String::from("to_i"),
+                kya_string_to_i,
+            ))),
+            instance: object.clone(),
+        })),
+    );
+
+    Ok(object)
 }
 
 pub fn instantiate_string(
     _: &mut Interpreter,
     args: Vec<Rc<KyaObject>>,
 ) -> Result<Rc<KyaObject>, Error> {
-    let arg = unpack_string(&args, 0, 1)
-        .unwrap_or_else(|_| Rc::new(KyaObject::String(KyaString::new("".to_string()))));
-    let value = kya_string_as_string(&arg)?;
+    let value = unpack_string(&args, 0, 1)?.as_string()?.to_string();
 
     kya_string_new(&value)
-}
-
-fn kya_string_get_value(interpreter: &mut Interpreter) -> Result<String, Error> {
-    let instance = interpreter.get_self()?;
-
-    if let KyaObject::InstanceObject(obj) = instance.as_ref() {
-        return Ok(obj.get_string_attribute("__value__").unwrap());
-    }
-
-    Err(Error::RuntimeError(
-        "String object does not have a __value__ attribute".to_string(),
-    ))
 }
 
 pub fn kya_string_eq(
@@ -187,38 +151,28 @@ pub fn kya_string_eq(
         ));
     }
 
-    if let KyaObject::InstanceObject(obj) = args[0].as_ref() {
-        if obj.name() != "String" {
-            return Ok(interpreter.false_object());
-        }
+    let instance = interpreter.get_self()?;
 
-        let self_value = kya_string_get_value(interpreter)?;
-        let other_value = obj.get_string_attribute("__value__").unwrap();
-
-        if self_value == other_value {
-            return Ok(interpreter.true_object());
-        } else {
-            return Ok(interpreter.false_object());
-        }
+    if instance.name() != "String" {
+        return Ok(interpreter.false_object());
     }
 
-    Err(Error::RuntimeError(
-        "String object does not have a __value__ attribute".to_string(),
-    ))
+    let self_value = instance.as_string()?;
+    let other_value = args[0].as_string()?;
+
+    if self_value == other_value {
+        return Ok(interpreter.true_object());
+    } else {
+        return Ok(interpreter.false_object());
+    }
 }
 
 pub fn kya_string_add(
     interpreter: &mut Interpreter,
     args: Vec<Rc<KyaObject>>,
 ) -> Result<Rc<KyaObject>, Error> {
-    if args.len() != 1 {
-        return Err(Error::TypeError(
-            "add() requires exactly one argument".to_string(),
-        ));
-    }
-
-    let other_value = kya_string_as_string(&args[0])?;
-    let self_value = kya_string_get_value(interpreter)?;
+    let other_value = unpack_args(&args, 0, 1)?.as_string()?;
+    let self_value = interpreter.get_self()?.as_string()?.to_string();
 
     Ok(kya_string_new(&(self_value + &other_value)).unwrap())
 }
@@ -227,10 +181,12 @@ pub fn kya_string_split(
     interpreter: &mut Interpreter,
     args: Vec<Rc<KyaObject>>,
 ) -> Result<Rc<KyaObject>, Error> {
-    let separator = unpack_string(&args, 0, 1)?;
-    let separator_value = kya_string_as_string(&separator)?;
+    let separator_value = unpack_args(&args, 0, 1)
+        .unwrap_or_else(|_| kya_string_new(" ").unwrap())
+        .as_string()?
+        .to_string();
     let instance = interpreter.get_self()?;
-    let value = kya_string_as_string(&instance)?;
+    let value = instance.as_string()?;
     let items = value
         .split(&separator_value)
         .map(|s| kya_string_new(s).unwrap())
@@ -244,7 +200,7 @@ pub fn kya_string_to_i(
     _: Vec<Rc<KyaObject>>,
 ) -> Result<Rc<KyaObject>, Error> {
     let instance = interpreter.get_self()?;
-    let value = kya_string_as_string(&instance)?;
+    let value = instance.as_string()?.to_string();
 
     match value.parse::<i64>() {
         Ok(num) => Ok(kya_number_new(num as f64).unwrap()),
