@@ -4,6 +4,7 @@ use crate::errors::Error;
 use crate::lexer::Lexer;
 use crate::objects::function_object::{create_function_type, FunctionObject};
 use crate::objects::none_object::{create_none_type, none_new};
+use crate::objects::number_object::{create_number_type, NumberObject};
 use crate::objects::rs_function_object::{create_rs_function_type, RsFunctionObject};
 use crate::objects::string_object::{create_string_type, StringObject};
 use crate::objects::utils::{create_rs_function_object, string_object_to_string};
@@ -20,6 +21,7 @@ pub static NONE_TYPE: &str = "None";
 pub static STRING_TYPE: &str = "String";
 pub static RS_FUNCTION_TYPE: &str = "RsFunction";
 pub static FUNCTION_TYPE: &str = "Function";
+pub static NUMBER_TYPE: &str = "Number";
 
 type FrameRef = Rc<RefCell<Frame>>;
 
@@ -106,6 +108,10 @@ impl Interpreter {
         self.types.insert(
             FUNCTION_TYPE.to_string(),
             create_function_type(type_type.clone()),
+        );
+        self.types.insert(
+            NUMBER_TYPE.to_string(),
+            create_number_type(type_type.clone()),
         );
     }
 
@@ -213,7 +219,10 @@ impl Evaluator for Interpreter {
     }
 
     fn eval_number_literal(&mut self, number_literal: &f64) -> Result<KyaObjectRef, Error> {
-        Ok(self.resolve(NONE_TYPE).unwrap())
+        Ok(KyaObject::from_number_object(NumberObject {
+            ob_type: self.get_type(NUMBER_TYPE),
+            value: *number_literal,
+        }))
     }
 
     fn eval_method_def(&mut self, method_def: &ast::MethodDef) -> Result<KyaObjectRef, Error> {

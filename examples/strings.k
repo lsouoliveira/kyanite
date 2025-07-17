@@ -8,7 +8,10 @@ def test(a, b, c)
     print(a, b, c)
 end
 
-# print(my_string)
-# print(my_string.length())
+print(my_string)
 
 test("a", "b", "c")
+
+a = 5
+
+print(a)

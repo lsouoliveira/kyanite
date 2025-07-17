@@ -41,3 +41,11 @@ pub fn create_rs_function_object(
         function_ptr,
     })
 }
+
+pub fn number_object_to_float(obj: &KyaObjectRef) -> Result<f64, Error> {
+    if let KyaObject::NumberObject(number_obj) = &*obj.borrow() {
+        Ok(number_obj.value)
+    } else {
+        Err(Error::RuntimeError("Expected a Number".to_string()))
+    }
+}

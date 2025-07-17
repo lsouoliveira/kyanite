@@ -5,6 +5,7 @@ use crate::errors::Error;
 use crate::interpreter::Interpreter;
 use crate::objects::function_object::FunctionObject;
 use crate::objects::none_object::NoneObject;
+use crate::objects::number_object::NumberObject;
 use crate::objects::rs_function_object::RsFunctionObject;
 use crate::objects::string_object::StringObject;
 
@@ -27,6 +28,7 @@ pub enum KyaObject {
     StringObject(StringObject),
     RsFunctionObject(RsFunctionObject),
     FunctionObject(FunctionObject),
+    NumberObject(NumberObject),
 }
 
 pub trait KyaObjectTrait {
@@ -83,6 +85,7 @@ impl KyaObject {
             KyaObject::StringObject(obj) => Some(obj),
             KyaObject::RsFunctionObject(obj) => Some(obj),
             KyaObject::FunctionObject(obj) => Some(obj),
+            KyaObject::NumberObject(obj) => Some(obj),
             _ => None,
         }
     }
@@ -115,6 +118,10 @@ impl KyaObject {
 
     pub fn from_string_object(string_object: StringObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::StringObject(string_object))
+    }
+
+    pub fn from_number_object(number_object: NumberObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::NumberObject(number_object))
     }
 }
 
