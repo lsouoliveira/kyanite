@@ -1,6 +1,5 @@
 mod ast;
 mod builtins;
-mod builtins_;
 mod dumper;
 mod errors;
 mod internal;
@@ -43,14 +42,16 @@ fn interpret(filename: &str) -> Result<(), String> {
 
     let mut interpreter = Interpreter::new(input, root_dir.to_string());
 
+    interpreter.init();
+
     match interpreter.evaluate() {
-        Ok(_) => {}
+        Ok(_) => Ok(()),
         Err(e) => {
             eprintln!("{}", e);
+
+            Ok(())
         }
     }
-
-    Ok(())
 }
 
 #[derive(Parser)]

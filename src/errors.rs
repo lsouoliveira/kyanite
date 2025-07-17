@@ -1,3 +1,5 @@
+use colored::Colorize;
+
 #[derive(Debug, Clone)]
 pub enum Error {
     RuntimeError(String),
@@ -37,11 +39,20 @@ impl std::fmt::Display for LexerError {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::RuntimeError(msg) => write!(f, "Runtime Error: {}", msg),
-            Error::UndefinedVariable(var) => write!(f, "Undefined Variable: {}", var),
-            Error::ParserError(msg) => write!(f, "Parser Error: {}", msg),
-            Error::LexerError(err) => write!(f, "Lexer Error: {}", err),
-            Error::TypeError(msg) => write!(f, "Type Error: {}", msg),
+            Error::RuntimeError(msg) => write!(f, "{}", format_error("Runtime Error", msg)),
+            Error::ParserError(msg) => write!(f, "{}", format_error("Parser Error", msg)),
+            Error::UndefinedVariable(var) => write!(
+                f,
+                "{}: {}",
+                "Undefined Variable".purple().bold(),
+                var.red().bold()
+            ),
+            Error::LexerError(lexer_error) => write!(f, "{}", lexer_error),
+            Error::TypeError(msg) => write!(f, "{}", format_error("Type Error", msg)),
         }
     }
+}
+
+fn format_error(error_type: &str, message: &str) -> String {
+    format!("{}: {}", error_type.purple().bold(), message.purple())
 }

@@ -1,8 +1,7 @@
 use crate::errors::Error;
 use crate::lexer::TokenType;
-use crate::objects::KyaObject;
+use crate::objects::base::KyaObjectRef;
 use crate::visitor::{Evaluator, Visitor};
-use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ASTNode {
@@ -173,7 +172,7 @@ impl ASTNode {
         }
     }
 
-    pub fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<Rc<KyaObject>, Error> {
+    pub fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<KyaObjectRef, Error> {
         match self {
             ASTNode::Module(module) => evaluator.eval_module(&module),
             ASTNode::Identifier(identifier) => evaluator.eval_identifier(&identifier),

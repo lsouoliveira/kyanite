@@ -1,4 +1,4 @@
-use crate::builtins_::number::kya_number_new;
+use crate::builtins::number::kya_number_new;
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
 use crate::objects::{unpack_args, Context, KyaModule, KyaObject, KyaRsFunction};

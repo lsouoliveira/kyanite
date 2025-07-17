@@ -1,395 +1,269 @@
 use crate::ast;
-use crate::builtins::{kya_globals, kya_input, kya_print};
-use crate::builtins_::bool::kya_bool_new;
-use crate::builtins_::modules::math;
-use crate::builtins_::number::kya_number_new;
-use crate::builtins_::string::{instantiate_string, kya_string_new};
+use crate::builtins::methods::kya_print;
 use crate::errors::Error;
 use crate::lexer::Lexer;
-use crate::lexer::TokenType;
-use crate::objects::{
-    Context, KyaClass, KyaFrame, KyaFunction, KyaMethod, KyaModule, KyaNone, KyaObject, KyaRsClass,
-    KyaRsFunction, ObjectType,
-};
+use crate::objects::function_object::{create_function_type, FunctionObject};
+use crate::objects::none_object::{create_none_type, none_new};
+use crate::objects::rs_function_object::{create_rs_function_type, RsFunctionObject};
+use crate::objects::string_object::{create_string_type, StringObject};
+use crate::objects::utils::{create_rs_function_object, string_object_to_string};
 use crate::parser;
 use crate::visitor::Evaluator;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fs;
 use std::path::PathBuf;
 use std::rc::Rc;
+
+use crate::objects::base::{create_type_type, KyaObject, KyaObjectRef, TypeRef};
+
+pub static NONE_TYPE: &str = "None";
+pub static STRING_TYPE: &str = "String";
+pub static RS_FUNCTION_TYPE: &str = "RsFunction";
+pub static FUNCTION_TYPE: &str = "Function";
+
+type FrameRef = Rc<RefCell<Frame>>;
 
 pub struct Interpreter {
     root: PathBuf,
     input: String,
-    pub context: Context,
-    pub frames: Vec<Rc<RefCell<KyaFrame>>>,
-    builtin_modules: HashMap<String, KyaObject>,
+
+    globals: HashMap<String, KyaObjectRef>,
+    frames: Vec<FrameRef>,
+
+    types: HashMap<String, TypeRef>,
 }
 
-fn setup_builtins(context: &mut Context) {
-    context.register(
-        String::from("print"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("print"),
-            kya_print,
-        ))),
-    );
+// fn import_module(root: &PathBuf, module_name: &str) -> Result<KyaObject, Error> {
+//     let module_path = root.join(format!("{}.k", module_name));
+//     let input = fs::read_to_string(&module_path)
+//         .map_err(|_| Error::RuntimeError(format!("Could not read module: {}", module_name)))?;
+//     let mut interpreter = Interpreter::new(input, root.to_string_lossy().to_string());
+//
+//     interpreter.evaluate()?;
+//
+//     Ok(KyaObject::Module(KyaModule {
+//         name: module_name.to_string(),
+//         objects: RefCell::new(interpreter.context.clone()),
+//     }))
+// }
 
-    context.register(
-        String::from("input"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("input"),
-            kya_input,
-        ))),
-    );
-
-    context.register(
-        String::from("__globals__"),
-        Rc::new(KyaObject::RsFunction(KyaRsFunction::new(
-            String::from("__globals__"),
-            kya_globals,
-        ))),
-    );
-
-    context.register(
-        String::from("String"),
-        Rc::new(KyaObject::RsClass(KyaRsClass::new(
-            String::from("String"),
-            vec![String::from("value")],
-            instantiate_string,
-        ))),
-    );
-
-    context.register(String::from("true"), kya_bool_new(true).unwrap());
-    context.register(String::from("false"), kya_bool_new(false).unwrap());
-}
-
-fn import_module(root: &PathBuf, module_name: &str) -> Result<KyaObject, Error> {
-    let module_path = root.join(format!("{}.k", module_name));
-    let input = fs::read_to_string(&module_path)
-        .map_err(|_| Error::RuntimeError(format!("Could not read module: {}", module_name)))?;
-    let mut interpreter = Interpreter::new(input, root.to_string_lossy().to_string());
-
-    interpreter.evaluate()?;
-
-    Ok(KyaObject::Module(KyaModule {
-        name: module_name.to_string(),
-        objects: RefCell::new(interpreter.context.clone()),
-    }))
+pub struct Frame {
+    pub locals: HashMap<String, KyaObjectRef>,
 }
 
 impl Interpreter {
     pub fn new(input: String, root: String) -> Self {
-        let mut context = Context::new();
-
-        setup_builtins(&mut context);
-
-        let builtin_modules = vec![("math", math::pack_module())];
         let root_path = PathBuf::from(root);
 
         Interpreter {
             root: root_path,
             input,
-            context,
-            frames: vec![],
-            builtin_modules: builtin_modules
-                .into_iter()
-                .map(|(name, module)| (name.to_string(), module))
-                .collect(),
+            globals: HashMap::new(),
+            types: HashMap::new(),
+            frames: vec![Rc::new(RefCell::new(Frame {
+                locals: HashMap::new(),
+            }))],
         }
     }
 
-    pub fn evaluate(&mut self) -> Result<(), Error> {
+    pub fn init(&mut self) {
+        self.register_types();
+        self.register_builtins();
+    }
+
+    pub fn current_frame(&self) -> FrameRef {
+        self.frames.last().unwrap().clone()
+    }
+
+    pub fn push_frame(&mut self) {
+        self.frames.push(Rc::new(RefCell::new(Frame {
+            locals: HashMap::new(),
+        })));
+    }
+
+    pub fn pop_frame(&mut self) {
+        if self.frames.len() > 1 {
+            self.frames.pop();
+        } else {
+            panic!("Cannot pop the global frame");
+        }
+    }
+
+    pub fn register_types(&mut self) {
+        let type_type = create_type_type();
+        let none_type = create_none_type(type_type.clone());
+
+        self.types.insert("Type".to_string(), type_type.clone());
+        self.types.insert("None".to_string(), none_type.clone());
+        self.types.insert(
+            STRING_TYPE.to_string(),
+            create_string_type(type_type.clone()),
+        );
+        self.types.insert(
+            RS_FUNCTION_TYPE.to_string(),
+            create_rs_function_type(type_type.clone()),
+        );
+        self.types.insert(
+            FUNCTION_TYPE.to_string(),
+            create_function_type(type_type.clone()),
+        );
+    }
+
+    pub fn register_builtins(&mut self) {
+        let none_object = none_new(self, self.get_type(NONE_TYPE), vec![]).unwrap();
+
+        self.globals
+            .insert(NONE_TYPE.to_string(), none_object.clone());
+
+        let kya_print_function_object = create_rs_function_object(self, kya_print);
+
+        self.globals
+            .insert("print".to_string(), kya_print_function_object.clone());
+    }
+
+    pub fn get_type(&self, name: &str) -> TypeRef {
+        self.types.get(name).cloned().unwrap()
+    }
+
+    pub fn resolve(&self, name: &str) -> Result<KyaObjectRef, Error> {
+        for frame in self.frames.iter().rev() {
+            if let Some(object) = frame.borrow().locals.get(name) {
+                return Ok(object.clone());
+            }
+        }
+
+        if let Some(object) = self.globals.get(name) {
+            return Ok(object.clone());
+        }
+
+        Err(Error::RuntimeError(format!(
+            "name '{}' is not defined",
+            name
+        )))
+    }
+
+    pub fn register(&mut self, name: &str, object: KyaObjectRef) {
+        self.current_frame()
+            .borrow_mut()
+            .locals
+            .insert(name.to_string(), object);
+    }
+
+    pub fn evaluate(&mut self) -> Result<KyaObjectRef, Error> {
         let lexer = Lexer::new(self.input.clone());
         let mut parser = parser::Parser::new(lexer);
 
         match parser.parse() {
-            Ok(module) => {
-                module.eval(self)?;
-            }
-            Err(e) => {
-                eprintln!("{}", e);
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn resolve(&self, name: &str) -> Option<Rc<KyaObject>> {
-        if let Some(object) = self.context.get(name) {
-            if let KyaObject::Module(_) = object.as_ref() {
-                return Some(object.get_attribute(name).unwrap());
-            }
-
-            return Some(object.clone());
-        }
-
-        for frame in self.frames.iter().rev() {
-            if let Some(object) = frame.borrow().locals.get(name) {
-                return Some(object.clone());
-            }
-        }
-
-        None
-    }
-
-    pub fn get_self(&self) -> Result<Rc<KyaObject>, Error> {
-        self.resolve("self")
-            .ok_or_else(|| Error::RuntimeError("Undefined identifier: self".to_string()))
-    }
-
-    fn register_local(
-        &mut self,
-        name: String,
-        object: Rc<KyaObject>,
-    ) -> Result<Rc<KyaObject>, Error> {
-        if let Some(frame) = self.frames.last() {
-            frame
-                .borrow_mut()
-                .locals
-                .register(name.clone(), object.clone());
-        } else {
-            self.context.register(name, object.clone());
-        }
-
-        Ok(object)
-    }
-
-    pub fn true_object(&self) -> Rc<KyaObject> {
-        self.context.get("true").unwrap().clone()
-    }
-
-    pub fn false_object(&self) -> Rc<KyaObject> {
-        self.context.get("false").unwrap().clone()
-    }
-
-    fn is_true(&self, object: &KyaObject) -> bool {
-        match object {
-            KyaObject::Bool(b) => b.value.borrow().clone(),
-            KyaObject::Number(number) => number.value.borrow().abs() == 0.0,
-            KyaObject::String(value) => !value.value.borrow().is_empty(),
-            KyaObject::List(list) => !list.items.borrow().is_empty(),
-            KyaObject::InstanceObject(instance) => {
-                if object.name() == "Bool" {
-                    object.as_bool().unwrap()
-                } else if instance.name() == "String" {
-                    !object
-                        .get_attribute("__value__")
-                        .unwrap()
-                        .as_string()
-                        .unwrap()
-                        .is_empty()
-                } else {
-                    true
-                }
-            }
-            KyaObject::None(_) => false,
-            _ => true,
+            Ok(module) => Ok(module.eval(self)?),
+            Err(e) => Err(Error::RuntimeError(format!("Parse error: {}", e))),
         }
     }
 
-    pub fn eval_body(&mut self, body: &[Box<ast::ASTNode>]) -> Result<Rc<KyaObject>, Error> {
-        let mut result = Rc::new(KyaObject::None(KyaNone {}));
+    pub fn get_none(&self) -> KyaObjectRef {
+        self.resolve(NONE_TYPE).unwrap()
+    }
+}
 
-        for statement in body {
+impl Evaluator for Interpreter {
+    fn eval_module(&mut self, module: &ast::Module) -> Result<KyaObjectRef, Error> {
+        let mut result = self.resolve(NONE_TYPE).unwrap();
+
+        for statement in &module.statements {
             result = statement.eval(self)?;
         }
 
         Ok(result)
     }
-}
 
-impl Evaluator for Interpreter {
-    fn eval_module(&mut self, module: &ast::Module) -> Result<Rc<KyaObject>, Error> {
-        for statement in &module.statements {
-            statement.eval(self)?;
-        }
-
-        Ok(Rc::new(KyaObject::None(KyaNone {})))
+    fn eval_identifier(&mut self, identifier: &ast::Identifier) -> Result<KyaObjectRef, Error> {
+        self.resolve(&identifier.name)
     }
 
-    fn eval_identifier(&mut self, identifier: &ast::Identifier) -> Result<Rc<KyaObject>, Error> {
-        let identifier = if let Some(object) = self.resolve(&identifier.name) {
-            object.clone()
-        } else {
-            return Err(Error::RuntimeError(format!(
-                "Undefined identifier: {}",
-                identifier.name
-            )));
-        };
-
-        Ok(identifier)
+    fn eval_string_literal(&mut self, string_literal: &str) -> Result<KyaObjectRef, Error> {
+        Ok(KyaObject::from_string_object(StringObject {
+            ob_type: self.get_type(STRING_TYPE),
+            value: string_literal.to_string(),
+        }))
     }
 
-    fn eval_string_literal(&mut self, string_literal: &str) -> Result<Rc<KyaObject>, Error> {
-        Ok(kya_string_new(string_literal)?)
-    }
-
-    fn eval_method_call(&mut self, method_call: &ast::MethodCall) -> Result<Rc<KyaObject>, Error> {
-        let callee = method_call.name.eval(self)?;
-        let args: Vec<Rc<KyaObject>> = method_call
+    fn eval_method_call(&mut self, method_call: &ast::MethodCall) -> Result<KyaObjectRef, Error> {
+        let name = method_call.name.eval(self)?;
+        let args = method_call
             .arguments
             .iter()
             .map(|arg| arg.eval(self))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<KyaObjectRef>, Error>>()?;
 
-        Ok(callee.call(self, args)?)
+        name.borrow()
+            .get_type()?
+            .borrow()
+            .call(self, name.clone(), args)
     }
 
-    fn eval_assignment(&mut self, assignment: &ast::Assignment) -> Result<Rc<KyaObject>, Error> {
+    fn eval_assignment(&mut self, assignment: &ast::Assignment) -> Result<KyaObjectRef, Error> {
         let value = assignment.value.eval(self)?;
 
         if let ast::ASTNode::Identifier(identifier) = &*assignment.name {
-            if identifier.name == "true" || identifier.name == "false" {
-                return Err(Error::RuntimeError(format!(
-                    "Cannot assign to reserved keyword: {}",
-                    identifier.name
-                )));
-            }
-
-            self.register_local(identifier.name.clone(), value.clone())?;
-        } else if let ast::ASTNode::Attribute(attribute) = &*assignment.name {
-            let instance = attribute.name.eval(self)?;
-
-            if let KyaObject::InstanceObject(instance_object) = instance.as_ref() {
-                instance_object.set_attribute(attribute.value.clone(), value.clone());
-            }
+            self.register(identifier.name.as_str(), value.clone());
         } else {
-            return Err(Error::RuntimeError(format!(
-                "Invalid assignment target: {:?}",
-                assignment.name
-            )));
+            return Err(Error::RuntimeError("Invalid assignment target".to_string()));
         }
 
-        Ok(value)
+        Ok(self.resolve(NONE_TYPE).unwrap())
     }
 
-    fn eval_number_literal(&mut self, number_literal: &f64) -> Result<Rc<KyaObject>, Error> {
-        Ok(kya_number_new(*number_literal)?)
+    fn eval_number_literal(&mut self, number_literal: &f64) -> Result<KyaObjectRef, Error> {
+        Ok(self.resolve(NONE_TYPE).unwrap())
     }
 
-    fn eval_method_def(&mut self, method_def: &ast::MethodDef) -> Result<Rc<KyaObject>, Error> {
+    fn eval_method_def(&mut self, method_def: &ast::MethodDef) -> Result<KyaObjectRef, Error> {
         let mut parameters = vec![];
 
         for param in &method_def.parameters {
             if let ast::ASTNode::Identifier(identifier) = &**param {
                 parameters.push(identifier.name.clone());
             } else {
-                return Err(Error::RuntimeError(format!(
-                    "Invalid parameter: {:?}",
-                    param
-                )));
+                return Err(Error::RuntimeError("Invalid parameter name".to_string()));
             }
         }
 
-        let function = Rc::new(KyaObject::Function(KyaFunction::new(
-            method_def.name.clone(),
+        let object = KyaObject::from_function_object(FunctionObject {
+            ob_type: self.get_type(FUNCTION_TYPE),
+            name: method_def.name.clone(),
             parameters,
-            method_def.body.clone(),
-        )));
+            body: method_def.body.clone(),
+        });
 
-        self.register_local(method_def.name.clone(), function.clone())?;
+        self.register(&method_def.name, object.clone());
 
-        Ok(function)
+        Ok(self.resolve(NONE_TYPE).unwrap())
     }
 
-    fn eval_class_def(&mut self, class_def: &ast::ClassDef) -> Result<Rc<KyaObject>, Error> {
-        let class = Rc::new(KyaObject::Class(KyaClass::new(
-            class_def.name.clone(),
-            class_def.body.clone(),
-        )));
-
-        self.register_local(class_def.name.clone(), class.clone())?;
-
-        Ok(class)
+    fn eval_class_def(&mut self, class_def: &ast::ClassDef) -> Result<KyaObjectRef, Error> {
+        Ok(self.resolve(NONE_TYPE).unwrap())
     }
 
-    fn eval_attribute(&mut self, attribute: &ast::Attribute) -> Result<Rc<KyaObject>, Error> {
-        let name = attribute.name.eval(self)?;
-        let object = name.get_attribute(attribute.value.as_str()).unwrap();
-
-        if let KyaObject::Function(_) = object.as_ref() {
-            return Ok(Rc::new(KyaObject::Method(KyaMethod {
-                function: object.clone(),
-                instance: name.clone(),
-            })));
-        } else if let KyaObject::RsFunction(_) = object.as_ref() {
-            return Ok(Rc::new(KyaObject::Method(KyaMethod {
-                function: object.clone(),
-                instance: name.clone(),
-            })));
-        }
-
-        return Ok(object);
+    fn eval_attribute(&mut self, attribute: &ast::Attribute) -> Result<KyaObjectRef, Error> {
+        Ok(self.resolve(NONE_TYPE).unwrap())
     }
 
-    fn eval_compare(&mut self, compare: &ast::Compare) -> Result<Rc<KyaObject>, Error> {
-        let left = compare.left.eval(self)?;
-        let right = compare.right.eval(self)?;
-
-        return left
-            .get_attribute("__eq__")?
-            .call(self, vec![right.clone()]);
+    fn eval_compare(&mut self, compare: &ast::Compare) -> Result<KyaObjectRef, Error> {
+        Ok(self.resolve(NONE_TYPE).unwrap())
     }
 
-    fn eval_if(&mut self, if_node: &ast::If) -> Result<Rc<KyaObject>, Error> {
-        let test = if_node.test.eval(self)?;
-
-        if self.is_true(&test) {
-            return self.eval_body(&if_node.body);
-        }
-
-        Ok(Rc::new(KyaObject::None(KyaNone {})))
+    fn eval_if(&mut self, if_node: &ast::If) -> Result<KyaObjectRef, Error> {
+        Ok(self.resolve(NONE_TYPE).unwrap())
     }
 
-    fn eval_import(&mut self, import: &ast::Import) -> Result<Rc<KyaObject>, Error> {
-        if let Some(module) = self.builtin_modules.get(&import.name) {
-            self.context
-                .register(import.name.clone(), Rc::new(module.clone()));
-
-            return Ok(Rc::new(KyaObject::None(KyaNone {})));
-        }
-
-        let module = import_module(&self.root, &import.name)?;
-
-        self.context.register(import.name.clone(), Rc::new(module));
-
-        return Ok(Rc::new(KyaObject::None(KyaNone {})));
+    fn eval_import(&mut self, import: &ast::Import) -> Result<KyaObjectRef, Error> {
+        Ok(self.resolve(NONE_TYPE).unwrap())
     }
 
-    fn eval_bin_op(&mut self, bin_op: &ast::BinOp) -> Result<Rc<KyaObject>, Error> {
-        let left = bin_op.left.eval(self)?;
-        let right = bin_op.right.eval(self)?;
-
-        match bin_op.operator {
-            TokenType::Plus => {
-                let args = vec![right];
-
-                return left.get_attribute("__add__")?.call(self, args);
-            }
-            _ => {
-                return Err(Error::RuntimeError(format!(
-                    "Unsupported binary operator: {:?}",
-                    bin_op.operator
-                )));
-            }
-        }
+    fn eval_bin_op(&mut self, bin_op: &ast::BinOp) -> Result<KyaObjectRef, Error> {
+        Ok(self.resolve(NONE_TYPE).unwrap())
     }
 
-    fn eval_unary_op(&mut self, unary_op: &ast::UnaryOp) -> Result<Rc<KyaObject>, Error> {
-        let operand = unary_op.operand.eval(self)?;
-
-        match unary_op.operator {
-            TokenType::Minus => {
-                return operand.get_attribute("__neg__")?.call(self, vec![]);
-            }
-            _ => {
-                return Err(Error::RuntimeError(format!(
-                    "Unsupported unary operator: {:?}",
-                    unary_op.operator
-                )));
-            }
-        }
+    fn eval_unary_op(&mut self, unary_op: &ast::UnaryOp) -> Result<KyaObjectRef, Error> {
+        Ok(self.resolve(NONE_TYPE).unwrap())
     }
 }
