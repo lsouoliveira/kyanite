@@ -10,6 +10,14 @@ end
 
 print(my_string)
 
+class Test
+    a = 5
+
+    def constructor
+        print("Constructor called")
+    end
+end
+
 test("a", "b", "c")
 
 a = 5

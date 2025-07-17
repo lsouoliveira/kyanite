@@ -2,6 +2,7 @@ use crate::ast;
 use crate::builtins::methods::kya_print;
 use crate::errors::Error;
 use crate::lexer::Lexer;
+use crate::objects::class_object::{create_class_type, ClassObject};
 use crate::objects::function_object::{create_function_type, FunctionObject};
 use crate::objects::none_object::{create_none_type, none_new};
 use crate::objects::number_object::{create_number_type, NumberObject};
@@ -15,7 +16,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use crate::objects::base::{create_type_type, KyaObject, KyaObjectRef, TypeRef};
+use crate::objects::base::{create_type_type, DictRef, KyaObject, KyaObjectRef, Type, TypeRef};
 
 pub static NONE_TYPE: &str = "None";
 pub static STRING_TYPE: &str = "String";
@@ -50,7 +51,7 @@ pub struct Interpreter {
 // }
 
 pub struct Frame {
-    pub locals: HashMap<String, KyaObjectRef>,
+    pub locals: DictRef,
 }
 
 impl Interpreter {
@@ -63,7 +64,7 @@ impl Interpreter {
             globals: HashMap::new(),
             types: HashMap::new(),
             frames: vec![Rc::new(RefCell::new(Frame {
-                locals: HashMap::new(),
+                locals: Rc::new(RefCell::new(HashMap::new())),
             }))],
         }
     }
@@ -79,7 +80,7 @@ impl Interpreter {
 
     pub fn push_frame(&mut self) {
         self.frames.push(Rc::new(RefCell::new(Frame {
-            locals: HashMap::new(),
+            locals: Rc::new(RefCell::new(HashMap::new())),
         })));
     }
 
@@ -133,7 +134,7 @@ impl Interpreter {
 
     pub fn resolve(&self, name: &str) -> Result<KyaObjectRef, Error> {
         for frame in self.frames.iter().rev() {
-            if let Some(object) = frame.borrow().locals.get(name) {
+            if let Some(object) = frame.borrow().locals.borrow().get(name) {
                 return Ok(object.clone());
             }
         }
@@ -152,6 +153,7 @@ impl Interpreter {
         self.current_frame()
             .borrow_mut()
             .locals
+            .borrow_mut()
             .insert(name.to_string(), object);
     }
 
@@ -249,6 +251,26 @@ impl Evaluator for Interpreter {
     }
 
     fn eval_class_def(&mut self, class_def: &ast::ClassDef) -> Result<KyaObjectRef, Error> {
+        self.push_frame();
+
+        for stmt in &class_def.body {
+            stmt.eval(self)?;
+        }
+
+        let class_type = create_class_type(
+            self,
+            class_def.name.clone(),
+            self.current_frame().borrow().locals.clone(),
+        );
+
+        let object = KyaObject::from_class_object(ClassObject {
+            ob_type: class_type.clone(),
+        });
+
+        self.pop_frame();
+
+        self.register(&class_def.name, object.clone());
+
         Ok(self.resolve(NONE_TYPE).unwrap())
     }
 

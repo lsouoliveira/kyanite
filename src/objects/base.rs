@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
+use crate::objects::class_object::ClassObject;
 use crate::objects::function_object::FunctionObject;
 use crate::objects::none_object::NoneObject;
 use crate::objects::number_object::NumberObject;
@@ -11,6 +12,7 @@ use crate::objects::string_object::StringObject;
 
 pub type KyaObjectRef = Rc<RefCell<KyaObject>>;
 pub type TypeRef = Rc<RefCell<Type>>;
+pub type DictRef = Rc<RefCell<std::collections::HashMap<String, KyaObjectRef>>>;
 pub type CallableFunctionPtr = fn(
     interpreter: &mut Interpreter,
     callable: KyaObjectRef,
@@ -29,6 +31,7 @@ pub enum KyaObject {
     RsFunctionObject(RsFunctionObject),
     FunctionObject(FunctionObject),
     NumberObject(NumberObject),
+    ClassObject(ClassObject),
 }
 
 pub trait KyaObjectTrait {
@@ -41,6 +44,7 @@ pub struct Type {
     pub tp_repr: Option<CallableFunctionPtr>,
     pub tp_call: Option<CallableFunctionPtr>,
     pub tp_set_attr: Option<SetAttrFunctionPtr>,
+    pub dict: DictRef,
 }
 
 impl Type {
@@ -86,6 +90,7 @@ impl KyaObject {
             KyaObject::RsFunctionObject(obj) => Some(obj),
             KyaObject::FunctionObject(obj) => Some(obj),
             KyaObject::NumberObject(obj) => Some(obj),
+            KyaObject::ClassObject(obj) => Some(obj),
             _ => None,
         }
     }
@@ -123,6 +128,10 @@ impl KyaObject {
     pub fn from_number_object(number_object: NumberObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::NumberObject(number_object))
     }
+
+    pub fn from_class_object(class_object: ClassObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::ClassObject(class_object))
+    }
 }
 
 impl Default for Type {
@@ -133,6 +142,7 @@ impl Default for Type {
             tp_repr: None,
             tp_call: None,
             tp_set_attr: None,
+            dict: Rc::new(RefCell::new(std::collections::HashMap::new())),
         }
     }
 }

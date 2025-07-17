@@ -1,4 +1,5 @@
 pub mod base;
+pub mod class_object;
 pub mod function_object;
 pub mod none_object;
 pub mod number_object;
