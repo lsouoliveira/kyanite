@@ -78,6 +78,14 @@ impl Interpreter {
         self.frames.last().unwrap().clone()
     }
 
+    pub fn print_frames(&self) {
+        for (i, frame) in self.frames.iter().enumerate() {
+            for (name, object) in frame.borrow().locals.borrow().iter() {
+                println!("Frame {}: {}", i, name,);
+            }
+        }
+    }
+
     pub fn push_frame(&mut self) {
         self.frames.push(Rc::new(RefCell::new(Frame {
             locals: Rc::new(RefCell::new(HashMap::new())),
@@ -195,6 +203,8 @@ impl Evaluator for Interpreter {
     }
 
     fn eval_method_call(&mut self, method_call: &ast::MethodCall) -> Result<KyaObjectRef, Error> {
+        self.push_frame();
+
         let name = method_call.name.eval(self)?;
         let args = method_call
             .arguments
@@ -202,10 +212,15 @@ impl Evaluator for Interpreter {
             .map(|arg| arg.eval(self))
             .collect::<Result<Vec<KyaObjectRef>, Error>>()?;
 
-        name.borrow()
+        let result = name
+            .borrow()
             .get_type()?
             .borrow()
-            .call(self, name.clone(), args)
+            .call(self, name.clone(), args)?;
+
+        self.pop_frame();
+
+        Ok(result)
     }
 
     fn eval_assignment(&mut self, assignment: &ast::Assignment) -> Result<KyaObjectRef, Error> {
@@ -213,11 +228,20 @@ impl Evaluator for Interpreter {
 
         if let ast::ASTNode::Identifier(identifier) = &*assignment.name {
             self.register(identifier.name.as_str(), value.clone());
+        } else if let ast::ASTNode::Attribute(attribute) = &*assignment.name {
+            let object = attribute.name.eval(self)?;
+
+            object.borrow().get_type()?.borrow().set_attr(
+                self,
+                object.clone(),
+                attribute.value.clone(),
+                value.clone(),
+            )?;
         } else {
             return Err(Error::RuntimeError("Invalid assignment target".to_string()));
         }
 
-        Ok(self.resolve(NONE_TYPE).unwrap())
+        Ok(value)
     }
 
     fn eval_number_literal(&mut self, number_literal: &f64) -> Result<KyaObjectRef, Error> {
@@ -275,7 +299,17 @@ impl Evaluator for Interpreter {
     }
 
     fn eval_attribute(&mut self, attribute: &ast::Attribute) -> Result<KyaObjectRef, Error> {
-        Ok(self.resolve(NONE_TYPE).unwrap())
+        if let ast::ASTNode::Identifier(identifier) = &*attribute.name {
+            let object = attribute.name.eval(self)?;
+
+            return object.borrow().get_type()?.borrow().get_attr(
+                self,
+                object.clone(),
+                attribute.value.clone(),
+            );
+        }
+
+        Err(Error::RuntimeError("Invalid attribute access".to_string()))
     }
 
     fn eval_compare(&mut self, compare: &ast::Compare) -> Result<KyaObjectRef, Error> {

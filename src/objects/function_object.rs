@@ -74,15 +74,15 @@ pub fn function_call(
             interpreter.register(param, arg);
         }
 
-        let mut result = interpreter.resolve("None").unwrap();
+        let mut result = interpreter.resolve("None");
 
         for statement in &func.body {
-            result = statement.eval(interpreter)?;
+            result = statement.eval(interpreter);
         }
 
         interpreter.pop_frame();
 
-        Ok(result)
+        result
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' is not callable",

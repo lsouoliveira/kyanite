@@ -5,6 +5,7 @@ use crate::errors::Error;
 use crate::interpreter::Interpreter;
 use crate::objects::class_object::ClassObject;
 use crate::objects::function_object::FunctionObject;
+use crate::objects::instance_object::InstanceObject;
 use crate::objects::none_object::NoneObject;
 use crate::objects::number_object::NumberObject;
 use crate::objects::rs_function_object::RsFunctionObject;
@@ -17,6 +18,16 @@ pub type CallableFunctionPtr = fn(
     interpreter: &mut Interpreter,
     callable: KyaObjectRef,
     args: Vec<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error>;
+pub type TypeFunctionPtr = fn(
+    interpreter: &mut Interpreter,
+    ob_type: TypeRef,
+    args: Vec<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error>;
+pub type GetAttrFunctionPtr = fn(
+    interpreter: &mut Interpreter,
+    obj: KyaObjectRef,
+    attr_name: String,
 ) -> Result<KyaObjectRef, Error>;
 pub type SetAttrFunctionPtr = fn(
     interpreter: &mut Interpreter,
@@ -32,6 +43,7 @@ pub enum KyaObject {
     FunctionObject(FunctionObject),
     NumberObject(NumberObject),
     ClassObject(ClassObject),
+    InstanceObject(InstanceObject),
 }
 
 pub trait KyaObjectTrait {
@@ -44,6 +56,9 @@ pub struct Type {
     pub tp_repr: Option<CallableFunctionPtr>,
     pub tp_call: Option<CallableFunctionPtr>,
     pub tp_set_attr: Option<SetAttrFunctionPtr>,
+    pub tp_new: Option<TypeFunctionPtr>,
+    pub tp_init: Option<CallableFunctionPtr>,
+    pub tp_get_attr: Option<GetAttrFunctionPtr>,
     pub dict: DictRef,
 }
 
@@ -59,7 +74,16 @@ impl Type {
         args: Vec<KyaObjectRef>,
     ) -> Result<KyaObjectRef, Error> {
         if let Some(repr_fn) = self.tp_repr {
-            repr_fn(interpreter, callable, args)
+            let obj = repr_fn(interpreter, callable, args)?;
+
+            if let KyaObject::StringObject(_) = &*obj.borrow() {
+                Ok(obj.clone())
+            } else {
+                Err(Error::RuntimeError(format!(
+                    "__repr__ returned a non-string object (type '{}')",
+                    obj.borrow().get_type()?.borrow().name
+                )))
+            }
         } else {
             Err(Error::RuntimeError("No repr function defined".to_string()))
         }
@@ -75,9 +99,82 @@ impl Type {
             callable_fn(interpreter, callable, args)
         } else {
             Err(Error::RuntimeError(format!(
-                "The object {} is not callable",
+                "The object '{}' is not callable",
                 self.name
             )))
+        }
+    }
+
+    pub fn new(
+        &self,
+        interpreter: &mut Interpreter,
+        ob_type: TypeRef,
+        args: Vec<KyaObjectRef>,
+    ) -> Result<KyaObjectRef, Error> {
+        if let Some(new_fn) = self.tp_new {
+            new_fn(interpreter, ob_type, args)
+        } else {
+            Err(Error::RuntimeError(format!(
+                "The object '{}' cannot be instantiated",
+                self.name
+            )))
+        }
+    }
+
+    pub fn init(
+        &self,
+        interpreter: &mut Interpreter,
+        obj: KyaObjectRef,
+        args: Vec<KyaObjectRef>,
+    ) -> Result<KyaObjectRef, Error> {
+        if let Some(init_fn) = self.tp_init {
+            init_fn(interpreter, obj, args)
+        } else {
+            Err(Error::RuntimeError(format!(
+                "The object '{}' cannot be initialized",
+                self.name
+            )))
+        }
+    }
+
+    pub fn get_attr(
+        &self,
+        interpreter: &mut Interpreter,
+        obj: KyaObjectRef,
+        attr_name: String,
+    ) -> Result<KyaObjectRef, Error> {
+        if let Some(get_attr_fn) = self.tp_get_attr {
+            get_attr_fn(interpreter, obj, attr_name)
+        } else {
+            Err(Error::RuntimeError(format!(
+                "The object '{}' has no attribute '{}'",
+                self.name, attr_name
+            )))
+        }
+    }
+
+    pub fn set_attr(
+        &self,
+        interpreter: &mut Interpreter,
+        obj: KyaObjectRef,
+        attr_name: String,
+        value: KyaObjectRef,
+    ) -> Result<(), Error> {
+        if let Some(set_attr_fn) = self.tp_set_attr {
+            set_attr_fn(interpreter, obj, attr_name, value)
+        } else {
+            Err(Error::RuntimeError(format!(
+                "The object '{}' cannot set attribute '{}'",
+                self.name, attr_name
+            )))
+        }
+    }
+
+    pub fn parent(&self) -> Result<TypeRef, Error> {
+        if let Some(parent_type) = &self.ob_type {
+            Ok(parent_type.clone())
+        } else {
+            Err(Error::RuntimeError("Type has no parent".to_string()))
         }
     }
 }
@@ -91,6 +188,7 @@ impl KyaObject {
             KyaObject::FunctionObject(obj) => Some(obj),
             KyaObject::NumberObject(obj) => Some(obj),
             KyaObject::ClassObject(obj) => Some(obj),
+            KyaObject::InstanceObject(obj) => Some(obj),
             _ => None,
         }
     }
@@ -132,6 +230,10 @@ impl KyaObject {
     pub fn from_class_object(class_object: ClassObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::ClassObject(class_object))
     }
+
+    pub fn from_instance_object(instance_object: InstanceObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::InstanceObject(instance_object))
+    }
 }
 
 impl Default for Type {
@@ -141,6 +243,9 @@ impl Default for Type {
             name: "Unknown".to_string(),
             tp_repr: None,
             tp_call: None,
+            tp_new: None,
+            tp_init: None,
+            tp_get_attr: None,
             tp_set_attr: None,
             dict: Rc::new(RefCell::new(std::collections::HashMap::new())),
         }
