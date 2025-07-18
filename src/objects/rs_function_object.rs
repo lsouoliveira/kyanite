@@ -41,7 +41,13 @@ pub fn rs_function_tp_call(
     let object = callable.borrow();
 
     if let KyaObject::RsFunctionObject(rs_function) = &*object {
-        (rs_function.function_ptr)(interpreter, callable.clone(), args)
+        interpreter.push_next_frame();
+
+        let result = (rs_function.function_ptr)(interpreter, callable.clone(), args);
+
+        interpreter.pop_frame();
+
+        result
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' is not callable",

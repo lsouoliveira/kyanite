@@ -3,10 +3,11 @@ use std::rc::Rc;
 
 use crate::errors::Error;
 use crate::interpreter::{Interpreter, METHOD_TYPE};
-use crate::objects::class_object::ClassObject;
+use crate::objects::class_object::{class_tp_call, class_tp_new, class_tp_repr, ClassObject};
 use crate::objects::function_object::FunctionObject;
 use crate::objects::instance_object::InstanceObject;
 use crate::objects::method_object::MethodObject;
+use crate::objects::modules::sockets::connection_object::ConnectionObject;
 use crate::objects::modules::sockets::socket_object::SocketObject;
 use crate::objects::none_object::NoneObject;
 use crate::objects::number_object::NumberObject;
@@ -16,6 +17,7 @@ use crate::objects::string_object::StringObject;
 pub type KyaObjectRef = Rc<RefCell<KyaObject>>;
 pub type TypeRef = Rc<RefCell<Type>>;
 pub type DictRef = Rc<RefCell<std::collections::HashMap<String, KyaObjectRef>>>;
+pub type TypeDictRef = Rc<RefCell<std::collections::HashMap<String, TypeRef>>>;
 pub type CallableFunctionPtr = fn(
     interpreter: &mut Interpreter,
     callable: KyaObjectRef,
@@ -48,6 +50,7 @@ pub enum KyaObject {
     InstanceObject(InstanceObject),
     MethodObject(MethodObject),
     SocketObject(SocketObject),
+    ConnectionObject(ConnectionObject),
 }
 
 pub trait KyaObjectTrait {
@@ -69,6 +72,37 @@ pub struct Type {
 impl Type {
     pub fn as_ref(type_obj: Type) -> TypeRef {
         Rc::new(RefCell::new(type_obj))
+    }
+
+    pub fn ready(&mut self) -> Result<(), Error> {
+        let parent = self.parent()?;
+        let parent_type = parent.borrow();
+
+        if self.tp_repr.is_none() {
+            self.tp_repr = parent_type.tp_repr.clone();
+        }
+
+        if self.tp_call.is_none() {
+            self.tp_call = parent_type.tp_call.clone();
+        }
+
+        if self.tp_new.is_none() {
+            self.tp_new = parent_type.tp_new.clone();
+        }
+
+        if self.tp_init.is_none() {
+            self.tp_init = parent_type.tp_init.clone();
+        }
+
+        if self.tp_get_attr.is_none() {
+            self.tp_get_attr = parent_type.tp_get_attr.clone();
+        }
+
+        if self.tp_set_attr.is_none() {
+            self.tp_set_attr = parent_type.tp_set_attr.clone();
+        }
+
+        Ok(())
     }
 
     pub fn repr(
@@ -195,6 +229,7 @@ impl KyaObject {
             KyaObject::InstanceObject(obj) => Some(obj),
             KyaObject::MethodObject(obj) => Some(obj),
             KyaObject::SocketObject(obj) => Some(obj),
+            KyaObject::ConnectionObject(obj) => Some(obj),
             _ => None,
         }
     }
@@ -273,6 +308,10 @@ impl KyaObject {
     pub fn from_socket_object(socket_object: SocketObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::SocketObject(socket_object))
     }
+
+    pub fn from_connection_object(connection_object: ConnectionObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::ConnectionObject(connection_object))
+    }
 }
 
 impl Default for Type {
@@ -280,12 +319,12 @@ impl Default for Type {
         Type {
             ob_type: None,
             name: "Unknown".to_string(),
-            tp_repr: None,
-            tp_call: None,
-            tp_new: None,
+            tp_repr: Some(class_tp_repr),
+            tp_call: Some(class_tp_call),
+            tp_new: Some(class_tp_new),
             tp_init: None,
-            tp_get_attr: None,
-            tp_set_attr: None,
+            tp_get_attr: Some(generic_get_attr),
+            tp_set_attr: Some(generic_set_attr),
             dict: Rc::new(RefCell::new(std::collections::HashMap::new())),
         }
     }
@@ -309,8 +348,6 @@ pub fn generic_get_attr(
     obj: KyaObjectRef,
     attr_name: String,
 ) -> Result<KyaObjectRef, Error> {
-    let obj_type = obj.borrow().get_type()?;
-
     let found_object = get_attr_helper(obj.clone(), attr_name.clone())?;
 
     if let KyaObject::FunctionObject(_) = &*found_object.borrow() {

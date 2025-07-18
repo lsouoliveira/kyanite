@@ -63,8 +63,6 @@ pub fn instance_tp_init(
             .cloned();
 
         if let Some(init) = constructor_option {
-            interpreter.push_frame();
-
             register_self(interpreter, callable.clone());
 
             let result = init
@@ -72,8 +70,6 @@ pub fn instance_tp_init(
                 .get_type()?
                 .borrow()
                 .call(interpreter, init.clone(), args);
-
-            interpreter.pop_frame();
 
             result
         } else {
@@ -109,8 +105,6 @@ pub fn instance_tp_repr(
             .get_attr(interpreter, callable.clone(), "__repr__".to_string());
 
         if let Ok(repr) = repr {
-            interpreter.push_frame();
-
             register_self(interpreter, callable.clone());
 
             let result = repr
@@ -118,8 +112,6 @@ pub fn instance_tp_repr(
                 .get_type()?
                 .borrow()
                 .call(interpreter, repr.clone(), vec![]);
-
-            interpreter.pop_frame();
 
             result
         } else {

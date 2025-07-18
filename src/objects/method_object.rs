@@ -18,8 +18,9 @@ impl KyaObjectTrait for MethodObject {
     }
 }
 
-pub fn create_method_type() -> TypeRef {
+pub fn create_method_type(ob_type: TypeRef) -> TypeRef {
     Type::as_ref(Type {
+        ob_type: Some(ob_type.clone()),
         name: "Method".to_string(),
         tp_repr: Some(method_tp_repr),
         tp_call: Some(method_tp_call),
@@ -65,8 +66,6 @@ pub fn method_tp_call(
     let object = callable.borrow();
 
     if let KyaObject::MethodObject(method_object) = &*object {
-        interpreter.push_frame();
-
         register_self(interpreter, method_object.instance_object.clone());
 
         let result = method_object.function.borrow().get_type()?.borrow().call(
@@ -74,8 +73,6 @@ pub fn method_tp_call(
             method_object.function.clone(),
             args,
         );
-
-        interpreter.pop_frame();
 
         result
     } else {

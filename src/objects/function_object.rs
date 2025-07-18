@@ -84,7 +84,7 @@ pub fn function_call(
             )));
         }
 
-        interpreter.push_frame();
+        interpreter.push_next_frame();
 
         for (param, arg) in func.parameters.iter().zip(args) {
             interpreter.register(param, arg);

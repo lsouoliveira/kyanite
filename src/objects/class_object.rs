@@ -4,8 +4,8 @@ use std::rc::Rc;
 
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
-use crate::objects::base::{DictRef, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef};
-use crate::objects::instance_object::{create_instance_type, instance_tp_repr, InstanceObject};
+use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, TypeRef};
+use crate::objects::instance_object::{create_instance_type, InstanceObject};
 use crate::objects::string_object::StringObject;
 
 pub struct ClassObject {
@@ -16,18 +16,6 @@ impl KyaObjectTrait for ClassObject {
     fn get_type(&self) -> TypeRef {
         self.ob_type.clone()
     }
-}
-
-pub fn create_class_type(interpreter: &mut Interpreter, name: String, dict: DictRef) -> TypeRef {
-    Type::as_ref(Type {
-        ob_type: Some(interpreter.get_type("Type")),
-        name: name.clone(),
-        tp_call: Some(class_tp_call),
-        tp_new: Some(class_tp_new),
-        tp_repr: Some(class_tp_repr),
-        dict: dict.clone(),
-        ..Default::default()
-    })
 }
 
 pub fn class_tp_call(

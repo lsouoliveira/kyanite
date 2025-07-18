@@ -20,7 +20,7 @@ pub enum Socket {
 }
 
 impl Socket {
-    fn as_socketable(&mut self) -> &mut dyn Socketable {
+    pub fn as_socketable(&mut self) -> &mut dyn Socketable {
         match self {
             Socket::Tcp(tcp_socket) => tcp_socket,
         }
@@ -28,6 +28,10 @@ impl Socket {
 
     pub fn bind(&mut self, host: &str, port: u16) -> Result<(), SocketError> {
         self.as_socketable().bind(host, port)
+    }
+
+    pub fn accept(&mut self) -> Result<Connection, SocketError> {
+        self.as_socketable().accept()
     }
 }
 
@@ -43,7 +47,13 @@ pub struct TcpSocket {
 
 impl Socketable for TcpSocket {
     fn bind(&mut self, host: &str, port: u16) -> Result<(), SocketError> {
-        let address = format!("{}:{}", host, port);
+        let parsed_host = if host == "localhost" {
+            "127.0.0.1"
+        } else {
+            host
+        };
+
+        let address = format!("{}:{}", parsed_host, port);
 
         match TcpListener::bind(&address) {
             Ok(listener) => {
@@ -58,7 +68,10 @@ impl Socketable for TcpSocket {
     fn accept(&mut self) -> Result<Connection, SocketError> {
         if let Some(listener) = &self.listener {
             match listener.accept() {
-                Ok((stream, _)) => Ok(Connection::Tcp(TcpConnection { stream })),
+                Ok((stream, _)) => {
+                    println!("Accepted connection from {}", stream.peer_addr().unwrap());
+                    Ok(Connection::Tcp(TcpConnection { stream }))
+                }
                 Err(e) => Err(SocketError::AcceptError(e.to_string())),
             }
         } else {
@@ -71,6 +84,18 @@ impl Socketable for TcpSocket {
 
 pub enum Connection {
     Tcp(TcpConnection),
+}
+
+impl Connection {
+    pub fn as_connectionable(&mut self) -> &mut dyn Connectionable {
+        match self {
+            Connection::Tcp(tcp_connection) => tcp_connection,
+        }
+    }
+
+    pub fn read(&mut self, buffer_size: usize) -> Result<Vec<u8>, SocketError> {
+        self.as_connectionable().read(buffer_size)
+    }
 }
 
 pub trait Connectionable {
