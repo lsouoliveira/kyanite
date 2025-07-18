@@ -2,11 +2,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::errors::Error;
-use crate::interpreter::Interpreter;
+use crate::interpreter::{Interpreter, METHOD_TYPE};
 use crate::objects::class_object::ClassObject;
 use crate::objects::function_object::FunctionObject;
 use crate::objects::instance_object::InstanceObject;
 use crate::objects::method_object::MethodObject;
+use crate::objects::modules::sockets::socket_object::SocketObject;
 use crate::objects::none_object::NoneObject;
 use crate::objects::number_object::NumberObject;
 use crate::objects::rs_function_object::RsFunctionObject;
@@ -46,6 +47,7 @@ pub enum KyaObject {
     ClassObject(ClassObject),
     InstanceObject(InstanceObject),
     MethodObject(MethodObject),
+    SocketObject(SocketObject),
 }
 
 pub trait KyaObjectTrait {
@@ -192,7 +194,33 @@ impl KyaObject {
             KyaObject::ClassObject(obj) => Some(obj),
             KyaObject::InstanceObject(obj) => Some(obj),
             KyaObject::MethodObject(obj) => Some(obj),
+            KyaObject::SocketObject(obj) => Some(obj),
             _ => None,
+        }
+    }
+
+    pub fn is_instance_of(&self, type_ref: &TypeRef) -> Result<bool, Error> {
+        if let Some(obj) = self.as_object_ref() {
+            let mut root_type = obj.get_type();
+            let mut parent_type = type_ref.borrow().parent()?;
+
+            loop {
+                if Rc::ptr_eq(&root_type, type_ref) {
+                    return Ok(true);
+                }
+
+                if Rc::ptr_eq(&root_type, &parent_type) {
+                    return Ok(false);
+                }
+
+                root_type = parent_type.clone();
+
+                let new_parent_type = root_type.borrow().parent()?;
+
+                parent_type = new_parent_type;
+            }
+        } else {
+            Ok(false)
         }
     }
 
@@ -241,6 +269,10 @@ impl KyaObject {
     pub fn from_method_object(method_object: MethodObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::MethodObject(method_object))
     }
+
+    pub fn from_socket_object(socket_object: SocketObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::SocketObject(socket_object))
+    }
 }
 
 impl Default for Type {
@@ -270,4 +302,76 @@ pub fn create_type_type() -> TypeRef {
     type_ref.borrow_mut().ob_type = Some(type_ref.clone());
 
     type_ref
+}
+
+pub fn generic_get_attr(
+    interpreter: &mut Interpreter,
+    obj: KyaObjectRef,
+    attr_name: String,
+) -> Result<KyaObjectRef, Error> {
+    let obj_type = obj.borrow().get_type()?;
+
+    let found_object = get_attr_helper(obj.clone(), attr_name.clone())?;
+
+    if let KyaObject::FunctionObject(_) = &*found_object.borrow() {
+        return Ok(KyaObject::from_method_object(MethodObject {
+            ob_type: interpreter.get_type(METHOD_TYPE),
+            instance_object: obj.clone(),
+            function: found_object.clone(),
+        }));
+    } else if let KyaObject::RsFunctionObject(_) = &*found_object.borrow() {
+        return Ok(KyaObject::from_method_object(MethodObject {
+            ob_type: interpreter.get_type(METHOD_TYPE),
+            instance_object: obj.clone(),
+            function: found_object.clone(),
+        }));
+    }
+
+    Ok(found_object)
+}
+
+fn get_attr_helper(object: KyaObjectRef, attr_name: String) -> Result<KyaObjectRef, Error> {
+    let ob_type = object.borrow().get_type()?;
+
+    if let Some(attr) = ob_type.borrow().dict.borrow().get(&attr_name) {
+        return Ok(attr.clone());
+    } else {
+        let mut root_type = ob_type;
+        let mut parent_type = root_type.borrow().parent()?;
+
+        loop {
+            if Rc::ptr_eq(&root_type, &parent_type) {
+                break;
+            }
+
+            if let Some(attr) = root_type.borrow().dict.borrow().get(&attr_name) {
+                return Ok(attr.clone());
+            }
+
+            root_type = parent_type.clone();
+
+            let new_parent_type = root_type.borrow().parent()?;
+
+            parent_type = new_parent_type;
+        }
+    }
+
+    Err(Error::RuntimeError(format!(
+        "The object '{}' has no attribute '{}'",
+        object.borrow().get_type()?.borrow().name,
+        attr_name
+    )))
+}
+
+pub fn generic_set_attr(
+    _interpreter: &mut Interpreter,
+    obj: KyaObjectRef,
+    attr_name: String,
+    value: KyaObjectRef,
+) -> Result<(), Error> {
+    let ob_type = obj.borrow().get_type()?;
+
+    ob_type.borrow().dict.borrow_mut().insert(attr_name, value);
+
+    Ok(())
 }

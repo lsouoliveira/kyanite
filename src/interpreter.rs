@@ -5,6 +5,8 @@ use crate::lexer::Lexer;
 use crate::objects::class_object::{create_class_type, ClassObject};
 use crate::objects::function_object::{create_function_type, FunctionObject};
 use crate::objects::method_object::create_method_type;
+use crate::objects::modules::sockets::functions::kya_socket;
+use crate::objects::modules::sockets::socket_object::create_socket_type;
 use crate::objects::none_object::{create_none_type, none_new};
 use crate::objects::number_object::{create_number_type, NumberObject};
 use crate::objects::rs_function_object::{create_rs_function_type, RsFunctionObject};
@@ -25,6 +27,7 @@ pub static RS_FUNCTION_TYPE: &str = "RsFunction";
 pub static FUNCTION_TYPE: &str = "Function";
 pub static NUMBER_TYPE: &str = "Number";
 pub static METHOD_TYPE: &str = "Method";
+pub static SOCKET_TYPE: &str = "Socket";
 
 type FrameRef = Rc<RefCell<Frame>>;
 
@@ -126,6 +129,10 @@ impl Interpreter {
         );
         self.types
             .insert(METHOD_TYPE.to_string(), create_method_type());
+
+        let socket_type = create_socket_type(self, type_type.clone());
+
+        self.types.insert(SOCKET_TYPE.to_string(), socket_type);
     }
 
     pub fn register_builtins(&mut self) {
@@ -138,6 +145,11 @@ impl Interpreter {
 
         self.globals
             .insert("print".to_string(), kya_print_function_object.clone());
+
+        let kya_socket_function_object = create_rs_function_object(self, kya_socket);
+
+        self.globals
+            .insert("socket".to_string(), kya_socket_function_object.clone());
     }
 
     pub fn get_type(&self, name: &str) -> TypeRef {
@@ -159,6 +171,10 @@ impl Interpreter {
             "name '{}' is not defined",
             name
         )))
+    }
+
+    pub fn resolve_self(&self) -> Result<KyaObjectRef, Error> {
+        self.resolve("self")
     }
 
     pub fn register(&mut self, name: &str, object: KyaObjectRef) {

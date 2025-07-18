@@ -7,6 +7,7 @@ pub enum Error {
     UndefinedVariable(String),
     LexerError(LexerError),
     TypeError(String),
+    ValueError(String),
 }
 
 #[derive(Debug, Clone)]
@@ -49,6 +50,7 @@ impl std::fmt::Display for Error {
             ),
             Error::LexerError(lexer_error) => write!(f, "{}", lexer_error),
             Error::TypeError(msg) => write!(f, "{}", format_error("Type Error", msg)),
+            Error::ValueError(msg) => write!(f, "{}", format_error("Value Error", msg)),
         }
     }
 }

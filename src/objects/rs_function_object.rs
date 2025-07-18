@@ -9,6 +9,15 @@ pub struct RsFunctionObject {
     pub function_ptr: CallableFunctionPtr,
 }
 
+impl RsFunctionObject {
+    pub fn new(ob_type: TypeRef, function_ptr: CallableFunctionPtr) -> Self {
+        Self {
+            ob_type,
+            function_ptr,
+        }
+    }
+}
+
 impl KyaObjectTrait for RsFunctionObject {
     fn get_type(&self) -> TypeRef {
         self.ob_type.clone()

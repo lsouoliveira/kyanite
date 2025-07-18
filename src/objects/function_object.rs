@@ -11,6 +11,22 @@ pub struct FunctionObject {
     pub body: Vec<Box<ast::ASTNode>>,
 }
 
+impl FunctionObject {
+    pub fn new(
+        ob_type: TypeRef,
+        name: String,
+        parameters: Vec<String>,
+        body: Vec<Box<ast::ASTNode>>,
+    ) -> Self {
+        Self {
+            ob_type,
+            name,
+            parameters,
+            body,
+        }
+    }
+}
+
 impl KyaObjectTrait for FunctionObject {
     fn get_type(&self) -> TypeRef {
         self.ob_type.clone()

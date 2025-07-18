@@ -14,7 +14,7 @@ impl std::fmt::Display for SocketError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub enum Socket {
     Tcp(TcpSocket),
 }
@@ -39,18 +39,6 @@ pub trait Socketable {
 #[derive(Debug)]
 pub struct TcpSocket {
     pub listener: Option<TcpListener>,
-}
-
-impl PartialEq for TcpSocket {
-    fn eq(&self, other: &Self) -> bool {
-        self == other
-    }
-}
-
-impl Clone for TcpSocket {
-    fn clone(&self) -> Self {
-        TcpSocket { listener: None }
-    }
 }
 
 impl Socketable for TcpSocket {
@@ -102,4 +90,8 @@ impl Connectionable for TcpConnection {
             Err(e) => Err(SocketError::ReadError(e.to_string())),
         }
     }
+}
+
+pub fn create_socket() -> Socket {
+    Socket::Tcp(TcpSocket { listener: None })
 }
