@@ -2,13 +2,13 @@ use crate::ast;
 use crate::builtins::methods::kya_print;
 use crate::errors::Error;
 use crate::lexer::Lexer;
+use crate::objects::bytes_object::create_bytes_type;
 use crate::objects::class_object::ClassObject;
 use crate::objects::function_object::{create_function_type, FunctionObject};
 use crate::objects::method_object::create_method_type;
 use crate::objects::modules::sockets::connection_object::create_connection_type;
 use crate::objects::modules::sockets::functions::kya_socket;
 use crate::objects::modules::sockets::socket_object::create_socket_type;
-use crate::objects::modules::sockets::SOCKET_TYPE;
 use crate::objects::none_object::{create_none_type, none_new};
 use crate::objects::number_object::{create_number_type, NumberObject};
 use crate::objects::rs_function_object::create_rs_function_type;
@@ -157,6 +157,7 @@ impl Interpreter {
         let socket_type = create_socket_type(self, type_type.clone(), rs_function_type.clone());
         let connection_type =
             create_connection_type(self, type_type.clone(), rs_function_type.clone());
+        let bytes_type = create_bytes_type(type_type.clone());
 
         self.register_type(type_type).unwrap();
         self.register_type(none_type).unwrap();
@@ -167,6 +168,7 @@ impl Interpreter {
         self.register_type(method_type).unwrap();
         self.register_type(socket_type).unwrap();
         self.register_type(connection_type).unwrap();
+        self.register_type(bytes_type).unwrap();
     }
 
     pub fn register_builtins(&mut self) -> Result<(), Error> {

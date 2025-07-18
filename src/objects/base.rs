@@ -1,8 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::str::Bytes;
 
 use crate::errors::Error;
 use crate::interpreter::{Interpreter, METHOD_TYPE};
+use crate::objects::bytes_object::BytesObject;
 use crate::objects::class_object::{class_tp_call, class_tp_new, class_tp_repr, ClassObject};
 use crate::objects::function_object::FunctionObject;
 use crate::objects::instance_object::InstanceObject;
@@ -51,6 +53,7 @@ pub enum KyaObject {
     MethodObject(MethodObject),
     SocketObject(SocketObject),
     ConnectionObject(ConnectionObject),
+    BytesObject(BytesObject),
 }
 
 pub trait KyaObjectTrait {
@@ -230,6 +233,7 @@ impl KyaObject {
             KyaObject::MethodObject(obj) => Some(obj),
             KyaObject::SocketObject(obj) => Some(obj),
             KyaObject::ConnectionObject(obj) => Some(obj),
+            KyaObject::BytesObject(obj) => Some(obj),
             _ => None,
         }
     }
@@ -311,6 +315,10 @@ impl KyaObject {
 
     pub fn from_connection_object(connection_object: ConnectionObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::ConnectionObject(connection_object))
+    }
+
+    pub fn from_bytes_object(bytes_object: BytesObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::BytesObject(bytes_object))
     }
 }
 
