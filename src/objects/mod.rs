@@ -3,6 +3,7 @@ pub mod class_object;
 pub mod function_object;
 pub mod instance_object;
 pub mod method_object;
+pub mod modules;
 pub mod none_object;
 pub mod number_object;
 pub mod rs_function_object;

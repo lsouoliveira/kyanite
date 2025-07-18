@@ -124,10 +124,8 @@ impl Interpreter {
             NUMBER_TYPE.to_string(),
             create_number_type(type_type.clone()),
         );
-        self.types.insert(
-            METHOD_TYPE.to_string(),
-            create_method_type(),
-        );
+        self.types
+            .insert(METHOD_TYPE.to_string(), create_method_type());
     }
 
     pub fn register_builtins(&mut self) {
