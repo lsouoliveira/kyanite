@@ -4,6 +4,7 @@ use crate::errors::Error;
 use crate::lexer::Lexer;
 use crate::objects::class_object::{create_class_type, ClassObject};
 use crate::objects::function_object::{create_function_type, FunctionObject};
+use crate::objects::method_object::create_method_type;
 use crate::objects::none_object::{create_none_type, none_new};
 use crate::objects::number_object::{create_number_type, NumberObject};
 use crate::objects::rs_function_object::{create_rs_function_type, RsFunctionObject};
@@ -23,6 +24,7 @@ pub static STRING_TYPE: &str = "String";
 pub static RS_FUNCTION_TYPE: &str = "RsFunction";
 pub static FUNCTION_TYPE: &str = "Function";
 pub static NUMBER_TYPE: &str = "Number";
+pub static METHOD_TYPE: &str = "Method";
 
 type FrameRef = Rc<RefCell<Frame>>;
 
@@ -121,6 +123,10 @@ impl Interpreter {
         self.types.insert(
             NUMBER_TYPE.to_string(),
             create_number_type(type_type.clone()),
+        );
+        self.types.insert(
+            METHOD_TYPE.to_string(),
+            create_method_type(),
         );
     }
 

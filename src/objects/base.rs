@@ -6,6 +6,7 @@ use crate::interpreter::Interpreter;
 use crate::objects::class_object::ClassObject;
 use crate::objects::function_object::FunctionObject;
 use crate::objects::instance_object::InstanceObject;
+use crate::objects::method_object::MethodObject;
 use crate::objects::none_object::NoneObject;
 use crate::objects::number_object::NumberObject;
 use crate::objects::rs_function_object::RsFunctionObject;
@@ -44,6 +45,7 @@ pub enum KyaObject {
     NumberObject(NumberObject),
     ClassObject(ClassObject),
     InstanceObject(InstanceObject),
+    MethodObject(MethodObject),
 }
 
 pub trait KyaObjectTrait {
@@ -189,6 +191,7 @@ impl KyaObject {
             KyaObject::NumberObject(obj) => Some(obj),
             KyaObject::ClassObject(obj) => Some(obj),
             KyaObject::InstanceObject(obj) => Some(obj),
+            KyaObject::MethodObject(obj) => Some(obj),
             _ => None,
         }
     }
@@ -233,6 +236,10 @@ impl KyaObject {
 
     pub fn from_instance_object(instance_object: InstanceObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::InstanceObject(instance_object))
+    }
+
+    pub fn from_method_object(method_object: MethodObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::MethodObject(method_object))
     }
 }
 

@@ -1,6 +1,7 @@
 use crate::errors::Error;
-use crate::interpreter::Interpreter;
+use crate::interpreter::{Interpreter, METHOD_TYPE};
 use crate::objects::base::{DictRef, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef};
+use crate::objects::method_object::MethodObject;
 use crate::objects::string_object::StringObject;
 use crate::objects::utils::parse_arg;
 use std::cell::RefCell;
@@ -157,7 +158,7 @@ pub fn instance_default_repr(
 }
 
 pub fn instance_tp_get_attr(
-    _interpreter: &mut Interpreter,
+    interpreter: &mut Interpreter,
     obj: KyaObjectRef,
     attr_name: String,
 ) -> Result<KyaObjectRef, Error> {
@@ -165,6 +166,20 @@ pub fn instance_tp_get_attr(
 
     if let KyaObject::InstanceObject(instance_object) = &*object {
         let found_object = get_attr(obj.clone(), instance_object, attr_name.clone())?;
+
+        if let KyaObject::FunctionObject(_) = &*found_object.borrow() {
+            return Ok(KyaObject::from_method_object(MethodObject {
+                ob_type: interpreter.get_type(METHOD_TYPE),
+                instance_object: obj.clone(),
+                function: found_object.clone(),
+            }));
+        } else if let KyaObject::RsFunctionObject(_) = &*found_object.borrow() {
+            return Ok(KyaObject::from_method_object(MethodObject {
+                ob_type: interpreter.get_type(METHOD_TYPE),
+                instance_object: obj.clone(),
+                function: found_object.clone(),
+            }));
+        }
 
         return Ok(found_object);
     }
