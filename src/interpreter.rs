@@ -2,6 +2,7 @@ use crate::ast;
 use crate::builtins::methods::kya_print;
 use crate::errors::Error;
 use crate::lexer::Lexer;
+use crate::objects::bool_object::{create_bool_type, BOOL_TYPE};
 use crate::objects::bytes_object::create_bytes_type;
 use crate::objects::class_object::ClassObject;
 use crate::objects::function_object::{create_function_type, FunctionObject};
@@ -158,6 +159,7 @@ impl Interpreter {
         let connection_type =
             create_connection_type(self, type_type.clone(), rs_function_type.clone());
         let bytes_type = create_bytes_type(type_type.clone());
+        let bool_type = create_bool_type(type_type.clone());
 
         self.register_type(type_type).unwrap();
         self.register_type(none_type).unwrap();
@@ -169,6 +171,7 @@ impl Interpreter {
         self.register_type(socket_type).unwrap();
         self.register_type(connection_type).unwrap();
         self.register_type(bytes_type).unwrap();
+        self.register_type(bool_type).unwrap();
     }
 
     pub fn register_builtins(&mut self) -> Result<(), Error> {
@@ -183,6 +186,18 @@ impl Interpreter {
         let kya_socket_function_object = create_rs_function_object(self, kya_socket);
 
         self.register("socket", kya_socket_function_object);
+
+        let true_object = KyaObject::from_bool_object(crate::objects::bool_object::BoolObject {
+            ob_type: self.get_type(BOOL_TYPE),
+            value: true,
+        });
+        self.register("true", true_object.clone());
+
+        let false_object = KyaObject::from_bool_object(crate::objects::bool_object::BoolObject {
+            ob_type: self.get_type(BOOL_TYPE),
+            value: false,
+        });
+        self.register("false", false_object.clone());
 
         Ok(())
     }
@@ -394,6 +409,10 @@ impl Evaluator for Interpreter {
     }
 
     fn eval_unary_op(&mut self, unary_op: &ast::UnaryOp) -> Result<KyaObjectRef, Error> {
+        Ok(self.resolve(NONE_TYPE).unwrap())
+    }
+
+    fn eval_while(&mut self, while_node: &ast::While) -> Result<KyaObjectRef, Error> {
         Ok(self.resolve(NONE_TYPE).unwrap())
     }
 }

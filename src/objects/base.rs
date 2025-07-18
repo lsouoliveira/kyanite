@@ -1,11 +1,13 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::str::Bytes;
 
 use crate::errors::Error;
 use crate::interpreter::{Interpreter, METHOD_TYPE};
+use crate::objects::bool_object::BoolObject;
 use crate::objects::bytes_object::BytesObject;
-use crate::objects::class_object::{class_tp_call, class_tp_new, class_tp_repr, ClassObject};
+use crate::objects::class_object::{
+    class_nb_bool, class_tp_call, class_tp_new, class_tp_repr, ClassObject,
+};
 use crate::objects::function_object::FunctionObject;
 use crate::objects::instance_object::InstanceObject;
 use crate::objects::method_object::MethodObject;
@@ -35,6 +37,8 @@ pub type GetAttrFunctionPtr = fn(
     obj: KyaObjectRef,
     attr_name: String,
 ) -> Result<KyaObjectRef, Error>;
+pub type NumberCheckFunctionPtr =
+    fn(interpreter: &mut Interpreter, obj: KyaObjectRef) -> Result<f64, Error>;
 pub type SetAttrFunctionPtr = fn(
     interpreter: &mut Interpreter,
     obj: KyaObjectRef,
@@ -54,6 +58,7 @@ pub enum KyaObject {
     SocketObject(SocketObject),
     ConnectionObject(ConnectionObject),
     BytesObject(BytesObject),
+    BoolObject(BoolObject),
 }
 
 pub trait KyaObjectTrait {
@@ -69,6 +74,7 @@ pub struct Type {
     pub tp_new: Option<TypeFunctionPtr>,
     pub tp_init: Option<CallableFunctionPtr>,
     pub tp_get_attr: Option<GetAttrFunctionPtr>,
+    pub nb_bool: Option<NumberCheckFunctionPtr>,
     pub dict: DictRef,
 }
 
@@ -103,6 +109,10 @@ impl Type {
 
         if self.tp_set_attr.is_none() {
             self.tp_set_attr = parent_type.tp_set_attr.clone();
+        }
+
+        if self.nb_bool.is_none() {
+            self.nb_bool = parent_type.nb_bool.clone();
         }
 
         Ok(())
@@ -211,6 +221,18 @@ impl Type {
         }
     }
 
+    pub fn nb_bool(&self, interpreter: &mut Interpreter, obj: KyaObjectRef) -> Result<bool, Error> {
+        if let Some(nb_bool_fn) = self.nb_bool {
+            let result = nb_bool_fn(interpreter, obj)?;
+            Ok(result != 0.0)
+        } else {
+            Err(Error::RuntimeError(format!(
+                "The object '{}' does not support boolean conversion",
+                self.name
+            )))
+        }
+    }
+
     pub fn parent(&self) -> Result<TypeRef, Error> {
         if let Some(parent_type) = &self.ob_type {
             Ok(parent_type.clone())
@@ -234,6 +256,7 @@ impl KyaObject {
             KyaObject::SocketObject(obj) => Some(obj),
             KyaObject::ConnectionObject(obj) => Some(obj),
             KyaObject::BytesObject(obj) => Some(obj),
+            KyaObject::BoolObject(obj) => Some(obj),
             _ => None,
         }
     }
@@ -320,6 +343,10 @@ impl KyaObject {
     pub fn from_bytes_object(bytes_object: BytesObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::BytesObject(bytes_object))
     }
+
+    pub fn from_bool_object(bool_object: BoolObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::BoolObject(bool_object))
+    }
 }
 
 impl Default for Type {
@@ -333,6 +360,7 @@ impl Default for Type {
             tp_init: None,
             tp_get_attr: Some(generic_get_attr),
             tp_set_attr: Some(generic_set_attr),
+            nb_bool: Some(class_nb_bool),
             dict: Rc::new(RefCell::new(std::collections::HashMap::new())),
         }
     }

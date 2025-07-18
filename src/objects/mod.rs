@@ -1,4 +1,5 @@
 pub mod base;
+pub mod bool_object;
 pub mod bytes_object;
 pub mod class_object;
 pub mod function_object;
