@@ -34,7 +34,8 @@ pub fn create_instance_type(ob_type: TypeRef) -> TypeRef {
 pub fn instance_new(
     _interpreter: &mut Interpreter,
     ob_type: TypeRef,
-    args: Vec<KyaObjectRef>,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let arg = parse_arg(&args, 0, 1)?;
 
@@ -47,7 +48,8 @@ pub fn instance_new(
 pub fn instance_tp_init(
     interpreter: &mut Interpreter,
     callable: KyaObjectRef,
-    args: Vec<KyaObjectRef>,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let object = callable.borrow();
 
@@ -63,13 +65,11 @@ pub fn instance_tp_init(
             .cloned();
 
         if let Some(init) = constructor_option {
-            register_self(interpreter, callable.clone());
-
-            let result = init
-                .borrow()
-                .get_type()?
-                .borrow()
-                .call(interpreter, init.clone(), args);
+            let result =
+                init.borrow()
+                    .get_type()?
+                    .borrow()
+                    .call(interpreter, init.clone(), args, receiver);
 
             result
         } else {
@@ -94,7 +94,8 @@ pub fn instance_tp_init(
 pub fn instance_tp_repr(
     interpreter: &mut Interpreter,
     callable: KyaObjectRef,
-    _args: Vec<KyaObjectRef>,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let object = callable.borrow();
 
@@ -105,17 +106,16 @@ pub fn instance_tp_repr(
             .get_attr(interpreter, callable.clone(), "__repr__".to_string());
 
         if let Ok(repr) = repr {
-            register_self(interpreter, callable.clone());
-
-            let result = repr
-                .borrow()
-                .get_type()?
-                .borrow()
-                .call(interpreter, repr.clone(), vec![]);
+            let result = repr.borrow().get_type()?.borrow().call(
+                interpreter,
+                repr.clone(),
+                &mut vec![],
+                receiver,
+            );
 
             result
         } else {
-            instance_default_repr(interpreter, callable.clone(), _args)
+            instance_default_repr(interpreter, callable.clone(), args, receiver)
         }
     } else {
         Err(Error::RuntimeError(format!(
@@ -128,7 +128,8 @@ pub fn instance_tp_repr(
 pub fn instance_default_repr(
     _interpreter: &mut Interpreter,
     callable: KyaObjectRef,
-    _args: Vec<KyaObjectRef>,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let object = callable.borrow();
 
@@ -235,8 +236,4 @@ pub fn instance_tp_set_attr(
             object.get_type()?.borrow().name
         )))
     }
-}
-
-pub fn register_self(interpreter: &mut Interpreter, instance: KyaObjectRef) {
-    interpreter.register("self", instance)
 }

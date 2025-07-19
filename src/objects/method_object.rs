@@ -1,10 +1,7 @@
 use crate::errors::Error;
 use crate::interpreter::Interpreter;
 use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef};
-use crate::objects::instance_object::register_self;
 use crate::objects::string_object::StringObject;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 pub struct MethodObject {
     pub ob_type: TypeRef,
@@ -31,7 +28,8 @@ pub fn create_method_type(ob_type: TypeRef) -> TypeRef {
 pub fn method_tp_repr(
     interpreter: &mut Interpreter,
     callable: KyaObjectRef,
-    _args: Vec<KyaObjectRef>,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let object = callable.borrow();
 
@@ -61,17 +59,17 @@ pub fn method_tp_repr(
 pub fn method_tp_call(
     interpreter: &mut Interpreter,
     callable: KyaObjectRef,
-    args: Vec<KyaObjectRef>,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let object = callable.borrow();
 
     if let KyaObject::MethodObject(method_object) = &*object {
-        register_self(interpreter, method_object.instance_object.clone());
-
         let result = method_object.function.borrow().get_type()?.borrow().call(
             interpreter,
             method_object.function.clone(),
             args,
+            Some(method_object.instance_object.clone()),
         );
 
         result

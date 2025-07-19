@@ -26,12 +26,14 @@ pub type TypeDictRef = Rc<RefCell<std::collections::HashMap<String, TypeRef>>>;
 pub type CallableFunctionPtr = fn(
     interpreter: &mut Interpreter,
     callable: KyaObjectRef,
-    args: Vec<KyaObjectRef>,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error>;
 pub type TypeFunctionPtr = fn(
     interpreter: &mut Interpreter,
     ob_type: TypeRef,
-    args: Vec<KyaObjectRef>,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error>;
 pub type GetAttrFunctionPtr = fn(
     interpreter: &mut Interpreter,
@@ -141,10 +143,11 @@ impl Type {
         &self,
         interpreter: &mut Interpreter,
         callable: KyaObjectRef,
-        args: Vec<KyaObjectRef>,
+        args: &mut Vec<KyaObjectRef>,
+        receiver: Option<KyaObjectRef>,
     ) -> Result<KyaObjectRef, Error> {
         if let Some(repr_fn) = self.tp_repr {
-            let obj = repr_fn(interpreter, callable, args)?;
+            let obj = repr_fn(interpreter, callable, args, receiver.clone())?;
 
             if let KyaObject::StringObject(_) = &*obj.borrow() {
                 Ok(obj.clone())
@@ -163,10 +166,11 @@ impl Type {
         &self,
         interpreter: &mut Interpreter,
         callable: KyaObjectRef,
-        args: Vec<KyaObjectRef>,
+        args: &mut Vec<KyaObjectRef>,
+        receiver: Option<KyaObjectRef>,
     ) -> Result<KyaObjectRef, Error> {
         if let Some(callable_fn) = self.tp_call {
-            callable_fn(interpreter, callable, args)
+            callable_fn(interpreter, callable, args, receiver)
         } else {
             Err(Error::RuntimeError(format!(
                 "The object '{}' is not callable",
@@ -179,10 +183,11 @@ impl Type {
         &self,
         interpreter: &mut Interpreter,
         ob_type: TypeRef,
-        args: Vec<KyaObjectRef>,
+        args: &mut Vec<KyaObjectRef>,
+        receiver: Option<KyaObjectRef>,
     ) -> Result<KyaObjectRef, Error> {
         if let Some(new_fn) = self.tp_new {
-            new_fn(interpreter, ob_type, args)
+            new_fn(interpreter, ob_type, args, receiver)
         } else {
             Err(Error::RuntimeError(format!(
                 "The object '{}' cannot be instantiated",
@@ -195,10 +200,11 @@ impl Type {
         &self,
         interpreter: &mut Interpreter,
         obj: KyaObjectRef,
-        args: Vec<KyaObjectRef>,
+        args: &mut Vec<KyaObjectRef>,
+        receiver: Option<KyaObjectRef>,
     ) -> Result<KyaObjectRef, Error> {
         if let Some(init_fn) = self.tp_init {
-            init_fn(interpreter, obj, args)
+            init_fn(interpreter, obj, args, receiver)
         } else {
             Err(Error::RuntimeError(format!(
                 "The object '{}' cannot be initialized",

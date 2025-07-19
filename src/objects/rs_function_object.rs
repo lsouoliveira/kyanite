@@ -36,14 +36,19 @@ pub fn create_rs_function_type(ob_type: TypeRef) -> TypeRef {
 pub fn rs_function_tp_call(
     interpreter: &mut Interpreter,
     callable: KyaObjectRef,
-    args: Vec<KyaObjectRef>,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let object = callable.borrow();
 
     if let KyaObject::RsFunctionObject(rs_function) = &*object {
         interpreter.push_next_frame();
 
-        let result = (rs_function.function_ptr)(interpreter, callable.clone(), args);
+        if let Some(receiver) = receiver.clone() {
+            interpreter.register("self", receiver);
+        }
+
+        let result = (rs_function.function_ptr)(interpreter, callable.clone(), args, receiver);
 
         interpreter.pop_frame();
 

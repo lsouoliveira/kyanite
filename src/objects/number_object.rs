@@ -30,7 +30,8 @@ pub fn create_number_type(ob_type: TypeRef) -> TypeRef {
 pub fn number_tp_repr(
     interpreter: &mut Interpreter,
     callable: KyaObjectRef,
-    _args: Vec<KyaObjectRef>,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let object = callable.borrow();
 

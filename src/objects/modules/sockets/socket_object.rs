@@ -10,7 +10,9 @@ use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRe
 use crate::objects::modules::sockets::connection_object::ConnectionObject;
 use crate::objects::modules::sockets::CONNECTION_TYPE;
 use crate::objects::rs_function_object::RsFunctionObject;
-use crate::objects::utils::{number_object_to_float, parse_arg, string_object_to_string};
+use crate::objects::utils::{
+    number_object_to_float, parse_arg, parse_receiver, string_object_to_string,
+};
 
 pub struct SocketObject {
     ob_type: TypeRef,
@@ -80,7 +82,8 @@ pub fn create_socket_type(
 pub fn socket_new(
     _interpreter: &mut Interpreter,
     ob_type: TypeRef,
-    _args: Vec<KyaObjectRef>,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let socket = socket::create_socket();
 
@@ -92,7 +95,8 @@ pub fn socket_new(
 pub fn socket_tp_init(
     interpreter: &mut Interpreter,
     _callable: KyaObjectRef,
-    _args: Vec<KyaObjectRef>,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     Ok(interpreter.get_none())
 }
@@ -100,9 +104,10 @@ pub fn socket_tp_init(
 pub fn socket_bind(
     interpreter: &mut Interpreter,
     _callable: KyaObjectRef,
-    args: Vec<KyaObjectRef>,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
-    let instance = interpreter.resolve_self()?;
+    let instance = parse_receiver(&receiver)?;
 
     if let KyaObject::SocketObject(ref mut socket_object) = *instance.borrow_mut() {
         let host = parse_arg(&args, 0, 2)?;
@@ -132,9 +137,10 @@ pub fn socket_bind(
 pub fn socket_accept(
     interpreter: &mut Interpreter,
     _callable: KyaObjectRef,
-    _args: Vec<KyaObjectRef>,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
-    let instance = interpreter.resolve_self()?;
+    let instance = parse_receiver(&receiver)?;
 
     if let KyaObject::SocketObject(ref mut socket_object) = *instance.borrow_mut() {
         let connection = socket_object.accept()?;

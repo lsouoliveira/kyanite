@@ -111,7 +111,7 @@ impl Connectionable for TcpConnection {
         let mut buffer = vec![0; buffer_size];
 
         match self.stream.read(&mut buffer) {
-            Ok(_) => Ok(buffer),
+            Ok(_) => Ok(buffer.into_iter().filter(|&b| b != 0).collect()),
             Err(e) => Err(SocketError::ReadError(e.to_string())),
         }
     }

@@ -46,7 +46,8 @@ pub fn create_function_type(ob_type: TypeRef) -> TypeRef {
 pub fn function_repr(
     _interpreter: &mut Interpreter,
     callable: KyaObjectRef,
-    _args: Vec<KyaObjectRef>,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let object = callable.borrow();
 
@@ -70,7 +71,8 @@ pub fn function_repr(
 pub fn function_call(
     interpreter: &mut Interpreter,
     callable: KyaObjectRef,
-    args: Vec<KyaObjectRef>,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let object = callable.borrow();
 
@@ -86,8 +88,12 @@ pub fn function_call(
 
         interpreter.push_next_frame();
 
+        if let Some(receiver) = receiver {
+            interpreter.register("self", receiver);
+        }
+
         for (param, arg) in func.parameters.iter().zip(args) {
-            interpreter.register(param, arg);
+            interpreter.register(param, arg.clone());
         }
 
         let mut result = interpreter.resolve("None");

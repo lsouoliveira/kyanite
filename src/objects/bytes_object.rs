@@ -4,6 +4,7 @@ use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRe
 use crate::objects::number_object::NumberObject;
 use crate::objects::rs_function_object::RsFunctionObject;
 use crate::objects::string_object::StringObject;
+use crate::objects::utils::{parse_arg, parse_receiver};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -43,7 +44,8 @@ pub fn create_bytes_type(ob_type: TypeRef, rs_function_type: TypeRef) -> TypeRef
 pub fn bytes_tp_repr(
     interpreter: &mut Interpreter,
     callable: KyaObjectRef,
-    _args: Vec<KyaObjectRef>,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let object = callable.borrow();
 
@@ -74,9 +76,10 @@ pub fn bytes_sq_len(_interpreter: &mut Interpreter, object: KyaObjectRef) -> Res
 pub fn bytes_length(
     interpreter: &mut Interpreter,
     _callable: KyaObjectRef,
-    _args: Vec<KyaObjectRef>,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
-    let instance = interpreter.resolve_self()?;
+    let instance = parse_receiver(&receiver)?;
 
     if let KyaObject::BytesObject(obj) = &*instance.borrow() {
         Ok(KyaObject::from_number_object(NumberObject {

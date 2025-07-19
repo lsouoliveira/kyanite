@@ -26,7 +26,8 @@ pub fn create_string_type(ob_type: TypeRef) -> TypeRef {
 pub fn string_new(
     _interpreter: &mut Interpreter,
     ob_type: TypeRef,
-    args: Vec<KyaObjectRef>,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let arg = parse_arg(&args, 0, 1)?;
 
@@ -39,7 +40,8 @@ pub fn string_new(
 pub fn string_tp_repr(
     _interpreter: &mut Interpreter,
     callable: KyaObjectRef,
-    _args: Vec<KyaObjectRef>,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let object = callable.borrow();
 

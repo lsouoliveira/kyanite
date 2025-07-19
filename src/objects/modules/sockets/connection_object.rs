@@ -8,7 +8,7 @@ use crate::interpreter::Interpreter;
 use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef};
 use crate::objects::bytes_object::BytesObject;
 use crate::objects::rs_function_object::RsFunctionObject;
-use crate::objects::utils::{number_object_to_float, parse_arg};
+use crate::objects::utils::{number_object_to_float, parse_arg, parse_receiver};
 
 pub struct ConnectionObject {
     ob_type: TypeRef,
@@ -61,12 +61,13 @@ pub fn create_connection_type(
 
 pub fn connection_read(
     interpreter: &mut Interpreter,
-    callable: KyaObjectRef,
-    args: Vec<KyaObjectRef>,
+    _callable: KyaObjectRef,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
+    let instance = parse_receiver(&receiver)?;
     let arg = parse_arg(&args, 0, 1)?;
     let buffer_size = number_object_to_float(&arg)? as usize;
-    let instance = interpreter.resolve_self()?;
 
     if let KyaObject::ConnectionObject(ref mut connection_obj) = *instance.borrow_mut() {
         let data = connection_obj.read(buffer_size)?;

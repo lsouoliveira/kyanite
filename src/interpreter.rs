@@ -175,7 +175,7 @@ impl Interpreter {
     }
 
     pub fn register_builtins(&mut self) -> Result<(), Error> {
-        let none_object = none_new(self, self.get_type(NONE_TYPE), vec![]).unwrap();
+        let none_object = none_new(self, self.get_type(NONE_TYPE), &mut vec![], None)?;
 
         self.register(NONE_TYPE, none_object.clone());
 
@@ -235,10 +235,6 @@ impl Interpreter {
         )))
     }
 
-    pub fn resolve_self(&self) -> Result<KyaObjectRef, Error> {
-        self.resolve("self")
-    }
-
     pub fn register(&mut self, name: &str, object: KyaObjectRef) {
         self.current_frame()
             .borrow_mut()
@@ -286,17 +282,17 @@ impl Evaluator for Interpreter {
 
     fn eval_method_call(&mut self, method_call: &ast::MethodCall) -> Result<KyaObjectRef, Error> {
         let name = method_call.name.eval(self)?;
-        let args = method_call
+        let mut args = method_call
             .arguments
             .iter()
             .map(|arg| arg.eval(self))
             .collect::<Result<Vec<KyaObjectRef>, Error>>()?;
 
-        let result = name
-            .borrow()
-            .get_type()?
-            .borrow()
-            .call(self, name.clone(), args)?;
+        let result =
+            name.borrow()
+                .get_type()?
+                .borrow()
+                .call(self, name.clone(), &mut args, None)?;
 
         Ok(result)
     }

@@ -21,18 +21,22 @@ impl KyaObjectTrait for ClassObject {
 pub fn class_tp_call(
     interpreter: &mut Interpreter,
     callable: KyaObjectRef,
-    args: Vec<KyaObjectRef>,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let class_type = callable.borrow().get_type()?;
 
-    let obj = class_type
-        .borrow()
-        .new(interpreter, class_type.clone(), args.clone())?;
+    let obj = class_type.borrow().new(
+        interpreter,
+        class_type.clone(),
+        &mut args.clone(),
+        Some(callable.clone()),
+    )?;
 
     obj.borrow()
         .get_type()?
         .borrow()
-        .init(interpreter, obj.clone(), args)?;
+        .init(interpreter, obj.clone(), args, Some(obj.clone()))?;
 
     Ok(obj)
 }
@@ -40,7 +44,8 @@ pub fn class_tp_call(
 pub fn class_tp_new(
     _interpreter: &mut Interpreter,
     ob_type: TypeRef,
-    _args: Vec<KyaObjectRef>,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let instance_ob_type = create_instance_type(ob_type);
 
@@ -53,7 +58,8 @@ pub fn class_tp_new(
 pub fn class_tp_repr(
     _interpreter: &mut Interpreter,
     callable: KyaObjectRef,
-    _args: Vec<KyaObjectRef>,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let object = callable.borrow();
 

@@ -63,3 +63,11 @@ pub fn kya_is_true(interpreter: &mut Interpreter, obj: KyaObjectRef) -> Result<b
         return Ok(false);
     }
 }
+
+pub fn parse_receiver(receiver: &Option<KyaObjectRef>) -> Result<KyaObjectRef, Error> {
+    if let Some(r) = receiver {
+        Ok(r.clone())
+    } else {
+        Err(Error::RuntimeError("Receiver is None".to_string()))
+    }
+}
