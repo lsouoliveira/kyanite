@@ -282,11 +282,13 @@ impl Evaluator for Interpreter {
 
     fn eval_method_call(&mut self, method_call: &ast::MethodCall) -> Result<KyaObjectRef, Error> {
         let name = method_call.name.eval(self)?;
-        let mut args = method_call
-            .arguments
-            .iter()
-            .map(|arg| arg.eval(self))
-            .collect::<Result<Vec<KyaObjectRef>, Error>>()?;
+        let mut args = Vec::new();
+
+        for arg in &method_call.arguments {
+            let arg_value = arg.eval(self)?;
+
+            args.push(arg_value);
+        }
 
         let result =
             name.borrow()
@@ -376,6 +378,14 @@ impl Evaluator for Interpreter {
 
     fn eval_attribute(&mut self, attribute: &ast::Attribute) -> Result<KyaObjectRef, Error> {
         if let ast::ASTNode::Identifier(_) = &*attribute.name {
+            let object = attribute.name.eval(self)?;
+
+            return object.borrow().get_type()?.borrow().get_attr(
+                self,
+                object.clone(),
+                attribute.value.clone(),
+            );
+        } else if let ast::ASTNode::Attribute(_) = &*attribute.name {
             let object = attribute.name.eval(self)?;
 
             return object.borrow().get_type()?.borrow().get_attr(

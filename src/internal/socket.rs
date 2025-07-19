@@ -10,7 +10,11 @@ pub enum SocketError {
 
 impl std::fmt::Display for SocketError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Socket Error")
+        match self {
+            SocketError::BindError(msg) => write!(f, "Bind Error: {}", msg),
+            SocketError::AcceptError(msg) => write!(f, "Accept Error: {}", msg),
+            SocketError::ReadError(msg) => write!(f, "Read Error: {}", msg),
+        }
     }
 }
 
@@ -68,10 +72,7 @@ impl Socketable for TcpSocket {
     fn accept(&mut self) -> Result<Connection, SocketError> {
         if let Some(listener) = &self.listener {
             match listener.accept() {
-                Ok((stream, _)) => {
-                    println!("Accepted connection from {}", stream.peer_addr().unwrap());
-                    Ok(Connection::Tcp(TcpConnection { stream }))
-                }
+                Ok((stream, _)) => Ok(Connection::Tcp(TcpConnection { stream })),
                 Err(e) => Err(SocketError::AcceptError(e.to_string())),
             }
         } else {

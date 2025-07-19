@@ -871,4 +871,37 @@ mod tests {
 
         assert_eq!(result, expected);
     }
+
+    #[test]
+    fn test_parse_method_call_with_attribute_args() {
+        let input = "my_method(arg1.attribute1, arg2.attribute2)\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::MethodCall(ast::MethodCall {
+                name: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                    name: "my_method".to_string(),
+                })),
+                arguments: vec![
+                    Box::new(ast::ASTNode::Attribute(ast::Attribute {
+                        name: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                            name: "arg1".to_string(),
+                        })),
+                        value: "attribute1".to_string(),
+                    })),
+                    Box::new(ast::ASTNode::Attribute(ast::Attribute {
+                        name: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                            name: "arg2".to_string(),
+                        })),
+                        value: "attribute2".to_string(),
+                    })),
+                ],
+            }),
+        )]));
+
+        assert_eq!(result, expected);
+    }
 }

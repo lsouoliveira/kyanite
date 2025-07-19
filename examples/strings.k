@@ -18,19 +18,18 @@ class Test
     end
 
     def test
-        print(self.a, self.b)
+        b = 10
+
+        self.test2(b)
+    end
+
+    def test2(a)
+        while true
+            print(a)
+            break
+        end
     end
 end
 
-test("a", "b", "c")
-
-a = 5
-
-print(a)
-
-a = Test("a")
-print(a)
-
-print(a.a)
-
+a = Test("Hello")
 a.test()
