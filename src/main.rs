@@ -42,7 +42,7 @@ fn interpret(filename: &str) -> Result<(), String> {
 
     let mut interpreter = Interpreter::new(input, root_dir.to_string());
 
-    interpreter.init();
+    let _ = interpreter.init();
 
     match interpreter.evaluate() {
         Ok(_) => Ok(()),

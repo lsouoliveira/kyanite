@@ -8,6 +8,8 @@ pub enum Error {
     LexerError(LexerError),
     TypeError(String),
     ValueError(String),
+    BreakInterrupt(String),
+    NotImplemented(String),
 }
 
 #[derive(Debug, Clone)]
@@ -51,6 +53,18 @@ impl std::fmt::Display for Error {
             Error::LexerError(lexer_error) => write!(f, "{}", lexer_error),
             Error::TypeError(msg) => write!(f, "{}", format_error("Type Error", msg)),
             Error::ValueError(msg) => write!(f, "{}", format_error("Value Error", msg)),
+            Error::BreakInterrupt(msg) => write!(
+                f,
+                "{}: {}",
+                "Break Interrupt".purple().bold(),
+                msg.red().bold()
+            ),
+            Error::NotImplemented(msg) => write!(
+                f,
+                "{}: {}",
+                "Not Implemented".purple().bold(),
+                msg.red().bold()
+            ),
         }
     }
 }

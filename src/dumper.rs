@@ -149,4 +149,20 @@ impl Visitor for ASTDumper {
         unary_op.operand.accept(self);
         self.push(")");
     }
+
+    fn visit_while(&mut self, while_node: &ast::While) {
+        self.push("While(");
+        self.concat("condition: ");
+        while_node.condition.accept(self);
+        self.concat("body: [");
+        for statement in &while_node.body {
+            statement.accept(self);
+        }
+        self.push("]");
+        self.push(")");
+    }
+
+    fn visit_break(&mut self) {
+        self.push("Break");
+    }
 }

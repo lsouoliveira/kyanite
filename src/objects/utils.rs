@@ -49,3 +49,17 @@ pub fn number_object_to_float(obj: &KyaObjectRef) -> Result<f64, Error> {
         Err(Error::RuntimeError("Expected a Number".to_string()))
     }
 }
+
+pub fn kya_is_true(interpreter: &mut Interpreter, obj: KyaObjectRef) -> Result<bool, Error> {
+    if obj
+        .borrow()
+        .get_type()?
+        .borrow()
+        .nb_bool(interpreter, obj.clone())?
+        != 0.0
+    {
+        return Ok(true);
+    } else {
+        return Ok(false);
+    }
+}

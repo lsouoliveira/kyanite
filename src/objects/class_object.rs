@@ -75,10 +75,6 @@ pub fn class_tp_repr(
     }
 }
 
-pub fn class_nb_bool(_interpreter: &mut Interpreter, object: KyaObjectRef) -> Result<f64, Error> {
-    if let KyaObject::ClassObject(_) = &*object.borrow() {
-        Ok(1.0)
-    } else {
-        Err(Error::RuntimeError("Expected a class object".to_string()))
-    }
+pub fn class_nb_bool(_interpreter: &mut Interpreter, _: KyaObjectRef) -> Result<f64, Error> {
+    Ok(1.0)
 }

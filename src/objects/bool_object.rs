@@ -21,6 +21,7 @@ pub fn create_bool_type(ob_type: TypeRef) -> TypeRef {
         ob_type: Some(ob_type.clone()),
         name: BOOL_TYPE.to_string(),
         tp_repr: Some(bool_tp_repr),
+        nb_bool: Some(bool_nb_bool),
         ..Default::default()
     })
 }
@@ -47,6 +48,17 @@ pub fn bool_tp_repr(
         Err(Error::RuntimeError(format!(
             "The object '{}' is not a string",
             object.get_type()?.borrow().name
+        )))
+    }
+}
+
+pub fn bool_nb_bool(_interpreter: &mut Interpreter, object: KyaObjectRef) -> Result<f64, Error> {
+    if let KyaObject::BoolObject(obj) = &*object.borrow() {
+        Ok(if obj.value { 1.0 } else { 0.0 })
+    } else {
+        Err(Error::RuntimeError(format!(
+            "The object '{}' is not a bool",
+            object.borrow().get_type()?.borrow().name
         )))
     }
 }

@@ -21,6 +21,8 @@ pub enum TokenType {
     Import,
     Plus,
     Minus,
+    While,
+    Break,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -88,6 +90,8 @@ fn symbols() -> HashMap<String, TokenType> {
     symbols.insert("import".to_string(), TokenType::Import);
     symbols.insert("+".to_string(), TokenType::Plus);
     symbols.insert("-".to_string(), TokenType::Minus);
+    symbols.insert("while".to_string(), TokenType::While);
+    symbols.insert("break".to_string(), TokenType::Break);
     symbols
 }
 
@@ -636,5 +640,36 @@ mod tests {
         assert_eq!(tokens[1].value, "module_name");
         assert_eq!(tokens[1].line, 1);
         assert_eq!(tokens[1].column, 8);
+    }
+
+    #[test]
+    fn test_while_keyword() {
+        let mut lexer = Lexer::new("while condition\nend\n".to_string());
+        let tokens = [
+            lexer.next_token().unwrap().unwrap(),
+            lexer.next_token().unwrap().unwrap(),
+        ];
+
+        assert_eq!(tokens[0].kind, TokenType::While);
+        assert_eq!(tokens[0].value, "while");
+        assert_eq!(tokens[0].line, 1);
+        assert_eq!(tokens[0].column, 1);
+
+        assert_eq!(tokens[1].kind, TokenType::Identifier);
+        assert_eq!(tokens[1].value, "condition");
+        assert_eq!(tokens[1].line, 1);
+        assert_eq!(tokens[1].column, 7);
+    }
+
+    #[test]
+    fn test_break_keyword() {
+        let mut lexer = Lexer::new("break\n".to_string());
+
+        let token = lexer.next_token().unwrap().unwrap();
+
+        assert_eq!(token.kind, TokenType::Break);
+        assert_eq!(token.value, "break");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 1);
     }
 }

@@ -20,4 +20,19 @@ def connect_to_server(host="localhost", port=8080):
 connection = connect_to_server()
 
 if connection:
-    connection.send(b"Hello, Server!")
+    while True:
+        try:
+            msg = input("Enter message to send (or 'exit' to quit): ")
+
+            if msg.lower() == "exit":
+                print("Exiting...")
+                connection.close()
+                break
+
+            connection.sendall(msg.encode("utf-8"))
+        except socket.error as e:
+            print(f"Error receiving data: {e}")
+            break
+        except KeyboardInterrupt:
+            print("Interrupted by user, closing connection.")
+            break

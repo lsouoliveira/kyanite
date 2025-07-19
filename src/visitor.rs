@@ -1,6 +1,6 @@
 use crate::ast::{
     Assignment, Attribute, BinOp, ClassDef, Compare, Identifier, If, Import, MethodCall, MethodDef,
-    Module, UnaryOp,
+    Module, UnaryOp, While,
 };
 use crate::errors::Error;
 use crate::objects::base::KyaObjectRef;
@@ -20,6 +20,8 @@ pub trait Visitor {
     fn visit_import(&mut self, import: &Import);
     fn visit_bin_op(&mut self, bin_op: &BinOp);
     fn visit_unary_op(&mut self, unary_op: &UnaryOp);
+    fn visit_while(&mut self, while_node: &While);
+    fn visit_break(&mut self);
 }
 
 pub trait Evaluator {
@@ -37,4 +39,6 @@ pub trait Evaluator {
     fn eval_import(&mut self, import: &Import) -> Result<KyaObjectRef, Error>;
     fn eval_bin_op(&mut self, bin_op: &BinOp) -> Result<KyaObjectRef, Error>;
     fn eval_unary_op(&mut self, unary_op: &UnaryOp) -> Result<KyaObjectRef, Error>;
+    fn eval_while(&mut self, while_node: &While) -> Result<KyaObjectRef, Error>;
+    fn eval_break(&mut self) -> Result<KyaObjectRef, Error>;
 }

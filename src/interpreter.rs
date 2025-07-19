@@ -11,10 +11,10 @@ use crate::objects::modules::sockets::connection_object::create_connection_type;
 use crate::objects::modules::sockets::functions::kya_socket;
 use crate::objects::modules::sockets::socket_object::create_socket_type;
 use crate::objects::none_object::{create_none_type, none_new};
-use crate::objects::number_object::{create_number_type, NumberObject};
+use crate::objects::number_object::{create_number_type, kya_compare_numbers, NumberObject};
 use crate::objects::rs_function_object::create_rs_function_type;
 use crate::objects::string_object::{create_string_type, StringObject};
-use crate::objects::utils::create_rs_function_object;
+use crate::objects::utils::{create_rs_function_object, kya_is_true};
 use crate::parser;
 use crate::visitor::Evaluator;
 use std::cell::RefCell;
@@ -73,7 +73,7 @@ impl Interpreter {
         }
     }
 
-    pub fn init(&mut self) {
+    pub fn init(&mut self) -> Result<(), Error> {
         let dict = Rc::new(RefCell::new(HashMap::new()));
         let type_dict = Rc::new(RefCell::new(HashMap::new()));
 
@@ -87,7 +87,7 @@ impl Interpreter {
         self.frames.push(Rc::new(RefCell::new(global_frame)));
 
         self.register_types();
-        self.register_builtins();
+        self.register_builtins()
     }
 
     pub fn current_frame(&self) -> FrameRef {
@@ -158,7 +158,7 @@ impl Interpreter {
         let socket_type = create_socket_type(self, type_type.clone(), rs_function_type.clone());
         let connection_type =
             create_connection_type(self, type_type.clone(), rs_function_type.clone());
-        let bytes_type = create_bytes_type(type_type.clone());
+        let bytes_type = create_bytes_type(type_type.clone(), rs_function_type.clone());
         let bool_type = create_bool_type(type_type.clone());
 
         self.register_type(type_type).unwrap();
@@ -393,10 +393,26 @@ impl Evaluator for Interpreter {
     }
 
     fn eval_compare(&mut self, compare: &ast::Compare) -> Result<KyaObjectRef, Error> {
-        Ok(self.resolve(NONE_TYPE).unwrap())
+        let left = compare.left.eval(self)?;
+        let right = compare.right.eval(self)?;
+
+        left.borrow().get_type()?.borrow().tp_compare(
+            self,
+            left.clone(),
+            right.clone(),
+            compare.operator.clone(),
+        )
     }
 
     fn eval_if(&mut self, if_node: &ast::If) -> Result<KyaObjectRef, Error> {
+        let condition = if_node.test.eval(self)?;
+
+        if kya_is_true(self, condition)? {
+            for statement in &if_node.body {
+                statement.eval(self)?;
+            }
+        }
+
         Ok(self.resolve(NONE_TYPE).unwrap())
     }
 
@@ -413,6 +429,30 @@ impl Evaluator for Interpreter {
     }
 
     fn eval_while(&mut self, while_node: &ast::While) -> Result<KyaObjectRef, Error> {
+        loop {
+            let condition = while_node.condition.eval(self)?;
+
+            if kya_is_true(self, condition)? == false {
+                break;
+            }
+
+            for statement in &while_node.body {
+                match statement.eval(self) {
+                    Ok(_) => continue,
+                    Err(Error::BreakInterrupt(_)) => {
+                        return Ok(self.resolve(NONE_TYPE).unwrap());
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
+        }
+
         Ok(self.resolve(NONE_TYPE).unwrap())
+    }
+
+    fn eval_break(&mut self) -> Result<KyaObjectRef, Error> {
+        Err(Error::BreakInterrupt(
+            "Break statement encountered".to_string(),
+        ))
     }
 }

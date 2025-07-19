@@ -7,6 +7,8 @@ use crate::visitor::{Evaluator, Visitor};
 pub enum ASTNode {
     Module(Module),
     // Statements
+    While(While),
+    Break(),
     // Expressions
     Identifier(Identifier),
     StringLiteral(String),
@@ -140,6 +142,18 @@ impl Import {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct While {
+    pub condition: Box<ASTNode>,
+    pub body: Vec<Box<ASTNode>>,
+}
+
+impl While {
+    pub fn new(condition: Box<ASTNode>, body: Vec<Box<ASTNode>>) -> Self {
+        While { condition, body }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct BinOp {
     pub left: Box<ASTNode>,
     pub operator: TokenType,
@@ -169,6 +183,8 @@ impl ASTNode {
             ASTNode::Import(import) => visitor.visit_import(&import),
             ASTNode::BinOp(bin_op) => visitor.visit_bin_op(&bin_op),
             ASTNode::UnaryOp(unary_op) => visitor.visit_unary_op(&unary_op),
+            ASTNode::While(while_node) => visitor.visit_while(&while_node),
+            ASTNode::Break() => visitor.visit_break(),
         }
     }
 
@@ -190,6 +206,8 @@ impl ASTNode {
             ASTNode::Import(import) => evaluator.eval_import(&import),
             ASTNode::BinOp(bin_op) => evaluator.eval_bin_op(&bin_op),
             ASTNode::UnaryOp(unary_op) => evaluator.eval_unary_op(&unary_op),
+            ASTNode::While(while_node) => evaluator.eval_while(&while_node),
+            ASTNode::Break() => evaluator.eval_break(),
         }
     }
 }

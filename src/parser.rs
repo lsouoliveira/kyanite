@@ -42,6 +42,10 @@ impl Parser {
             self.parse_if_statement()?
         } else if self.accept(TokenType::Import).is_some() {
             self.parse_import()?
+        } else if self.accept(TokenType::While).is_some() {
+            self.parse_while()?
+        } else if self.accept(TokenType::Break).is_some() {
+            Box::new(ast::ASTNode::Break())
         } else {
             self.parse_expression()?
         };
@@ -117,6 +121,31 @@ impl Parser {
         Ok(Box::new(ast::ASTNode::Import(ast::Import {
             name: module_name,
         })))
+    }
+
+    pub fn parse_while(&mut self) -> Result<Box<ast::ASTNode>, Error> {
+        let condition = self.parse_expression()?;
+
+        self.expect(TokenType::Newline)?;
+
+        let mut body = Vec::new();
+
+        while self.peek().is_some() {
+            if let Some(_) = self.accept(TokenType::End) {
+                break;
+            }
+
+            match self.parse_statement() {
+                Ok(statement) => {
+                    body.push(statement);
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
+        let while_node = ast::While::new(condition, body);
+
+        Ok(Box::new(ast::ASTNode::While(while_node)))
     }
 
     fn parse_method_def(&mut self) -> Result<Box<ast::ASTNode>, Error> {
@@ -780,6 +809,65 @@ mod tests {
                 })),
             },
         ))]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_unary_op() {
+        let input = "-a\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(
+            ast::ASTNode::UnaryOp(ast::UnaryOp {
+                operator: TokenType::Minus,
+                operand: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                    name: "a".to_string(),
+                })),
+            }),
+        )]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_while_loop() {
+        let input = "while condition\nmy_variable = \"42\"\nend\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected = ast::ASTNode::Module(ast::Module::new(vec![Box::new(ast::ASTNode::While(
+            ast::While {
+                condition: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                    name: "condition".to_string(),
+                })),
+                body: vec![Box::new(ast::ASTNode::Assignment(ast::Assignment {
+                    name: Box::new(ast::ASTNode::Identifier(ast::Identifier {
+                        name: "my_variable".to_string(),
+                    })),
+                    value: Box::new(ast::ASTNode::StringLiteral("42".to_string())),
+                }))],
+            },
+        ))]));
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_break_statement() {
+        let input = "break\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse().unwrap();
+
+        let expected =
+            ast::ASTNode::Module(ast::Module::new(vec![Box::new(ast::ASTNode::Break())]));
 
         assert_eq!(result, expected);
     }

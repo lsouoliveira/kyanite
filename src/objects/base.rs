@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::ast;
 use crate::errors::Error;
 use crate::interpreter::{Interpreter, METHOD_TYPE};
 use crate::objects::bool_object::BoolObject;
@@ -39,6 +40,14 @@ pub type GetAttrFunctionPtr = fn(
 ) -> Result<KyaObjectRef, Error>;
 pub type NumberCheckFunctionPtr =
     fn(interpreter: &mut Interpreter, obj: KyaObjectRef) -> Result<f64, Error>;
+pub type LenFunctionPtr =
+    fn(interpreter: &mut Interpreter, obj: KyaObjectRef) -> Result<usize, Error>;
+pub type CompareFunctionPtr = fn(
+    interpreter: &mut Interpreter,
+    obj1: KyaObjectRef,
+    obj2: KyaObjectRef,
+    operator: ast::Operator,
+) -> Result<KyaObjectRef, Error>;
 pub type SetAttrFunctionPtr = fn(
     interpreter: &mut Interpreter,
     obj: KyaObjectRef,
@@ -75,6 +84,8 @@ pub struct Type {
     pub tp_init: Option<CallableFunctionPtr>,
     pub tp_get_attr: Option<GetAttrFunctionPtr>,
     pub nb_bool: Option<NumberCheckFunctionPtr>,
+    pub sq_len: Option<LenFunctionPtr>,
+    pub tp_compare: Option<CompareFunctionPtr>,
     pub dict: DictRef,
 }
 
@@ -113,6 +124,14 @@ impl Type {
 
         if self.nb_bool.is_none() {
             self.nb_bool = parent_type.nb_bool.clone();
+        }
+
+        if self.sq_len.is_none() {
+            self.sq_len = parent_type.sq_len.clone();
+        }
+
+        if self.tp_compare.is_none() {
+            self.tp_compare = parent_type.tp_compare.clone();
         }
 
         Ok(())
@@ -221,13 +240,40 @@ impl Type {
         }
     }
 
-    pub fn nb_bool(&self, interpreter: &mut Interpreter, obj: KyaObjectRef) -> Result<bool, Error> {
+    pub fn nb_bool(&self, interpreter: &mut Interpreter, obj: KyaObjectRef) -> Result<f64, Error> {
         if let Some(nb_bool_fn) = self.nb_bool {
-            let result = nb_bool_fn(interpreter, obj)?;
-            Ok(result != 0.0)
+            Ok(nb_bool_fn(interpreter, obj)?)
         } else {
             Err(Error::RuntimeError(format!(
                 "The object '{}' does not support boolean conversion",
+                self.name
+            )))
+        }
+    }
+
+    pub fn sq_len(&self, interpreter: &mut Interpreter, obj: KyaObjectRef) -> Result<usize, Error> {
+        if let Some(sq_len_fn) = self.sq_len {
+            sq_len_fn(interpreter, obj)
+        } else {
+            Err(Error::RuntimeError(format!(
+                "The object '{}' does not support length calculation",
+                self.name
+            )))
+        }
+    }
+
+    pub fn tp_compare(
+        &self,
+        interpreter: &mut Interpreter,
+        obj1: KyaObjectRef,
+        obj2: KyaObjectRef,
+        operator: ast::Operator,
+    ) -> Result<KyaObjectRef, Error> {
+        if let Some(compare_fn) = self.tp_compare {
+            compare_fn(interpreter, obj1, obj2, operator)
+        } else {
+            Err(Error::RuntimeError(format!(
+                "The object '{}' does not support comparison",
                 self.name
             )))
         }
@@ -361,6 +407,8 @@ impl Default for Type {
             tp_get_attr: Some(generic_get_attr),
             tp_set_attr: Some(generic_set_attr),
             nb_bool: Some(class_nb_bool),
+            sq_len: None,
+            tp_compare: None,
             dict: Rc::new(RefCell::new(std::collections::HashMap::new())),
         }
     }
