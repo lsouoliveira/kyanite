@@ -29,29 +29,29 @@ pub fn method_tp_repr(
     interpreter: &mut Interpreter,
     callable: KyaObjectRef,
     _args: &mut Vec<KyaObjectRef>,
-    receiver: Option<KyaObjectRef>,
+    _receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
-    let object = callable.borrow();
+    let object = callable.lock().unwrap();
 
     if let KyaObject::MethodObject(method_object) = &*object {
-        let instance_type = method_object.instance_object.borrow().get_type()?;
+        let instance_type = method_object.instance_object.lock().unwrap().get_type()?;
 
         Ok(KyaObject::from_string_object(StringObject {
             ob_type: interpreter.get_type("String"),
             value: format!(
                 "<bound method {} of {}>",
-                instance_type.borrow().name,
+                instance_type.lock().unwrap().name,
                 format!(
                     "<instance {} at {:p}>",
-                    instance_type.borrow().name,
-                    &*method_object.instance_object.borrow() as *const KyaObject
+                    instance_type.lock().unwrap().name,
+                    &*method_object.instance_object.lock().unwrap() as *const KyaObject
                 )
             ),
         }))
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' is not a method",
-            object.get_type()?.borrow().name
+            object.get_type()?.lock().unwrap().name
         )))
     }
 }
@@ -60,12 +60,12 @@ pub fn method_tp_call(
     interpreter: &mut Interpreter,
     callable: KyaObjectRef,
     args: &mut Vec<KyaObjectRef>,
-    receiver: Option<KyaObjectRef>,
+    _receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
-    let object = callable.borrow();
+    let object = callable.lock().unwrap();
 
     if let KyaObject::MethodObject(method_object) = &*object {
-        let result = method_object.function.borrow().get_type()?.borrow().call(
+        let result = method_object.function.lock().unwrap().get_type()?.lock().unwrap().call(
             interpreter,
             method_object.function.clone(),
             args,
@@ -76,7 +76,7 @@ pub fn method_tp_call(
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' is not a method",
-            object.get_type()?.borrow().name
+            object.get_type()?.lock().unwrap().name
         )))
     }
 }

@@ -42,3 +42,22 @@ pub trait Evaluator {
     fn eval_while(&mut self, while_node: &While) -> Result<KyaObjectRef, Error>;
     fn eval_break(&mut self) -> Result<KyaObjectRef, Error>;
 }
+
+pub trait CompilerVisitor {
+    fn compile_module(&mut self, module: &Module) -> Result<(), Error>;
+    fn compile_identifier(&mut self, identifier: &Identifier) -> Result<(), Error>;
+    fn compile_method_call(&mut self, method_call: &MethodCall) -> Result<(), Error>;
+    fn compile_string_literal(&mut self, string_literal: &str) -> Result<(), Error>;
+    fn compile_assignment(&mut self, assignment: &Assignment) -> Result<(), Error>;
+    fn compile_number_literal(&mut self, number_literal: &f64) -> Result<(), Error>;
+    fn compile_method_def(&mut self, method_def: &MethodDef) -> Result<(), Error>;
+    fn compile_class_def(&mut self, class_def: &ClassDef) -> Result<(), Error>;
+    fn compile_attribute(&mut self, attribute: &Attribute) -> Result<(), Error>;
+    fn compile_compare(&mut self, compare: &Compare) -> Result<(), Error>;
+    fn compile_if(&mut self, if_node: &If) -> Result<(), Error>;
+    fn compile_import(&mut self, import: &Import) -> Result<(), Error>;
+    fn compile_bin_op(&mut self, bin_op: &BinOp) -> Result<(), Error>;
+    fn compile_unary_op(&mut self, unary_op: &UnaryOp) -> Result<(), Error>;
+    fn compile_while(&mut self, while_node: &While) -> Result<(), Error>;
+    fn compile_break(&mut self) -> Result<(), Error>;
+}

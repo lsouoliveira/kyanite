@@ -1,7 +1,5 @@
 use crate::errors::Error;
-use crate::interpreter::Interpreter;
-use crate::objects::base::{CallableFunctionPtr, KyaObject, KyaObjectRef};
-use crate::objects::rs_function_object::RsFunctionObject;
+use crate::objects::base::{KyaObject, KyaObjectRef};
 
 pub fn parse_arg(
     args: &Vec<KyaObjectRef>,
@@ -25,37 +23,29 @@ pub fn parse_arg(
 }
 
 pub fn string_object_to_string(obj: &KyaObjectRef) -> Result<String, Error> {
-    if let KyaObject::StringObject(string_obj) = &*obj.borrow() {
+    if let KyaObject::StringObject(string_obj) = &*obj.lock().unwrap() {
         Ok(string_obj.value.clone())
     } else {
         Err(Error::RuntimeError("Expected a String".to_string()))
     }
 }
 
-pub fn create_rs_function_object(
-    interpreter: &mut Interpreter,
-    function_ptr: CallableFunctionPtr,
-) -> KyaObjectRef {
-    KyaObject::from_rs_function_object(RsFunctionObject {
-        ob_type: interpreter.get_type("RsFunction"),
-        function_ptr,
-    })
-}
-
 pub fn number_object_to_float(obj: &KyaObjectRef) -> Result<f64, Error> {
-    if let KyaObject::NumberObject(number_obj) = &*obj.borrow() {
+    if let KyaObject::NumberObject(number_obj) = &*obj.lock().unwrap() {
         Ok(number_obj.value)
     } else {
         Err(Error::RuntimeError("Expected a Number".to_string()))
     }
 }
 
-pub fn kya_is_true(interpreter: &mut Interpreter, obj: KyaObjectRef) -> Result<bool, Error> {
+pub fn kya_is_true(obj: KyaObjectRef) -> Result<bool, Error> {
     if obj
-        .borrow()
+        .lock()
+        .unwrap()
         .get_type()?
-        .borrow()
-        .nb_bool(interpreter, obj.clone())?
+        .lock()
+        .unwrap()
+        .nb_bool(obj.clone())?
         != 0.0
     {
         return Ok(true);

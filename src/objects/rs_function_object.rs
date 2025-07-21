@@ -1,8 +1,9 @@
 use crate::errors::Error;
-use crate::interpreter::Interpreter;
 use crate::objects::base::{
-    CallableFunctionPtr, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef,
+    CallableFunctionPtr, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE,
 };
+
+use once_cell::sync::Lazy;
 
 pub struct RsFunctionObject {
     pub ob_type: TypeRef,
@@ -24,39 +25,37 @@ impl KyaObjectTrait for RsFunctionObject {
     }
 }
 
-pub fn create_rs_function_type(ob_type: TypeRef) -> TypeRef {
-    Type::as_ref(Type {
-        ob_type: Some(ob_type.clone()),
-        name: "RsFunction".to_string(),
-        tp_call: Some(rs_function_tp_call),
-        ..Default::default()
-    })
-}
-
 pub fn rs_function_tp_call(
-    interpreter: &mut Interpreter,
     callable: KyaObjectRef,
     args: &mut Vec<KyaObjectRef>,
     receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
-    let object = callable.borrow();
+    let object = callable.clone();
 
-    if let KyaObject::RsFunctionObject(rs_function) = &*object {
-        interpreter.push_next_frame();
+    if let KyaObject::RsFunctionObject(rs_function) = &*object.lock().unwrap() {
+        let result = (rs_function.function_ptr)(callable, args, receiver)?;
 
-        if let Some(receiver) = receiver.clone() {
-            interpreter.register("self", receiver);
-        }
-
-        let result = (rs_function.function_ptr)(interpreter, callable.clone(), args, receiver);
-
-        interpreter.pop_frame();
-
-        result
+        Ok(result)
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' is not callable",
-            object.get_type()?.borrow().name
+            object.lock().unwrap().get_type()?.lock().unwrap().name
         )))
     }
 }
+
+pub fn rs_function_new(function_ptr: CallableFunctionPtr) -> KyaObjectRef {
+    KyaObject::from_rs_function_object(RsFunctionObject::new(
+        RS_FUNCTION_TYPE.clone(),
+        function_ptr,
+    ))
+}
+
+pub static RS_FUNCTION_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    Type::as_ref(Type {
+        ob_type: Some(BASE_TYPE.clone()),
+        name: "RsFunction".to_string(),
+        tp_call: Some(rs_function_tp_call),
+        ..Default::default()
+    })
+});

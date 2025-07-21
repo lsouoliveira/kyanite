@@ -10,6 +10,7 @@ pub enum Error {
     ValueError(String),
     BreakInterrupt(String),
     NotImplemented(String),
+    CompilationError(String),
 }
 
 #[derive(Debug, Clone)]
@@ -65,6 +66,7 @@ impl std::fmt::Display for Error {
                 "Not Implemented".purple().bold(),
                 msg.red().bold()
             ),
+            Error::CompilationError(msg) => write!(f, "{}", format_error("Compilation Error", msg)),
         }
     }
 }

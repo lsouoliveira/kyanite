@@ -36,14 +36,10 @@ impl KyaObjectTrait for ConnectionObject {
     }
 }
 
-pub fn create_connection_type(
-    _: &mut Interpreter,
-    ob_type: TypeRef,
-    rs_function_type: TypeRef,
-) -> TypeRef {
+pub fn create_connection_type(ob_type: TypeRef, rs_function_type: TypeRef) -> TypeRef {
     let dict = Rc::new(RefCell::new(HashMap::new()));
 
-    dict.borrow_mut().insert(
+    dict.lock_mut().insert(
         "recv".to_string(),
         KyaObject::from_rs_function_object(RsFunctionObject::new(
             rs_function_type.clone(),
@@ -69,7 +65,7 @@ pub fn connection_read(
     let arg = parse_arg(&args, 0, 1)?;
     let buffer_size = number_object_to_float(&arg)? as usize;
 
-    if let KyaObject::ConnectionObject(ref mut connection_obj) = *instance.borrow_mut() {
+    if let KyaObject::ConnectionObject(ref mut connection_obj) = *instance.lock_mut() {
         let data = connection_obj.read(buffer_size)?;
 
         Ok(KyaObject::from_bytes_object(BytesObject {

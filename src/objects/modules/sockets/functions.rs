@@ -14,7 +14,7 @@ pub fn kya_socket(
         ob_type: interpreter.get_type(SOCKET_TYPE),
     });
 
-    socket_object.borrow().get_type()?.borrow().call(
+    socket_object.lock().unwrap().get_type()?.lock().unwrap().call(
         interpreter,
         socket_object.clone(),
         &mut vec![],

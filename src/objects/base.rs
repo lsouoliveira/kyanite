@@ -1,74 +1,62 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use once_cell::sync::Lazy;
+use std::sync::{Arc, Mutex};
 
 use crate::ast;
 use crate::errors::Error;
-use crate::interpreter::{Interpreter, METHOD_TYPE};
+// use crate::interpreter::{Interpreter, METHOD_TYPE};
 use crate::objects::bool_object::BoolObject;
-use crate::objects::bytes_object::BytesObject;
+// use crate::objects::bytes_object::BytesObject;
 use crate::objects::class_object::{
     class_nb_bool, class_tp_call, class_tp_new, class_tp_repr, ClassObject,
 };
-use crate::objects::function_object::FunctionObject;
-use crate::objects::instance_object::InstanceObject;
-use crate::objects::method_object::MethodObject;
-use crate::objects::modules::sockets::connection_object::ConnectionObject;
-use crate::objects::modules::sockets::socket_object::SocketObject;
+// use crate::objects::function_object::FunctionObject;
+// use crate::objects::instance_object::InstanceObject;
+// use crate::objects::method_object::MethodObject;
+// use crate::objects::modules::sockets::connection_object::ConnectionObject;
+// use crate::objects::modules::sockets::socket_object::SocketObject;
 use crate::objects::none_object::NoneObject;
 use crate::objects::number_object::NumberObject;
 use crate::objects::rs_function_object::RsFunctionObject;
 use crate::objects::string_object::StringObject;
 
-pub type KyaObjectRef = Rc<RefCell<KyaObject>>;
-pub type TypeRef = Rc<RefCell<Type>>;
-pub type DictRef = Rc<RefCell<std::collections::HashMap<String, KyaObjectRef>>>;
-pub type TypeDictRef = Rc<RefCell<std::collections::HashMap<String, TypeRef>>>;
+pub type KyaObjectRef = Arc<Mutex<KyaObject>>;
+pub type TypeRef = Arc<Mutex<Type>>;
+pub type DictRef = Arc<Mutex<std::collections::HashMap<String, KyaObjectRef>>>;
+pub type TypeDictRef = Arc<Mutex<std::collections::HashMap<String, TypeRef>>>;
 pub type CallableFunctionPtr = fn(
-    interpreter: &mut Interpreter,
     callable: KyaObjectRef,
     args: &mut Vec<KyaObjectRef>,
     receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error>;
 pub type TypeFunctionPtr = fn(
-    interpreter: &mut Interpreter,
     ob_type: TypeRef,
     args: &mut Vec<KyaObjectRef>,
     receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error>;
-pub type GetAttrFunctionPtr = fn(
-    interpreter: &mut Interpreter,
-    obj: KyaObjectRef,
-    attr_name: String,
-) -> Result<KyaObjectRef, Error>;
-pub type NumberCheckFunctionPtr =
-    fn(interpreter: &mut Interpreter, obj: KyaObjectRef) -> Result<f64, Error>;
-pub type LenFunctionPtr =
-    fn(interpreter: &mut Interpreter, obj: KyaObjectRef) -> Result<usize, Error>;
+pub type GetAttrFunctionPtr =
+    fn(obj: KyaObjectRef, attr_name: String) -> Result<KyaObjectRef, Error>;
+pub type NumberCheckFunctionPtr = fn(obj: KyaObjectRef) -> Result<f64, Error>;
+pub type LenFunctionPtr = fn(obj: KyaObjectRef) -> Result<usize, Error>;
 pub type CompareFunctionPtr = fn(
-    interpreter: &mut Interpreter,
     obj1: KyaObjectRef,
     obj2: KyaObjectRef,
     operator: ast::Operator,
 ) -> Result<KyaObjectRef, Error>;
-pub type SetAttrFunctionPtr = fn(
-    interpreter: &mut Interpreter,
-    obj: KyaObjectRef,
-    attr_name: String,
-    value: KyaObjectRef,
-) -> Result<(), Error>;
+pub type SetAttrFunctionPtr =
+    fn(obj: KyaObjectRef, attr_name: String, value: KyaObjectRef) -> Result<(), Error>;
 
 pub enum KyaObject {
     NoneObject(NoneObject),
     StringObject(StringObject),
     RsFunctionObject(RsFunctionObject),
-    FunctionObject(FunctionObject),
+    // FunctionObject(FunctionObject),
     NumberObject(NumberObject),
     ClassObject(ClassObject),
-    InstanceObject(InstanceObject),
-    MethodObject(MethodObject),
-    SocketObject(SocketObject),
-    ConnectionObject(ConnectionObject),
-    BytesObject(BytesObject),
+    // InstanceObject(InstanceObject),
+    // MethodObject(MethodObject),
+    // SocketObject(SocketObject),
+    // ConnectionObject(ConnectionObject),
+    // BytesObject(BytesObject),
     BoolObject(BoolObject),
 }
 
@@ -93,12 +81,12 @@ pub struct Type {
 
 impl Type {
     pub fn as_ref(type_obj: Type) -> TypeRef {
-        Rc::new(RefCell::new(type_obj))
+        Arc::new(Mutex::new(type_obj))
     }
 
     pub fn ready(&mut self) -> Result<(), Error> {
         let parent = self.parent()?;
-        let parent_type = parent.borrow();
+        let parent_type = parent.lock().unwrap();
 
         if self.tp_repr.is_none() {
             self.tp_repr = parent_type.tp_repr.clone();
@@ -141,20 +129,19 @@ impl Type {
 
     pub fn repr(
         &self,
-        interpreter: &mut Interpreter,
         callable: KyaObjectRef,
         args: &mut Vec<KyaObjectRef>,
         receiver: Option<KyaObjectRef>,
     ) -> Result<KyaObjectRef, Error> {
         if let Some(repr_fn) = self.tp_repr {
-            let obj = repr_fn(interpreter, callable, args, receiver.clone())?;
+            let obj = repr_fn(callable, args, receiver.clone())?;
 
-            if let KyaObject::StringObject(_) = &*obj.borrow() {
+            if let KyaObject::StringObject(_) = &*obj.lock().unwrap() {
                 Ok(obj.clone())
             } else {
                 Err(Error::RuntimeError(format!(
                     "__repr__ returned a non-string object (type '{}')",
-                    obj.borrow().get_type()?.borrow().name
+                    obj.lock().unwrap().get_type()?.lock().unwrap().name
                 )))
             }
         } else {
@@ -164,13 +151,12 @@ impl Type {
 
     pub fn call(
         &self,
-        interpreter: &mut Interpreter,
         callable: KyaObjectRef,
         args: &mut Vec<KyaObjectRef>,
         receiver: Option<KyaObjectRef>,
     ) -> Result<KyaObjectRef, Error> {
         if let Some(callable_fn) = self.tp_call {
-            callable_fn(interpreter, callable, args, receiver)
+            callable_fn(callable, args, receiver)
         } else {
             Err(Error::RuntimeError(format!(
                 "The object '{}' is not callable",
@@ -181,13 +167,12 @@ impl Type {
 
     pub fn new(
         &self,
-        interpreter: &mut Interpreter,
         ob_type: TypeRef,
         args: &mut Vec<KyaObjectRef>,
         receiver: Option<KyaObjectRef>,
     ) -> Result<KyaObjectRef, Error> {
         if let Some(new_fn) = self.tp_new {
-            new_fn(interpreter, ob_type, args, receiver)
+            new_fn(ob_type, args, receiver)
         } else {
             Err(Error::RuntimeError(format!(
                 "The object '{}' cannot be instantiated",
@@ -198,13 +183,12 @@ impl Type {
 
     pub fn init(
         &self,
-        interpreter: &mut Interpreter,
         obj: KyaObjectRef,
         args: &mut Vec<KyaObjectRef>,
         receiver: Option<KyaObjectRef>,
     ) -> Result<KyaObjectRef, Error> {
         if let Some(init_fn) = self.tp_init {
-            init_fn(interpreter, obj, args, receiver)
+            init_fn(obj, args, receiver)
         } else {
             Err(Error::RuntimeError(format!(
                 "The object '{}' cannot be initialized",
@@ -213,14 +197,9 @@ impl Type {
         }
     }
 
-    pub fn get_attr(
-        &self,
-        interpreter: &mut Interpreter,
-        obj: KyaObjectRef,
-        attr_name: String,
-    ) -> Result<KyaObjectRef, Error> {
+    pub fn get_attr(&self, obj: KyaObjectRef, attr_name: String) -> Result<KyaObjectRef, Error> {
         if let Some(get_attr_fn) = self.tp_get_attr {
-            get_attr_fn(interpreter, obj, attr_name)
+            get_attr_fn(obj, attr_name)
         } else {
             Err(Error::RuntimeError(format!(
                 "The object '{}' has no attribute '{}'",
@@ -231,13 +210,12 @@ impl Type {
 
     pub fn set_attr(
         &self,
-        interpreter: &mut Interpreter,
         obj: KyaObjectRef,
         attr_name: String,
         value: KyaObjectRef,
     ) -> Result<(), Error> {
         if let Some(set_attr_fn) = self.tp_set_attr {
-            set_attr_fn(interpreter, obj, attr_name, value)
+            set_attr_fn(obj, attr_name, value)
         } else {
             Err(Error::RuntimeError(format!(
                 "The object '{}' cannot set attribute '{}'",
@@ -246,9 +224,9 @@ impl Type {
         }
     }
 
-    pub fn nb_bool(&self, interpreter: &mut Interpreter, obj: KyaObjectRef) -> Result<f64, Error> {
+    pub fn nb_bool(&self, obj: KyaObjectRef) -> Result<f64, Error> {
         if let Some(nb_bool_fn) = self.nb_bool {
-            Ok(nb_bool_fn(interpreter, obj)?)
+            Ok(nb_bool_fn(obj)?)
         } else {
             Err(Error::RuntimeError(format!(
                 "The object '{}' does not support boolean conversion",
@@ -257,9 +235,9 @@ impl Type {
         }
     }
 
-    pub fn sq_len(&self, interpreter: &mut Interpreter, obj: KyaObjectRef) -> Result<usize, Error> {
+    pub fn sq_len(&self, obj: KyaObjectRef) -> Result<usize, Error> {
         if let Some(sq_len_fn) = self.sq_len {
-            sq_len_fn(interpreter, obj)
+            sq_len_fn(obj)
         } else {
             Err(Error::RuntimeError(format!(
                 "The object '{}' does not support length calculation",
@@ -270,13 +248,12 @@ impl Type {
 
     pub fn tp_compare(
         &self,
-        interpreter: &mut Interpreter,
         obj1: KyaObjectRef,
         obj2: KyaObjectRef,
         operator: ast::Operator,
     ) -> Result<KyaObjectRef, Error> {
         if let Some(compare_fn) = self.tp_compare {
-            compare_fn(interpreter, obj1, obj2, operator)
+            compare_fn(obj1, obj2, operator)
         } else {
             Err(Error::RuntimeError(format!(
                 "The object '{}' does not support comparison",
@@ -300,14 +277,14 @@ impl KyaObject {
             KyaObject::NoneObject(obj) => Some(obj),
             KyaObject::StringObject(obj) => Some(obj),
             KyaObject::RsFunctionObject(obj) => Some(obj),
-            KyaObject::FunctionObject(obj) => Some(obj),
+            // KyaObject::FunctionObject(obj) => Some(obj),
             KyaObject::NumberObject(obj) => Some(obj),
             KyaObject::ClassObject(obj) => Some(obj),
-            KyaObject::InstanceObject(obj) => Some(obj),
-            KyaObject::MethodObject(obj) => Some(obj),
-            KyaObject::SocketObject(obj) => Some(obj),
-            KyaObject::ConnectionObject(obj) => Some(obj),
-            KyaObject::BytesObject(obj) => Some(obj),
+            // KyaObject::InstanceObject(obj) => Some(obj),
+            // KyaObject::MethodObject(obj) => Some(obj),
+            // KyaObject::SocketObject(obj) => Some(obj),
+            // KyaObject::ConnectionObject(obj) => Some(obj),
+            // KyaObject::BytesObject(obj) => Some(obj),
             KyaObject::BoolObject(obj) => Some(obj),
             _ => None,
         }
@@ -316,20 +293,20 @@ impl KyaObject {
     pub fn is_instance_of(&self, type_ref: &TypeRef) -> Result<bool, Error> {
         if let Some(obj) = self.as_object_ref() {
             let mut root_type = obj.get_type();
-            let mut parent_type = type_ref.borrow().parent()?;
+            let mut parent_type = type_ref.lock().unwrap().parent()?;
 
             loop {
-                if Rc::ptr_eq(&root_type, type_ref) {
+                if Arc::ptr_eq(&root_type, type_ref) {
                     return Ok(true);
                 }
 
-                if Rc::ptr_eq(&root_type, &parent_type) {
+                if Arc::ptr_eq(&root_type, &parent_type) {
                     return Ok(false);
                 }
 
                 root_type = parent_type.clone();
 
-                let new_parent_type = root_type.borrow().parent()?;
+                let new_parent_type = root_type.lock().unwrap().parent()?;
 
                 parent_type = new_parent_type;
             }
@@ -349,7 +326,7 @@ impl KyaObject {
     }
 
     pub fn as_ref(object: KyaObject) -> KyaObjectRef {
-        Rc::new(RefCell::new(object))
+        Arc::new(Mutex::new(object))
     }
 
     pub fn from_none_object(none_object: NoneObject) -> KyaObjectRef {
@@ -360,10 +337,10 @@ impl KyaObject {
         KyaObject::as_ref(KyaObject::RsFunctionObject(rs_function_object))
     }
 
-    pub fn from_function_object(function_object: FunctionObject) -> KyaObjectRef {
-        KyaObject::as_ref(KyaObject::FunctionObject(function_object))
-    }
-
+    // pub fn from_function_object(function_object: FunctionObject) -> KyaObjectRef {
+    //     KyaObject::as_ref(KyaObject::FunctionObject(function_object))
+    // }
+    //
     pub fn from_string_object(string_object: StringObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::StringObject(string_object))
     }
@@ -375,27 +352,27 @@ impl KyaObject {
     pub fn from_class_object(class_object: ClassObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::ClassObject(class_object))
     }
-
-    pub fn from_instance_object(instance_object: InstanceObject) -> KyaObjectRef {
-        KyaObject::as_ref(KyaObject::InstanceObject(instance_object))
-    }
-
-    pub fn from_method_object(method_object: MethodObject) -> KyaObjectRef {
-        KyaObject::as_ref(KyaObject::MethodObject(method_object))
-    }
-
-    pub fn from_socket_object(socket_object: SocketObject) -> KyaObjectRef {
-        KyaObject::as_ref(KyaObject::SocketObject(socket_object))
-    }
-
-    pub fn from_connection_object(connection_object: ConnectionObject) -> KyaObjectRef {
-        KyaObject::as_ref(KyaObject::ConnectionObject(connection_object))
-    }
-
-    pub fn from_bytes_object(bytes_object: BytesObject) -> KyaObjectRef {
-        KyaObject::as_ref(KyaObject::BytesObject(bytes_object))
-    }
-
+    //
+    // pub fn from_instance_object(instance_object: InstanceObject) -> KyaObjectRef {
+    //     KyaObject::as_ref(KyaObject::InstanceObject(instance_object))
+    // }
+    //
+    // pub fn from_method_object(method_object: MethodObject) -> KyaObjectRef {
+    //     KyaObject::as_ref(KyaObject::MethodObject(method_object))
+    // }
+    //
+    // pub fn from_socket_object(socket_object: SocketObject) -> KyaObjectRef {
+    //     KyaObject::as_ref(KyaObject::SocketObject(socket_object))
+    // }
+    //
+    // pub fn from_connection_object(connection_object: ConnectionObject) -> KyaObjectRef {
+    //     KyaObject::as_ref(KyaObject::ConnectionObject(connection_object))
+    // }
+    //
+    // pub fn from_bytes_object(bytes_object: BytesObject) -> KyaObjectRef {
+    //     KyaObject::as_ref(KyaObject::BytesObject(bytes_object))
+    // }
+    //
     pub fn from_bool_object(bool_object: BoolObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::BoolObject(bool_object))
     }
@@ -406,78 +383,74 @@ impl Default for Type {
         Type {
             ob_type: None,
             name: "Unknown".to_string(),
-            tp_repr: Some(class_tp_repr),
-            tp_call: Some(class_tp_call),
-            tp_new: Some(class_tp_new),
+            // tp_repr: Some(class_tp_repr),
+            // tp_call: Some(class_tp_call),
+            // tp_new: Some(class_tp_new),
+            tp_repr: None,
+            tp_call: None,
+            tp_new: None,
             tp_init: None,
-            tp_get_attr: Some(generic_get_attr),
-            tp_set_attr: Some(generic_set_attr),
-            nb_bool: Some(class_nb_bool),
+            // tp_get_attr: Some(generic_get_attr),
+            // tp_set_attr: Some(generic_set_attr),
+            // nb_bool: Some(class_nb_bool),
+            tp_get_attr: None,
+            tp_set_attr: None,
+            nb_bool: None,
             sq_len: None,
             tp_compare: None,
-            dict: Rc::new(RefCell::new(std::collections::HashMap::new())),
+            dict: Arc::new(Mutex::new(std::collections::HashMap::new())),
         }
     }
 }
 
-pub fn create_type_type() -> TypeRef {
-    let type_object = Type {
-        name: "Type".to_string(),
-        ..Default::default()
-    };
-
-    let type_ref = Type::as_ref(type_object);
-
-    type_ref.borrow_mut().ob_type = Some(type_ref.clone());
-
-    type_ref
-}
-
-pub fn generic_get_attr(
-    interpreter: &mut Interpreter,
-    obj: KyaObjectRef,
-    attr_name: String,
-) -> Result<KyaObjectRef, Error> {
+pub fn generic_get_attr(obj: KyaObjectRef, attr_name: String) -> Result<KyaObjectRef, Error> {
     let found_object = get_attr_helper(obj.clone(), attr_name.clone())?;
 
-    if let KyaObject::FunctionObject(_) = &*found_object.borrow() {
-        return Ok(KyaObject::from_method_object(MethodObject {
-            ob_type: interpreter.get_type(METHOD_TYPE),
-            instance_object: obj.clone(),
-            function: found_object.clone(),
-        }));
-    } else if let KyaObject::RsFunctionObject(_) = &*found_object.borrow() {
-        return Ok(KyaObject::from_method_object(MethodObject {
-            ob_type: interpreter.get_type(METHOD_TYPE),
-            instance_object: obj.clone(),
-            function: found_object.clone(),
-        }));
-    }
+    // if let KyaObject::FunctionObject(_) = &*found_object.lock().unwrap() {
+    //     return Ok(KyaObject::from_method_object(MethodObject {
+    //         ob_type: interpreter.get_type(METHOD_TYPE),
+    //         instance_object: obj.clone(),
+    //         function: found_object.clone(),
+    //     }));
+    // } else if let KyaObject::RsFunctionObject(_) = &*found_object.lock().unwrap() {
+    //     return Ok(KyaObject::from_method_object(MethodObject {
+    //         ob_type: interpreter.get_type(METHOD_TYPE),
+    //         instance_object: obj.clone(),
+    //         function: found_object.clone(),
+    //     }));
+    // }
 
     Ok(found_object)
 }
 
 fn get_attr_helper(object: KyaObjectRef, attr_name: String) -> Result<KyaObjectRef, Error> {
-    let ob_type = object.borrow().get_type()?;
+    let ob_type = object.lock().unwrap().get_type()?;
 
-    if let Some(attr) = ob_type.borrow().dict.borrow().get(&attr_name) {
+    if let Some(attr) = ob_type.lock().unwrap().dict.lock().unwrap().get(&attr_name) {
         return Ok(attr.clone());
     } else {
         let mut root_type = ob_type;
-        let mut parent_type = root_type.borrow().parent()?;
+        let mut parent_type = root_type.lock().unwrap().parent()?;
 
         loop {
-            if Rc::ptr_eq(&root_type, &parent_type) {
+            if Arc::ptr_eq(&root_type, &parent_type) {
                 break;
             }
 
-            if let Some(attr) = root_type.borrow().dict.borrow().get(&attr_name) {
+            if let Some(attr) = root_type
+                .lock()
+                .unwrap()
+                .dict
+                .lock()
+                .unwrap()
+                .get(&attr_name)
+            {
                 return Ok(attr.clone());
             }
 
             root_type = parent_type.clone();
 
-            let new_parent_type = root_type.borrow().parent()?;
+            let new_parent_type = root_type.lock().unwrap().parent()?;
 
             parent_type = new_parent_type;
         }
@@ -485,20 +458,36 @@ fn get_attr_helper(object: KyaObjectRef, attr_name: String) -> Result<KyaObjectR
 
     Err(Error::RuntimeError(format!(
         "The object '{}' has no attribute '{}'",
-        object.borrow().get_type()?.borrow().name,
+        object.lock().unwrap().get_type()?.lock().unwrap().name,
         attr_name
     )))
 }
 
 pub fn generic_set_attr(
-    _interpreter: &mut Interpreter,
     obj: KyaObjectRef,
     attr_name: String,
     value: KyaObjectRef,
 ) -> Result<(), Error> {
-    let ob_type = obj.borrow().get_type()?;
+    let ob_type = obj.lock().unwrap().get_type()?;
 
-    ob_type.borrow().dict.borrow_mut().insert(attr_name, value);
+    ob_type
+        .lock()
+        .unwrap()
+        .dict
+        .lock()
+        .unwrap()
+        .insert(attr_name, value);
 
     Ok(())
 }
+
+pub static BASE_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    let base_type = Type::as_ref(Type {
+        name: "Type".to_string(),
+        ..Default::default()
+    });
+
+    base_type.lock().unwrap().ob_type = Some(base_type.clone());
+
+    base_type
+});

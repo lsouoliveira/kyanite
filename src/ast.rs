@@ -1,7 +1,7 @@
 use crate::errors::Error;
 use crate::lexer::TokenType;
 use crate::objects::base::KyaObjectRef;
-use crate::visitor::{Evaluator, Visitor};
+use crate::visitor::{CompilerVisitor, Evaluator, Visitor};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ASTNode {
@@ -23,6 +23,23 @@ pub enum ASTNode {
     Import(Import),
     BinOp(BinOp),
     UnaryOp(UnaryOp),
+}
+
+impl ASTNode {
+    pub fn is_expression(&self) -> bool {
+        matches!(
+            self,
+            ASTNode::Identifier(_)
+                | ASTNode::StringLiteral(_)
+                | ASTNode::NumberLiteral(_)
+                | ASTNode::MethodCall(_)
+                | ASTNode::Assignment(_)
+                | ASTNode::Attribute(_)
+                | ASTNode::Compare(_)
+                | ASTNode::BinOp(_)
+                | ASTNode::UnaryOp(_)
+        )
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -208,6 +225,31 @@ impl ASTNode {
             ASTNode::UnaryOp(unary_op) => evaluator.eval_unary_op(&unary_op),
             ASTNode::While(while_node) => evaluator.eval_while(&while_node),
             ASTNode::Break() => evaluator.eval_break(),
+        }
+    }
+
+    pub fn compile(&self, compiler: &mut dyn CompilerVisitor) -> Result<(), Error> {
+        match self {
+            ASTNode::Module(module) => compiler.compile_module(&module),
+            ASTNode::Identifier(identifier) => compiler.compile_identifier(&identifier),
+            ASTNode::StringLiteral(string_literal) => {
+                compiler.compile_string_literal(string_literal)
+            }
+            ASTNode::MethodCall(method_call) => compiler.compile_method_call(&method_call),
+            ASTNode::Assignment(assignment) => compiler.compile_assignment(&assignment),
+            ASTNode::NumberLiteral(number_literal) => {
+                compiler.compile_number_literal(&number_literal)
+            }
+            ASTNode::MethodDef(method_def) => compiler.compile_method_def(&method_def),
+            ASTNode::ClassDef(class_def) => compiler.compile_class_def(&class_def),
+            ASTNode::Attribute(attribute) => compiler.compile_attribute(&attribute),
+            ASTNode::Compare(compare) => compiler.compile_compare(&compare),
+            ASTNode::If(if_node) => compiler.compile_if(&if_node),
+            ASTNode::Import(import) => compiler.compile_import(&import),
+            ASTNode::BinOp(bin_op) => compiler.compile_bin_op(&bin_op),
+            ASTNode::UnaryOp(unary_op) => compiler.compile_unary_op(&unary_op),
+            ASTNode::While(while_node) => compiler.compile_while(&while_node),
+            ASTNode::Break() => Ok(()), // Break does not need compilation
         }
     }
 }

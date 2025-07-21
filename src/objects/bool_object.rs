@@ -1,9 +1,8 @@
 use crate::errors::Error;
-use crate::interpreter::Interpreter;
-use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef};
-use crate::objects::string_object::StringObject;
+use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE};
+use crate::objects::string_object::{StringObject, STRING_TYPE};
 
-pub static BOOL_TYPE: &str = "Bool";
+use once_cell::sync::Lazy;
 
 pub struct BoolObject {
     pub ob_type: TypeRef,
@@ -16,23 +15,12 @@ impl KyaObjectTrait for BoolObject {
     }
 }
 
-pub fn create_bool_type(ob_type: TypeRef) -> TypeRef {
-    Type::as_ref(Type {
-        ob_type: Some(ob_type.clone()),
-        name: BOOL_TYPE.to_string(),
-        tp_repr: Some(bool_tp_repr),
-        nb_bool: Some(bool_nb_bool),
-        ..Default::default()
-    })
-}
-
 pub fn bool_tp_repr(
-    _interpreter: &mut Interpreter,
     callable: KyaObjectRef,
     _args: &mut Vec<KyaObjectRef>,
-    receiver: Option<KyaObjectRef>,
+    _receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
-    let object = callable.borrow();
+    let object = callable.lock().unwrap();
 
     if let KyaObject::BoolObject(obj) = &*object {
         let repr = if obj.value {
@@ -42,24 +30,34 @@ pub fn bool_tp_repr(
         };
 
         Ok(KyaObject::from_string_object(StringObject {
-            ob_type: _interpreter.get_type("String"),
+            ob_type: STRING_TYPE.clone(),
             value: repr,
         }))
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' is not a string",
-            object.get_type()?.borrow().name
+            object.get_type()?.lock().unwrap().name
         )))
     }
 }
 
-pub fn bool_nb_bool(_interpreter: &mut Interpreter, object: KyaObjectRef) -> Result<f64, Error> {
-    if let KyaObject::BoolObject(obj) = &*object.borrow() {
+pub fn bool_nb_bool(object: KyaObjectRef) -> Result<f64, Error> {
+    if let KyaObject::BoolObject(obj) = &*object.lock().unwrap() {
         Ok(if obj.value { 1.0 } else { 0.0 })
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' is not a bool",
-            object.borrow().get_type()?.borrow().name
+            object.lock().unwrap().get_type()?.lock().unwrap().name
         )))
     }
 }
+
+pub static BOOL_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    Type::as_ref(Type {
+        ob_type: Some(BASE_TYPE.clone()),
+        name: "Bool".to_string(),
+        tp_repr: Some(bool_tp_repr),
+        nb_bool: Some(bool_nb_bool),
+        ..Default::default()
+    })
+});
