@@ -1,5 +1,7 @@
 use crate::bytecode::{CodeObject, Opcode};
 use crate::errors::Error;
+use crate::objects::code_object::code_object_new;
+use crate::objects::function_object::function_new;
 use crate::objects::number_object::number_new;
 use crate::objects::string_object::string_new;
 use crate::{ast, visitor::CompilerVisitor};
@@ -24,11 +26,7 @@ impl Compiler {
     }
 
     pub fn get_output(&self) -> CodeObject {
-        CodeObject {
-            code: self.code.code.clone(),
-            consts: self.code.consts.clone(),
-            names: self.code.names.clone(),
-        }
+        self.code.clone()
     }
 
     fn store_variable(&mut self, name: String) {
@@ -48,9 +46,7 @@ impl Compiler {
 
 impl CompilerVisitor for Compiler {
     fn compile_module(&mut self, module: &ast::Module) -> Result<(), Error> {
-        for statement in &module.statements {
-            statement.compile(self)?;
-        }
+        module.block.compile(self)?;
 
         Ok(())
     }
@@ -92,6 +88,7 @@ impl CompilerVisitor for Compiler {
 
         if let ast::ASTNode::Identifier(identifier) = &*assignment.name {
             self.store_variable(identifier.name.clone());
+            self.load_variable(identifier.name.clone());
         } else {
             return Err(Error::CompilationError(
                 "Assignment name must be an identifier".to_string(),
@@ -113,6 +110,30 @@ impl CompilerVisitor for Compiler {
     }
 
     fn compile_method_def(&mut self, method_def: &ast::MethodDef) -> Result<(), Error> {
+        let mut compiler = Compiler::new(Arc::new(*method_def.body.clone()));
+        let _ = compiler.compile()?;
+        let mut code = compiler.get_output();
+
+        for param in &method_def.parameters {
+            if let ast::ASTNode::Identifier(identifier) = &**param {
+                code.args.push(identifier.name.clone());
+            } else {
+                return Err(Error::CompilationError(
+                    "Method parameters must be identifiers".to_string(),
+                ));
+            }
+        }
+
+        code.name = method_def.name.clone();
+
+        let code_object = code_object_new(Arc::new(code));
+
+        let index = self.code.add_const(code_object);
+        self.code.add_instruction(Opcode::LoadConst as u8);
+        self.code.add_instruction(index);
+
+        self.code.add_instruction(Opcode::MakeFunction as u8);
+
         Ok(())
     }
 
@@ -149,6 +170,18 @@ impl CompilerVisitor for Compiler {
     }
 
     fn compile_break(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn compile_block(&mut self, block: &ast::Block) -> Result<(), Error> {
+        for statement in &block.statements {
+            statement.compile(self)?;
+
+            if statement.is_expression() {
+                self.code.add_instruction(Opcode::PopTop as u8);
+            }
+        }
+
         Ok(())
     }
 }

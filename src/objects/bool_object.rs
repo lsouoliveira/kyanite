@@ -52,6 +52,13 @@ pub fn bool_nb_bool(object: KyaObjectRef) -> Result<f64, Error> {
     }
 }
 
+pub fn bool_new(value: bool) -> KyaObjectRef {
+    KyaObject::from_bool_object(BoolObject {
+        ob_type: BOOL_TYPE.clone(),
+        value,
+    })
+}
+
 pub static BOOL_TYPE: Lazy<TypeRef> = Lazy::new(|| {
     Type::as_ref(Type {
         ob_type: Some(BASE_TYPE.clone()),

@@ -35,9 +35,7 @@ impl Visitor for ASTDumper {
     fn visit_module(&mut self, module: &ast::Module) {
         self.concat("Module(");
         self.push_newline();
-        for statement in &module.statements {
-            statement.accept(self);
-        }
+        module.block.accept(self);
         self.push(")");
     }
 
@@ -76,19 +74,13 @@ impl Visitor for ASTDumper {
     fn visit_method_def(&mut self, method_def: &ast::MethodDef) {
         self.push(&format!("MethodDef({})", method_def.name));
         self.concat("body: [");
-        for statement in &method_def.body {
-            statement.accept(self);
-        }
-        self.push("]");
+        method_def.body.accept(self);
     }
 
     fn visit_class_def(&mut self, class_def: &ast::ClassDef) {
         self.push(&format!("ClassDef({})", class_def.name));
-        self.concat("body: [");
-        for statement in &class_def.body {
-            statement.accept(self);
-        }
-        self.push("]");
+        self.concat("body: ");
+        class_def.body.accept(self);
     }
 
     fn visit_attribute(&mut self, attribute: &ast::Attribute) {
@@ -115,11 +107,8 @@ impl Visitor for ASTDumper {
         self.push("If(");
         self.concat("test: ");
         if_statement.test.accept(self);
-        self.concat("body: [");
-        for statement in &if_statement.body {
-            statement.accept(self);
-        }
-        self.push("]");
+        self.concat("body: ");
+        if_statement.body.accept(self);
         self.push(")");
     }
 
@@ -154,15 +143,20 @@ impl Visitor for ASTDumper {
         self.push("While(");
         self.concat("condition: ");
         while_node.condition.accept(self);
-        self.concat("body: [");
-        for statement in &while_node.body {
-            statement.accept(self);
-        }
-        self.push("]");
+        self.concat("body: ");
+        while_node.body.accept(self);
         self.push(")");
     }
 
     fn visit_break(&mut self) {
         self.push("Break");
+    }
+
+    fn visit_block(&mut self, block: &ast::Block) {
+        self.push("Block(");
+        for statement in &block.statements {
+            statement.accept(self);
+        }
+        self.push(")");
     }
 }

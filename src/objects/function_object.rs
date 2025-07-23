@@ -1,14 +1,21 @@
-use crate::ast;
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+
+use crate::bytecode::CodeObject;
 use crate::errors::Error;
-use crate::interpreter::{Interpreter, NONE_TYPE};
-use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef};
-use crate::objects::string_object::StringObject;
+use crate::interpreter::{eval_frame, Frame};
+use crate::objects::base::{
+    DictRef, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE,
+};
+use crate::objects::none_object::none_new;
+use crate::objects::string_object::{StringObject, STRING_TYPE};
 
 pub struct FunctionObject {
     pub ob_type: TypeRef,
     pub name: String,
-    pub parameters: Vec<String>,
-    pub body: Vec<Box<ast::ASTNode>>,
+    pub code: Arc<CodeObject>,
+    pub globals: DictRef,
 }
 
 impl KyaObjectTrait for FunctionObject {
@@ -17,18 +24,7 @@ impl KyaObjectTrait for FunctionObject {
     }
 }
 
-pub fn create_function_type(ob_type: TypeRef) -> TypeRef {
-    Type::as_ref(Type {
-        ob_type: Some(ob_type.clone()),
-        name: "Function".to_string(),
-        tp_repr: Some(function_repr),
-        tp_call: Some(function_call),
-        ..Default::default()
-    })
-}
-
 pub fn function_repr(
-    _interpreter: &mut Interpreter,
     callable: KyaObjectRef,
     _args: &mut Vec<KyaObjectRef>,
     _receiver: Option<KyaObjectRef>,
@@ -37,7 +33,7 @@ pub fn function_repr(
 
     if let KyaObject::FunctionObject(_) = &*object {
         Ok(KyaObject::from_string_object(StringObject {
-            ob_type: _interpreter.get_type("String"),
+            ob_type: STRING_TYPE.clone(),
             value: format!(
                 "<function {} at {:p}>",
                 object.get_type()?.lock().unwrap().name,
@@ -53,46 +49,58 @@ pub fn function_repr(
 }
 
 pub fn function_call(
-    interpreter: &mut Interpreter,
     callable: KyaObjectRef,
     args: &mut Vec<KyaObjectRef>,
-    receiver: Option<KyaObjectRef>,
+    _receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
-    let object = callable.lock().unwrap();
+    if let KyaObject::FunctionObject(func) = &*callable.lock().unwrap() {
+        if func.code.args.len() != args.len() {
+            return Err(Error::RuntimeError(format!(
+                "Function '{}' expects {} arguments, but got {}",
+                func.name,
+                func.code.args.len(),
+                args.len()
+            )));
+        }
 
-    if let KyaObject::FunctionObject(func) = &*object {
-        // if func.parameters.len() != args.len() {
-        return Err(Error::RuntimeError(format!(
-            "Function '{}' expects {} arguments, but got {}",
-            func.name,
-            func.parameters.len(),
-            args.len()
-        )));
-        // }
+        let mut locals = HashMap::new();
 
-        // interpreter.push_next_frame();
-        //
-        // if let Some(receiver) = receiver {
-        //     interpreter.register("self", receiver);
-        // }
-        //
-        // for (param, arg) in func.parameters.iter().zip(args) {
-        //     interpreter.register(param, arg.clone());
-        // }
-        //
-        // let mut result = interpreter.resolve("None")?;
-        //
-        // for statement in &func.body {
-        //     result = statement.eval(interpreter)?;
-        // }
-        //
-        // interpreter.pop_frame();
+        for (i, arg) in func.code.args.iter().enumerate() {
+            locals.insert(arg.clone(), args[i].clone());
+        }
 
-        // Ok(interpreter.resolve(NONE_TYPE)?)
+        let mut frame_ref = Frame {
+            locals: Arc::new(Mutex::new(locals)),
+            globals: func.globals.clone(),
+            code: func.code.clone(),
+            pc: 0,
+            stack: vec![],
+        };
+
+        eval_frame(&mut frame_ref)
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' is not callable",
-            object.get_type()?.lock().unwrap().name
+            callable.lock().unwrap().get_type()?.lock().unwrap().name
         )))
     }
 }
+
+pub fn function_new(name: String, code: Arc<CodeObject>, globals: DictRef) -> KyaObjectRef {
+    KyaObject::from_function_object(FunctionObject {
+        ob_type: FUNCTION_TYPE.clone(),
+        name,
+        code,
+        globals,
+    })
+}
+
+pub static FUNCTION_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    Type::as_ref(Type {
+        ob_type: Some(BASE_TYPE.clone()),
+        name: "Function".to_string(),
+        tp_repr: Some(function_repr),
+        tp_call: Some(function_call),
+        ..Default::default()
+    })
+});

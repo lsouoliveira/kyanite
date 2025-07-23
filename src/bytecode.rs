@@ -8,19 +8,32 @@ pub enum Opcode {
     LoadName = 2,
     Call = 3,
     PopTop = 4,
+    MakeFunction = 5,
 }
 
-impl TryFrom<u8> for Opcode {
-    type Error = String;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
+impl Opcode {
+    pub fn from_u8(value: u8) -> Option<Self> {
         match value {
-            0 => Ok(Opcode::LoadConst),
-            1 => Ok(Opcode::StoreName),
-            2 => Ok(Opcode::LoadName),
-            3 => Ok(Opcode::Call),
-            4 => Ok(Opcode::PopTop),
-            _ => Err(format!("Invalid opcode: {}", value)),
+            0 => Some(Opcode::LoadConst),
+            1 => Some(Opcode::StoreName),
+            2 => Some(Opcode::LoadName),
+            3 => Some(Opcode::Call),
+            4 => Some(Opcode::PopTop),
+            5 => Some(Opcode::MakeFunction),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for Opcode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Opcode::LoadConst => write!(f, "LOAD_CONST"),
+            Opcode::StoreName => write!(f, "STORE_NAME"),
+            Opcode::LoadName => write!(f, "LOAD_NAME"),
+            Opcode::Call => write!(f, "CALL_FUNCTION"),
+            Opcode::PopTop => write!(f, "POP_TOP"),
+            Opcode::MakeFunction => write!(f, "MAKE_FUNCTION"),
         }
     }
 }
@@ -29,6 +42,8 @@ pub struct CodeObject {
     pub code: Vec<u8>,
     pub consts: Vec<KyaObjectRef>,
     pub names: Vec<String>,
+    pub args: Vec<String>,
+    pub name: String,
 }
 
 impl Clone for CodeObject {
@@ -37,6 +52,8 @@ impl Clone for CodeObject {
             code: self.code.clone(),
             consts: self.consts.clone(),
             names: self.names.clone(),
+            args: self.args.clone(),
+            name: self.name.clone(),
         }
     }
 }
@@ -47,6 +64,8 @@ impl CodeObject {
             code: Vec::new(),
             consts: Vec::new(),
             names: Vec::new(),
+            args: Vec::new(),
+            name: String::new(),
         }
     }
 
@@ -60,6 +79,12 @@ impl CodeObject {
     }
 
     pub fn add_name(&mut self, name: String) -> u8 {
+        for (index, existing_name) in self.names.iter().enumerate() {
+            if existing_name == &name {
+                return index as u8;
+            }
+        }
+
         self.names.push(name);
         (self.names.len() - 1) as u8
     }
@@ -119,6 +144,9 @@ impl Disassembler {
                 }
                 4 => {
                     pc = self.write_pop_top(pc);
+                }
+                5 => {
+                    pc = self.write_make_function(pc);
                 }
                 _ => {
                     panic!("Unknown opcode: {}", opcode);
@@ -184,6 +212,11 @@ impl Disassembler {
 
     fn write_pop_top(&mut self, pc: u8) -> u8 {
         self.output.push_str("POP_TOP");
+        pc + 1
+    }
+
+    fn write_make_function(&mut self, pc: u8) -> u8 {
+        self.output.push_str("MAKE_FUNCTION");
         pc + 1
     }
 }

@@ -1,6 +1,6 @@
 use crate::ast::{
-    Assignment, Attribute, BinOp, ClassDef, Compare, Identifier, If, Import, MethodCall, MethodDef,
-    Module, UnaryOp, While,
+    Assignment, Attribute, BinOp, Block, ClassDef, Compare, Identifier, If, Import, MethodCall,
+    MethodDef, Module, UnaryOp, While,
 };
 use crate::errors::Error;
 use crate::objects::base::KyaObjectRef;
@@ -22,25 +22,7 @@ pub trait Visitor {
     fn visit_unary_op(&mut self, unary_op: &UnaryOp);
     fn visit_while(&mut self, while_node: &While);
     fn visit_break(&mut self);
-}
-
-pub trait Evaluator {
-    fn eval_module(&mut self, module: &Module) -> Result<KyaObjectRef, Error>;
-    fn eval_identifier(&mut self, identifier: &Identifier) -> Result<KyaObjectRef, Error>;
-    fn eval_method_call(&mut self, method_call: &MethodCall) -> Result<KyaObjectRef, Error>;
-    fn eval_string_literal(&mut self, string_literal: &str) -> Result<KyaObjectRef, Error>;
-    fn eval_assignment(&mut self, assignment: &Assignment) -> Result<KyaObjectRef, Error>;
-    fn eval_number_literal(&mut self, number_literal: &f64) -> Result<KyaObjectRef, Error>;
-    fn eval_method_def(&mut self, method_def: &MethodDef) -> Result<KyaObjectRef, Error>;
-    fn eval_class_def(&mut self, class_def: &ClassDef) -> Result<KyaObjectRef, Error>;
-    fn eval_attribute(&mut self, attribute: &Attribute) -> Result<KyaObjectRef, Error>;
-    fn eval_compare(&mut self, compare: &Compare) -> Result<KyaObjectRef, Error>;
-    fn eval_if(&mut self, if_node: &If) -> Result<KyaObjectRef, Error>;
-    fn eval_import(&mut self, import: &Import) -> Result<KyaObjectRef, Error>;
-    fn eval_bin_op(&mut self, bin_op: &BinOp) -> Result<KyaObjectRef, Error>;
-    fn eval_unary_op(&mut self, unary_op: &UnaryOp) -> Result<KyaObjectRef, Error>;
-    fn eval_while(&mut self, while_node: &While) -> Result<KyaObjectRef, Error>;
-    fn eval_break(&mut self) -> Result<KyaObjectRef, Error>;
+    fn visit_block(&mut self, block: &Block);
 }
 
 pub trait CompilerVisitor {
@@ -60,4 +42,5 @@ pub trait CompilerVisitor {
     fn compile_unary_op(&mut self, unary_op: &UnaryOp) -> Result<(), Error>;
     fn compile_while(&mut self, while_node: &While) -> Result<(), Error>;
     fn compile_break(&mut self) -> Result<(), Error>;
+    fn compile_block(&mut self, block: &Block) -> Result<(), Error>;
 }

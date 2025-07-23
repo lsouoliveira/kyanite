@@ -3,14 +3,14 @@ use std::sync::{Arc, Mutex};
 
 use crate::ast;
 use crate::errors::Error;
-// use crate::interpreter::{Interpreter, METHOD_TYPE};
 use crate::objects::bool_object::BoolObject;
+use crate::objects::code_object::CodeObject;
 // use crate::objects::bytes_object::BytesObject;
 use crate::objects::class_object::{
     class_nb_bool, class_tp_call, class_tp_new, class_tp_repr, ClassObject,
 };
-// use crate::objects::function_object::FunctionObject;
-// use crate::objects::instance_object::InstanceObject;
+use crate::objects::function_object::FunctionObject;
+use crate::objects::instance_object::InstanceObject;
 // use crate::objects::method_object::MethodObject;
 // use crate::objects::modules::sockets::connection_object::ConnectionObject;
 // use crate::objects::modules::sockets::socket_object::SocketObject;
@@ -49,15 +49,16 @@ pub enum KyaObject {
     NoneObject(NoneObject),
     StringObject(StringObject),
     RsFunctionObject(RsFunctionObject),
-    // FunctionObject(FunctionObject),
+    FunctionObject(FunctionObject),
     NumberObject(NumberObject),
     ClassObject(ClassObject),
-    // InstanceObject(InstanceObject),
+    InstanceObject(InstanceObject),
     // MethodObject(MethodObject),
     // SocketObject(SocketObject),
     // ConnectionObject(ConnectionObject),
     // BytesObject(BytesObject),
     BoolObject(BoolObject),
+    CodeObject(CodeObject),
 }
 
 pub trait KyaObjectTrait {
@@ -277,15 +278,16 @@ impl KyaObject {
             KyaObject::NoneObject(obj) => Some(obj),
             KyaObject::StringObject(obj) => Some(obj),
             KyaObject::RsFunctionObject(obj) => Some(obj),
-            // KyaObject::FunctionObject(obj) => Some(obj),
+            KyaObject::FunctionObject(obj) => Some(obj),
             KyaObject::NumberObject(obj) => Some(obj),
             KyaObject::ClassObject(obj) => Some(obj),
-            // KyaObject::InstanceObject(obj) => Some(obj),
+            KyaObject::InstanceObject(obj) => Some(obj),
             // KyaObject::MethodObject(obj) => Some(obj),
             // KyaObject::SocketObject(obj) => Some(obj),
             // KyaObject::ConnectionObject(obj) => Some(obj),
             // KyaObject::BytesObject(obj) => Some(obj),
             KyaObject::BoolObject(obj) => Some(obj),
+            KyaObject::CodeObject(obj) => Some(obj),
             _ => None,
         }
     }
@@ -337,10 +339,10 @@ impl KyaObject {
         KyaObject::as_ref(KyaObject::RsFunctionObject(rs_function_object))
     }
 
-    // pub fn from_function_object(function_object: FunctionObject) -> KyaObjectRef {
-    //     KyaObject::as_ref(KyaObject::FunctionObject(function_object))
-    // }
-    //
+    pub fn from_function_object(function_object: FunctionObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::FunctionObject(function_object))
+    }
+
     pub fn from_string_object(string_object: StringObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::StringObject(string_object))
     }
@@ -352,11 +354,11 @@ impl KyaObject {
     pub fn from_class_object(class_object: ClassObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::ClassObject(class_object))
     }
-    //
-    // pub fn from_instance_object(instance_object: InstanceObject) -> KyaObjectRef {
-    //     KyaObject::as_ref(KyaObject::InstanceObject(instance_object))
-    // }
-    //
+
+    pub fn from_instance_object(instance_object: InstanceObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::InstanceObject(instance_object))
+    }
+
     // pub fn from_method_object(method_object: MethodObject) -> KyaObjectRef {
     //     KyaObject::as_ref(KyaObject::MethodObject(method_object))
     // }
@@ -376,6 +378,10 @@ impl KyaObject {
     pub fn from_bool_object(bool_object: BoolObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::BoolObject(bool_object))
     }
+
+    pub fn from_code_object(code_object: CodeObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::CodeObject(code_object))
+    }
 }
 
 impl Default for Type {
@@ -383,19 +389,13 @@ impl Default for Type {
         Type {
             ob_type: None,
             name: "Unknown".to_string(),
-            // tp_repr: Some(class_tp_repr),
-            // tp_call: Some(class_tp_call),
-            // tp_new: Some(class_tp_new),
-            tp_repr: None,
-            tp_call: None,
-            tp_new: None,
+            tp_repr: Some(class_tp_repr),
+            tp_call: Some(class_tp_call),
+            tp_new: Some(class_tp_new),
             tp_init: None,
-            // tp_get_attr: Some(generic_get_attr),
-            // tp_set_attr: Some(generic_set_attr),
-            // nb_bool: Some(class_nb_bool),
-            tp_get_attr: None,
-            tp_set_attr: None,
-            nb_bool: None,
+            tp_get_attr: Some(generic_get_attr),
+            tp_set_attr: Some(generic_set_attr),
+            nb_bool: Some(class_nb_bool),
             sq_len: None,
             tp_compare: None,
             dict: Arc::new(Mutex::new(std::collections::HashMap::new())),

@@ -1,7 +1,7 @@
 use crate::builtins::methods::kya_print;
 use crate::bytecode::{CodeObject, Opcode};
 use crate::errors::Error;
-use crate::objects::bool_object::BOOL_TYPE;
+use crate::objects::bool_object::{bool_new, BOOL_TYPE};
 // use crate::objects::bytes_object::create_bytes_type;
 use crate::objects::class_object::{class_new, ClassObject};
 // use crate::objects::function_object::{create_function_type, FunctionObject};
@@ -12,11 +12,10 @@ use crate::objects::class_object::{class_new, ClassObject};
 use crate::objects::none_object::{none_new, NONE_TYPE};
 use crate::objects::number_object::{kya_compare_numbers, NumberObject};
 use crate::objects::rs_function_object::rs_function_new;
-use crate::objects::string_object::StringObject;
+use crate::objects::string_object::{StringObject, STRING_TYPE};
 use crate::opcodes::OPCODE_HANDLERS;
 // use crate::objects::utils::{create_rs_function_object, kya_is_true};
 use crate::parser;
-use crate::visitor::Evaluator;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -25,17 +24,14 @@ use crate::objects::base::{
     DictRef, KyaObject, KyaObjectRef, Type, TypeDictRef, TypeRef, BASE_TYPE,
 };
 
-type FrameRef = Arc<Mutex<Frame>>;
-
 pub struct Interpreter {
     root: PathBuf,
-    frames: Vec<FrameRef>,
 }
 
 pub struct Frame {
     pub locals: DictRef,
     pub globals: DictRef,
-    pub code: CodeObject,
+    pub code: Arc<CodeObject>,
     pub pc: usize,
     pub stack: Vec<KyaObjectRef>,
 }
@@ -88,9 +84,13 @@ impl Frame {
         self.pc = self.pc + offset;
     }
 
-    pub fn next_opcode(&self) -> u8 {
+    pub fn next_opcode(&mut self) -> u8 {
         if self.pc < self.code.code.len() {
-            return self.code.instruction_at(self.pc);
+            let value = self.code.instruction_at(self.pc);
+
+            self.pc += 1;
+
+            return value;
         }
 
         panic!(
@@ -127,10 +127,14 @@ fn register_builtin_objects(frame: &mut Frame) {
 fn register_builtin_types(frame: &mut Frame) {
     let type_object = class_new(BASE_TYPE.clone());
     let none_type = class_new(NONE_TYPE.clone());
-    // // let rs_function_type = class_new(RS_FUNCTION_OBJE);
+    let string_class = class_new(STRING_TYPE.clone());
 
     frame.register_local("Type", type_object);
     frame.register_local("None", none_type);
+    frame.register_local("true", bool_new(true));
+    frame.register_local("false", bool_new(false));
+    frame.register_local("String", string_class);
+
     // frame.register_local(RS_FUNCTION_TYPE, rs_function_type);
 }
 
@@ -139,84 +143,47 @@ fn register_builtins(frame: &mut Frame) {
     register_builtin_objects(frame);
 }
 
-fn create_main_frame(code: CodeObject) -> FrameRef {
+fn create_main_frame(code: CodeObject) -> Frame {
     let globals = Arc::new(Mutex::new(HashMap::new()));
-    let frame_ref = Arc::new(Mutex::new(Frame {
+    let mut frame = Frame {
         locals: globals.clone(),
         globals,
-        code,
+        code: Arc::new(code),
         pc: 0,
         stack: vec![],
-    }));
+    };
 
-    register_builtins(&mut frame_ref.lock().unwrap());
+    register_builtins(&mut frame);
 
-    frame_ref
+    frame
 }
 
 impl Interpreter {
     pub fn new(root: &str) -> Self {
         let root_path = PathBuf::from(root);
 
-        Interpreter {
-            root: root_path,
-            frames: vec![],
-        }
-    }
-
-    pub fn current_frame(&self) -> FrameRef {
-        self.frames.last().unwrap().clone()
-    }
-
-    pub fn print_frames(&self) {
-        for (i, frame) in self.frames.iter().enumerate() {
-            for (name, _) in frame.lock().unwrap().locals.lock().unwrap().iter() {
-                println!("Frame {}: {}", i, name,);
-            }
-        }
-    }
-
-    pub fn push_frame(&mut self, frame: FrameRef) {
-        self.frames.push(frame);
-    }
-
-    pub fn push_empty_frame(&mut self) {
-        let frame_ref = Arc::new(Mutex::new(Frame {
-            locals: Arc::new(Mutex::new(HashMap::new())),
-            globals: self.current_frame().lock().unwrap().globals.clone(),
-            code: CodeObject {
-                consts: vec![],
-                names: vec![],
-                code: vec![],
-            },
-            pc: 0,
-            stack: vec![],
-        }));
-
-        self.push_frame(frame_ref);
-    }
-
-    pub fn pop_frame(&mut self) {
-        self.frames.pop();
+        Interpreter { root: root_path }
     }
 
     pub fn eval(&mut self, code_object: &CodeObject) -> Result<KyaObjectRef, Error> {
-        let frame = create_main_frame(code_object.clone());
+        let mut frame = create_main_frame(code_object.clone());
 
-        let result = self.eval_frame(&mut frame.lock().unwrap())?;
+        let result = eval_frame(&mut frame)?;
 
         Ok(result)
     }
+}
 
-    fn eval_frame(&mut self, frame: &mut Frame) -> Result<KyaObjectRef, Error> {
-        while frame.current_pc() < frame.current_code_length() {
-            let opcode = frame.next_opcode();
+pub fn eval_frame(frame: &mut Frame) -> Result<KyaObjectRef, Error> {
+    while frame.current_pc() < frame.current_code_length() {
+        let opcode = frame.next_opcode();
 
-            frame.increment_pc(1);
-
-            OPCODE_HANDLERS[opcode as usize](frame)?;
-        }
-
-        Ok(frame.resolve("None")?)
+        OPCODE_HANDLERS[opcode as usize](frame)?;
     }
+
+    if let Some(object) = frame.stack.last() {
+        return Ok(object.clone());
+    }
+
+    Ok(frame.resolve("None")?)
 }

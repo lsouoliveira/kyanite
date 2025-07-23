@@ -19,6 +19,12 @@ impl Parser {
     pub fn parse(&mut self) -> Result<ast::ASTNode, Error> {
         self.next_token().unwrap();
 
+        let block = self.parse_block()?;
+
+        Ok(ast::ASTNode::Module(ast::Module::new(block)))
+    }
+
+    fn parse_block(&mut self) -> Result<Box<ast::ASTNode>, Error> {
         let mut statements = Vec::new();
 
         while self.current_token.is_some() {
@@ -28,7 +34,7 @@ impl Parser {
             }
         }
 
-        Ok(ast::ASTNode::Module(ast::Module::new(statements)))
+        Ok(Box::new(ast::ASTNode::Block(ast::Block { statements })))
     }
 
     fn parse_statement(&mut self) -> Result<Box<ast::ASTNode>, Error> {
@@ -80,7 +86,10 @@ impl Parser {
             }
         }
 
-        let class_def = ast::ClassDef::new(identifier.value.clone(), body);
+        let class_def = ast::ClassDef::new(
+            identifier.value.clone(),
+            Box::new(ast::ASTNode::Block(ast::Block { statements: body })),
+        );
 
         Ok(Box::new(ast::ASTNode::ClassDef(class_def)))
     }
@@ -105,7 +114,10 @@ impl Parser {
             }
         }
 
-        let if_node = ast::If::new(test, body);
+        let if_node = ast::If::new(
+            test,
+            Box::new(ast::ASTNode::Block(ast::Block { statements: body })),
+        );
 
         Ok(Box::new(ast::ASTNode::If(if_node)))
     }
@@ -143,7 +155,10 @@ impl Parser {
             }
         }
 
-        let while_node = ast::While::new(condition, body);
+        let while_node = ast::While::new(
+            condition,
+            Box::new(ast::ASTNode::Block(ast::Block { statements: body })),
+        );
 
         Ok(Box::new(ast::ASTNode::While(while_node)))
     }
@@ -173,7 +188,11 @@ impl Parser {
             }
         }
 
-        let method_def = ast::MethodDef::new(identifier.value.clone(), parameters, body);
+        let method_def = ast::MethodDef::new(
+            identifier.value.clone(),
+            parameters,
+            Box::new(ast::ASTNode::Block(ast::Block { statements: body })),
+        );
 
         Ok(Box::new(ast::ASTNode::MethodDef(method_def)))
     }

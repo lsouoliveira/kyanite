@@ -1,7 +1,6 @@
 use crate::errors::Error;
 use crate::lexer::TokenType;
-use crate::objects::base::KyaObjectRef;
-use crate::visitor::{CompilerVisitor, Evaluator, Visitor};
+use crate::visitor::{CompilerVisitor, Visitor};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ASTNode {
@@ -9,6 +8,7 @@ pub enum ASTNode {
     // Statements
     While(While),
     Break(),
+    Block(Block),
     // Expressions
     Identifier(Identifier),
     StringLiteral(String),
@@ -44,12 +44,12 @@ impl ASTNode {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Module {
-    pub statements: Vec<Box<ASTNode>>,
+    pub block: Box<ASTNode>,
 }
 
 impl Module {
-    pub fn new(statements: Vec<Box<ASTNode>>) -> Self {
-        Module { statements }
+    pub fn new(block: Box<ASTNode>) -> Self {
+        Module { block }
     }
 }
 
@@ -86,11 +86,11 @@ impl Assignment {
 pub struct MethodDef {
     pub name: String,
     pub parameters: Vec<Box<ASTNode>>,
-    pub body: Vec<Box<ASTNode>>,
+    pub body: Box<ASTNode>,
 }
 
 impl MethodDef {
-    pub fn new(name: String, parameters: Vec<Box<ASTNode>>, body: Vec<Box<ASTNode>>) -> Self {
+    pub fn new(name: String, parameters: Vec<Box<ASTNode>>, body: Box<ASTNode>) -> Self {
         MethodDef {
             name,
             parameters,
@@ -102,11 +102,11 @@ impl MethodDef {
 #[derive(Debug, PartialEq, Clone)]
 pub struct ClassDef {
     pub name: String,
-    pub body: Vec<Box<ASTNode>>,
+    pub body: Box<ASTNode>,
 }
 
 impl ClassDef {
-    pub fn new(name: String, body: Vec<Box<ASTNode>>) -> Self {
+    pub fn new(name: String, body: Box<ASTNode>) -> Self {
         ClassDef { name, body }
     }
 }
@@ -138,11 +138,11 @@ pub struct Compare {
 #[derive(Debug, PartialEq, Clone)]
 pub struct If {
     pub test: Box<ASTNode>,
-    pub body: Vec<Box<ASTNode>>,
+    pub body: Box<ASTNode>,
 }
 
 impl If {
-    pub fn new(test: Box<ASTNode>, body: Vec<Box<ASTNode>>) -> Self {
+    pub fn new(test: Box<ASTNode>, body: Box<ASTNode>) -> Self {
         If { test, body }
     }
 }
@@ -161,12 +161,23 @@ impl Import {
 #[derive(Debug, PartialEq, Clone)]
 pub struct While {
     pub condition: Box<ASTNode>,
-    pub body: Vec<Box<ASTNode>>,
+    pub body: Box<ASTNode>,
 }
 
 impl While {
-    pub fn new(condition: Box<ASTNode>, body: Vec<Box<ASTNode>>) -> Self {
+    pub fn new(condition: Box<ASTNode>, body: Box<ASTNode>) -> Self {
         While { condition, body }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Block {
+    pub statements: Vec<Box<ASTNode>>,
+}
+
+impl Block {
+    pub fn new(statements: Vec<Box<ASTNode>>) -> Self {
+        Block { statements }
     }
 }
 
@@ -202,29 +213,7 @@ impl ASTNode {
             ASTNode::UnaryOp(unary_op) => visitor.visit_unary_op(&unary_op),
             ASTNode::While(while_node) => visitor.visit_while(&while_node),
             ASTNode::Break() => visitor.visit_break(),
-        }
-    }
-
-    pub fn eval(&self, evaluator: &mut dyn Evaluator) -> Result<KyaObjectRef, Error> {
-        match self {
-            ASTNode::Module(module) => evaluator.eval_module(&module),
-            ASTNode::Identifier(identifier) => evaluator.eval_identifier(&identifier),
-            ASTNode::StringLiteral(string_literal) => evaluator.eval_string_literal(string_literal),
-            ASTNode::MethodCall(method_call) => evaluator.eval_method_call(&method_call),
-            ASTNode::Assignment(assignment) => evaluator.eval_assignment(&assignment),
-            ASTNode::NumberLiteral(number_literal) => {
-                evaluator.eval_number_literal(&number_literal)
-            }
-            ASTNode::MethodDef(method_def) => evaluator.eval_method_def(&method_def),
-            ASTNode::ClassDef(class_def) => evaluator.eval_class_def(&class_def),
-            ASTNode::Attribute(attribute) => evaluator.eval_attribute(&attribute),
-            ASTNode::Compare(compare) => evaluator.eval_compare(&compare),
-            ASTNode::If(if_node) => evaluator.eval_if(&if_node),
-            ASTNode::Import(import) => evaluator.eval_import(&import),
-            ASTNode::BinOp(bin_op) => evaluator.eval_bin_op(&bin_op),
-            ASTNode::UnaryOp(unary_op) => evaluator.eval_unary_op(&unary_op),
-            ASTNode::While(while_node) => evaluator.eval_while(&while_node),
-            ASTNode::Break() => evaluator.eval_break(),
+            ASTNode::Block(block) => visitor.visit_block(&block),
         }
     }
 
@@ -249,7 +238,8 @@ impl ASTNode {
             ASTNode::BinOp(bin_op) => compiler.compile_bin_op(&bin_op),
             ASTNode::UnaryOp(unary_op) => compiler.compile_unary_op(&unary_op),
             ASTNode::While(while_node) => compiler.compile_while(&while_node),
-            ASTNode::Break() => Ok(()), // Break does not need compilation
+            ASTNode::Break() => Ok(()),
+            ASTNode::Block(block) => compiler.compile_block(&block),
         }
     }
 }

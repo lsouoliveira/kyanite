@@ -1,5 +1,7 @@
 use crate::errors::Error;
 use crate::interpreter::Frame;
+use crate::objects::base::KyaObject;
+use crate::objects::function_object::function_new;
 
 pub static OPCODE_HANDLERS: &[fn(&mut Frame) -> Result<(), Error>] = &[
     op_load_const,
@@ -7,6 +9,7 @@ pub static OPCODE_HANDLERS: &[fn(&mut Frame) -> Result<(), Error>] = &[
     op_load_name,
     op_call,
     op_pop_top,
+    op_make_function,
 ];
 
 fn op_load_const(frame: &mut Frame) -> Result<(), Error> {
@@ -16,7 +19,6 @@ fn op_load_const(frame: &mut Frame) -> Result<(), Error> {
     })?;
 
     frame.push_stack(const_value.clone());
-    frame.increment_pc(1);
 
     Ok(())
 }
@@ -30,7 +32,6 @@ fn op_load_name(frame: &mut Frame) -> Result<(), Error> {
     let object = frame.resolve(&name)?;
 
     frame.push_stack(object);
-    frame.increment_pc(1);
 
     Ok(())
 }
@@ -44,8 +45,6 @@ fn op_store_name(frame: &mut Frame) -> Result<(), Error> {
     let value = frame.pop_stack()?;
 
     frame.register_local(&name, value.clone());
-
-    frame.increment_pc(1);
 
     Ok(())
 }
@@ -61,19 +60,42 @@ fn op_call(frame: &mut Frame) -> Result<(), Error> {
 
     let callable = frame.pop_stack()?;
     let callable_type = callable.lock().unwrap().get_type()?;
+    let tp_call = callable_type.lock().unwrap().tp_call;
 
-    callable_type
-        .lock()
-        .unwrap()
-        .call(callable.clone(), &mut args, None)?;
+    if let Some(call_fn) = tp_call {
+        let result = call_fn(callable, &mut args, None)?;
 
-    frame.increment_pc(1);
+        frame.push_stack(result);
 
-    Ok(())
+        Ok(())
+    } else {
+        Err(Error::RuntimeError(format!(
+            "Object '{}' is not callable",
+            callable.lock().unwrap().get_type()?.lock().unwrap().name
+        )))
+    }
 }
 
 fn op_pop_top(frame: &mut Frame) -> Result<(), Error> {
     frame.pop_stack()?;
-    frame.increment_pc(1);
+    Ok(())
+}
+
+fn op_make_function(frame: &mut Frame) -> Result<(), Error> {
+    let code_object = frame.pop_stack()?;
+
+    if let KyaObject::CodeObject(c) = &*code_object.lock().unwrap() {
+        let code = c.code.clone();
+
+        let function_object = function_new(code.name.clone(), code.clone(), frame.globals.clone());
+
+        frame.register_local(&code.name, function_object.clone());
+    } else {
+        return Err(Error::RuntimeError(format!(
+            "Expected a CodeObject, but got '{}'",
+            code_object.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
+    }
+
     Ok(())
 }
