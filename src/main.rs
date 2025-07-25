@@ -7,6 +7,7 @@ mod errors;
 mod internal;
 mod interpreter;
 mod lexer;
+mod lock;
 mod objects;
 mod opcodes;
 mod parser;

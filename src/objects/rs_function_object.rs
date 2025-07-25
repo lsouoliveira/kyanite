@@ -30,18 +30,17 @@ pub fn rs_function_tp_call(
     args: &mut Vec<KyaObjectRef>,
     receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
-    let object = callable.clone();
-
-    if let KyaObject::RsFunctionObject(rs_function) = &*object.lock().unwrap() {
-        let result = (rs_function.function_ptr)(callable, args, receiver)?;
-
-        Ok(result)
+    let function_pointer = if let KyaObject::RsFunctionObject(function) = &*callable.lock().unwrap()
+    {
+        Ok(function.function_ptr.clone())
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' is not callable",
-            object.lock().unwrap().get_type()?.lock().unwrap().name
+            callable.lock().unwrap().get_type()?.lock().unwrap().name
         )))
-    }
+    }?;
+
+    (function_pointer)(callable.clone(), args, receiver)
 }
 
 pub fn rs_function_new(function_ptr: CallableFunctionPtr) -> KyaObjectRef {

@@ -10,6 +10,7 @@ pub static OPCODE_HANDLERS: &[fn(&mut Frame) -> Result<(), Error>] = &[
     op_call,
     op_pop_top,
     op_make_function,
+    op_load_attr,
 ];
 
 fn op_load_const(frame: &mut Frame) -> Result<(), Error> {
@@ -94,6 +95,33 @@ fn op_make_function(frame: &mut Frame) -> Result<(), Error> {
         return Err(Error::RuntimeError(format!(
             "Expected a CodeObject, but got '{}'",
             code_object.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
+    }
+
+    Ok(())
+}
+
+pub fn op_load_attr(frame: &mut Frame) -> Result<(), Error> {
+    let instance = frame.pop_stack()?;
+    let instance_type = instance.lock().unwrap().get_type()?;
+    let tp_get_attr = instance_type.lock().unwrap().tp_get_attr;
+
+    if let Some(get_attr_fn) = tp_get_attr {
+        let attr_name_index = frame.next_opcode() as usize;
+        let attr_name = frame.get_name(attr_name_index).ok_or_else(|| {
+            Error::RuntimeError(format!(
+                "Attribute at index {} not defined",
+                attr_name_index
+            ))
+        })?;
+
+        let result = get_attr_fn(instance, attr_name)?;
+
+        frame.push_stack(result);
+    } else {
+        return Err(Error::RuntimeError(format!(
+            "Object '{}' does not support attribute access",
+            instance_type.lock().unwrap().name
         )));
     }
 

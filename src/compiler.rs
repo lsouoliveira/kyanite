@@ -42,6 +42,12 @@ impl Compiler {
         self.code.add_instruction(Opcode::LoadName as u8);
         self.code.add_instruction(index);
     }
+
+    fn load_attr(&mut self, value: &str) {
+        self.code.add_instruction(Opcode::LoadAttr as u8);
+        let index = self.code.add_name(value.to_string());
+        self.code.add_instruction(index);
+    }
 }
 
 impl CompilerVisitor for Compiler {
@@ -142,6 +148,9 @@ impl CompilerVisitor for Compiler {
     }
 
     fn compile_attribute(&mut self, attribute: &ast::Attribute) -> Result<(), Error> {
+        attribute.name.compile(self)?;
+        self.load_attr(&attribute.value);
+
         Ok(())
     }
 

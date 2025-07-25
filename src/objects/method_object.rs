@@ -1,7 +1,7 @@
 use crate::errors::Error;
-use crate::interpreter::Interpreter;
-use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef};
-use crate::objects::string_object::StringObject;
+use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE};
+use crate::objects::string_object::string_new;
+use once_cell::sync::Lazy;
 
 pub struct MethodObject {
     pub ob_type: TypeRef,
@@ -15,18 +15,7 @@ impl KyaObjectTrait for MethodObject {
     }
 }
 
-pub fn create_method_type(ob_type: TypeRef) -> TypeRef {
-    Type::as_ref(Type {
-        ob_type: Some(ob_type.clone()),
-        name: "Method".to_string(),
-        tp_repr: Some(method_tp_repr),
-        tp_call: Some(method_tp_call),
-        ..Default::default()
-    })
-}
-
 pub fn method_tp_repr(
-    interpreter: &mut Interpreter,
     callable: KyaObjectRef,
     _args: &mut Vec<KyaObjectRef>,
     _receiver: Option<KyaObjectRef>,
@@ -36,18 +25,12 @@ pub fn method_tp_repr(
     if let KyaObject::MethodObject(method_object) = &*object {
         let instance_type = method_object.instance_object.lock().unwrap().get_type()?;
 
-        Ok(KyaObject::from_string_object(StringObject {
-            ob_type: interpreter.get_type("String"),
-            value: format!(
-                "<bound method {} of {}>",
-                instance_type.lock().unwrap().name,
-                format!(
-                    "<instance {} at {:p}>",
-                    instance_type.lock().unwrap().name,
-                    &*method_object.instance_object.lock().unwrap() as *const KyaObject
-                )
-            ),
-        }))
+        Ok(string_new(&format!(
+            "<{} method at {:p} for {}>",
+            object.get_type()?.lock().unwrap().name,
+            &*object as *const KyaObject,
+            instance_type.lock().unwrap().name
+        )))
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' is not a method",
@@ -57,26 +40,41 @@ pub fn method_tp_repr(
 }
 
 pub fn method_tp_call(
-    interpreter: &mut Interpreter,
     callable: KyaObjectRef,
     args: &mut Vec<KyaObjectRef>,
     _receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
-    let object = callable.lock().unwrap();
+    let function_object;
+    let instance_object;
 
-    if let KyaObject::MethodObject(method_object) = &*object {
-        let result = method_object.function.lock().unwrap().get_type()?.lock().unwrap().call(
-            interpreter,
-            method_object.function.clone(),
-            args,
-            Some(method_object.instance_object.clone()),
-        );
-
-        result
+    if let KyaObject::MethodObject(method_object) = &*callable.lock().unwrap() {
+        function_object = method_object.function.clone();
+        instance_object = method_object.instance_object.clone();
     } else {
-        Err(Error::RuntimeError(format!(
+        return Err(Error::RuntimeError(format!(
             "The object '{}' is not a method",
-            object.get_type()?.lock().unwrap().name
-        )))
+            callable.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
+    };
+
+    let function_type = function_object.lock().unwrap().get_type()?;
+    let tp_call = function_type.lock().unwrap().tp_call.clone();
+
+    if tp_call.is_none() {
+        return Err(Error::RuntimeError(format!("The method is not callable",)));
     }
+
+    let call_fn = tp_call.unwrap();
+
+    call_fn(function_object.clone(), args, Some(instance_object.clone()))
 }
+
+pub static METHOD_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    Type::as_ref(Type {
+        ob_type: Some(BASE_TYPE.clone()),
+        name: "Method".to_string(),
+        tp_repr: Some(method_tp_repr),
+        tp_call: Some(method_tp_call),
+        ..Default::default()
+    })
+});

@@ -1,9 +1,11 @@
 use crate::builtins::methods::kya_print;
 use crate::bytecode::{CodeObject, Opcode};
 use crate::errors::Error;
+use crate::lock::KYA_LOCK;
 use crate::objects::bool_object::{bool_new, BOOL_TYPE};
 // use crate::objects::bytes_object::create_bytes_type;
 use crate::objects::class_object::{class_new, ClassObject};
+use crate::objects::modules::threads::thread_object::THREAD_OBJECT;
 // use crate::objects::function_object::{create_function_type, FunctionObject};
 // use crate::objects::method_object::create_method_type;
 // use crate::objects::modules::sockets::connection_object::create_connection_type;
@@ -128,12 +130,14 @@ fn register_builtin_types(frame: &mut Frame) {
     let type_object = class_new(BASE_TYPE.clone());
     let none_type = class_new(NONE_TYPE.clone());
     let string_class = class_new(STRING_TYPE.clone());
+    let thread_class = class_new(THREAD_OBJECT.clone());
 
     frame.register_local("Type", type_object);
     frame.register_local("None", none_type);
     frame.register_local("true", bool_new(true));
     frame.register_local("false", bool_new(false));
     frame.register_local("String", string_class);
+    frame.register_local("Thread", thread_class);
 
     // frame.register_local(RS_FUNCTION_TYPE, rs_function_type);
 }
@@ -166,6 +170,8 @@ impl Interpreter {
     }
 
     pub fn eval(&mut self, code_object: &CodeObject) -> Result<KyaObjectRef, Error> {
+        let _lock = KYA_LOCK.lock().unwrap();
+
         let mut frame = create_main_frame(code_object.clone());
 
         let result = eval_frame(&mut frame)?;

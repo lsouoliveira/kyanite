@@ -9,6 +9,7 @@ pub enum Opcode {
     Call = 3,
     PopTop = 4,
     MakeFunction = 5,
+    LoadAttr = 6,
 }
 
 impl Opcode {
@@ -20,6 +21,7 @@ impl Opcode {
             3 => Some(Opcode::Call),
             4 => Some(Opcode::PopTop),
             5 => Some(Opcode::MakeFunction),
+            6 => Some(Opcode::LoadAttr),
             _ => None,
         }
     }
@@ -34,6 +36,7 @@ impl std::fmt::Display for Opcode {
             Opcode::Call => write!(f, "CALL_FUNCTION"),
             Opcode::PopTop => write!(f, "POP_TOP"),
             Opcode::MakeFunction => write!(f, "MAKE_FUNCTION"),
+            Opcode::LoadAttr => write!(f, "LOAD_ATTR"),
         }
     }
 }
@@ -148,6 +151,9 @@ impl Disassembler {
                 5 => {
                     pc = self.write_make_function(pc);
                 }
+                6 => {
+                    pc = self.write_load_attr(pc);
+                }
                 _ => {
                     panic!("Unknown opcode: {}", opcode);
                 }
@@ -218,5 +224,19 @@ impl Disassembler {
     fn write_make_function(&mut self, pc: u8) -> u8 {
         self.output.push_str("MAKE_FUNCTION");
         pc + 1
+    }
+
+    fn write_load_attr(&mut self, pc: u8) -> u8 {
+        let attr_index = self.instruction_at((pc + 1).into());
+        let attr_name = self
+            .code_object
+            .names
+            .get(attr_index as usize)
+            .expect("Attribute index out of bounds");
+
+        self.output
+            .push_str(&format!("LOAD_ATTR {} ({})", attr_index, attr_name));
+
+        pc + 2
     }
 }

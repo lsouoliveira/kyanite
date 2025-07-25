@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use crate::bytecode::CodeObject;
 use crate::errors::Error;
 use crate::interpreter::{eval_frame, Frame};
+use crate::lock::KYA_LOCK;
 use crate::objects::base::{
     DictRef, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE,
 };
