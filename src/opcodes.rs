@@ -65,6 +65,8 @@ fn op_call(frame: &mut Frame) -> Result<(), Error> {
         args.push(frame.pop_stack()?);
     }
 
+    let mut args = args.into_iter().rev().collect::<Vec<_>>();
+
     let callable = frame.pop_stack()?;
     let result = kya_call(callable, &mut args, None)?;
 

@@ -1,7 +1,6 @@
 use once_cell::sync::Lazy;
 use std::sync::{Arc, Mutex};
 
-use crate::ast;
 use crate::bytecode::ComparisonOperator;
 use crate::errors::Error;
 use crate::objects::bool_object::BoolObject;
@@ -13,9 +12,9 @@ use crate::objects::code_object::CodeObject;
 use crate::objects::function_object::FunctionObject;
 use crate::objects::instance_object::InstanceObject;
 use crate::objects::method_object::{MethodObject, METHOD_TYPE};
+use crate::objects::modules::sockets::connection_object::ConnectionObject;
+use crate::objects::modules::sockets::socket_object::SocketObject;
 use crate::objects::modules::threads::thread_object::ThreadObject;
-// use crate::objects::modules::sockets::connection_object::ConnectionObject;
-// use crate::objects::modules::sockets::socket_object::SocketObject;
 use crate::objects::none_object::NoneObject;
 use crate::objects::number_object::NumberObject;
 use crate::objects::rs_function_object::RsFunctionObject;
@@ -56,8 +55,8 @@ pub enum KyaObject {
     ClassObject(ClassObject),
     InstanceObject(InstanceObject),
     MethodObject(MethodObject),
-    // SocketObject(SocketObject),
-    // ConnectionObject(ConnectionObject),
+    SocketObject(SocketObject),
+    ConnectionObject(ConnectionObject),
     BytesObject(BytesObject),
     BoolObject(BoolObject),
     CodeObject(CodeObject),
@@ -259,8 +258,8 @@ impl KyaObject {
             KyaObject::ClassObject(obj) => Some(obj),
             KyaObject::InstanceObject(obj) => Some(obj),
             KyaObject::MethodObject(obj) => Some(obj),
-            // KyaObject::SocketObject(obj) => Some(obj),
-            // KyaObject::ConnectionObject(obj) => Some(obj),
+            KyaObject::SocketObject(obj) => Some(obj),
+            KyaObject::ConnectionObject(obj) => Some(obj),
             KyaObject::BytesObject(obj) => Some(obj),
             KyaObject::BoolObject(obj) => Some(obj),
             KyaObject::CodeObject(obj) => Some(obj),
@@ -340,14 +339,14 @@ impl KyaObject {
         KyaObject::as_ref(KyaObject::MethodObject(method_object))
     }
 
-    // pub fn from_socket_object(socket_object: SocketObject) -> KyaObjectRef {
-    //     KyaObject::as_ref(KyaObject::SocketObject(socket_object))
-    // }
-    //
-    // pub fn from_connection_object(connection_object: ConnectionObject) -> KyaObjectRef {
-    //     KyaObject::as_ref(KyaObject::ConnectionObject(connection_object))
-    // }
-    //
+    pub fn from_socket_object(socket_object: SocketObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::SocketObject(socket_object))
+    }
+
+    pub fn from_connection_object(connection_object: ConnectionObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::ConnectionObject(connection_object))
+    }
+
     pub fn from_bytes_object(bytes_object: BytesObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::BytesObject(bytes_object))
     }
@@ -532,6 +531,24 @@ pub fn kya_sq_len(obj: KyaObjectRef) -> Result<usize, Error> {
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' does not support length calculation",
+            ob_type.lock().unwrap().name
+        )))
+    }
+}
+
+pub fn kya_repr(
+    obj: KyaObjectRef,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let ob_type = obj.lock().unwrap().get_type()?;
+    let tp_repr = ob_type.lock().unwrap().tp_repr.clone();
+
+    if let Some(repr_fn) = tp_repr {
+        repr_fn(obj, args, receiver)
+    } else {
+        Err(Error::RuntimeError(format!(
+            "The object '{}' does not support representation",
             ob_type.lock().unwrap().name
         )))
     }

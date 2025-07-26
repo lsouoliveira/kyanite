@@ -4,12 +4,8 @@ use crate::errors::Error;
 use crate::lock::kya_acquire_lock;
 use crate::objects::bool_object::bool_new;
 use crate::objects::class_object::class_new;
+use crate::objects::modules::sockets::functions::kya_socket;
 use crate::objects::modules::threads::thread_object::THREAD_OBJECT;
-// use crate::objects::function_object::{create_function_type, FunctionObject};
-// use crate::objects::method_object::create_method_type;
-// use crate::objects::modules::sockets::connection_object::create_connection_type;
-// use crate::objects::modules::sockets::functions::kya_socket;
-// use crate::objects::modules::sockets::socket_object::create_socket_type;
 use crate::objects::none_object::none_new;
 use crate::objects::rs_function_object::rs_function_new;
 use crate::objects::string_object::STRING_TYPE;
@@ -19,10 +15,10 @@ use std::path::PathBuf;
 use std::sync::LazyLock as Lazy;
 use std::sync::{Arc, Mutex};
 
-static NONE_OBJECT: Lazy<KyaObjectRef> =
+pub static NONE_OBJECT: Lazy<KyaObjectRef> =
     Lazy::new(|| none_new().expect("Failed to create None object"));
-static TRUE_OBJECT: Lazy<KyaObjectRef> = Lazy::new(|| bool_new(true));
-static FALSE_OBJECT: Lazy<KyaObjectRef> = Lazy::new(|| bool_new(false));
+pub static TRUE_OBJECT: Lazy<KyaObjectRef> = Lazy::new(|| bool_new(true));
+pub static FALSE_OBJECT: Lazy<KyaObjectRef> = Lazy::new(|| bool_new(false));
 
 use crate::objects::base::{DictRef, KyaObjectRef, BASE_TYPE};
 
@@ -127,6 +123,7 @@ fn register_builtin_objects(frame: &mut Frame) {
     frame.register_local("None", NONE_OBJECT.clone());
     frame.register_local("true", TRUE_OBJECT.clone());
     frame.register_local("false", FALSE_OBJECT.clone());
+    frame.register_local("socket", rs_function_new(kya_socket));
 }
 
 fn register_builtin_types(frame: &mut Frame) {

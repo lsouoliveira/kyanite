@@ -1,14 +1,13 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use crate::errors::Error;
 use crate::internal::socket::Connection;
-use crate::interpreter::Interpreter;
-use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef};
-use crate::objects::bytes_object::BytesObject;
-use crate::objects::rs_function_object::RsFunctionObject;
+use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE};
+use crate::objects::bytes_object::bytes_new;
+use crate::objects::rs_function_object::rs_function_new;
 use crate::objects::utils::{number_object_to_float, parse_arg, parse_receiver};
+use once_cell::sync::Lazy;
+use std::sync::{Arc, Mutex};
 
 pub struct ConnectionObject {
     ob_type: TypeRef,
@@ -36,27 +35,14 @@ impl KyaObjectTrait for ConnectionObject {
     }
 }
 
-pub fn create_connection_type(ob_type: TypeRef, rs_function_type: TypeRef) -> TypeRef {
-    let dict = Rc::new(RefCell::new(HashMap::new()));
-
-    dict.lock_mut().insert(
-        "recv".to_string(),
-        KyaObject::from_rs_function_object(RsFunctionObject::new(
-            rs_function_type.clone(),
-            connection_read,
-        )),
-    );
-
-    Type::as_ref(Type {
-        ob_type: Some(ob_type.clone()),
-        name: "sockets.Connection".to_string(),
-        dict,
-        ..Default::default()
+pub fn connection_new(connection: Connection) -> KyaObjectRef {
+    KyaObject::from_connection_object(ConnectionObject {
+        ob_type: SOCKETS_CONNECTION_TYPE.clone(),
+        connection,
     })
 }
 
 pub fn connection_read(
-    interpreter: &mut Interpreter,
     _callable: KyaObjectRef,
     args: &mut Vec<KyaObjectRef>,
     receiver: Option<KyaObjectRef>,
@@ -65,16 +51,28 @@ pub fn connection_read(
     let arg = parse_arg(&args, 0, 1)?;
     let buffer_size = number_object_to_float(&arg)? as usize;
 
-    if let KyaObject::ConnectionObject(ref mut connection_obj) = *instance.lock_mut() {
+    if let KyaObject::ConnectionObject(ref mut connection_obj) = *instance.lock().unwrap() {
         let data = connection_obj.read(buffer_size)?;
 
-        Ok(KyaObject::from_bytes_object(BytesObject {
-            ob_type: interpreter.get_type("Bytes"),
-            value: data,
-        }))
+        Ok(bytes_new(data))
     } else {
         Err(Error::RuntimeError(
             "Expected a Connection object".to_string(),
         ))
     }
 }
+
+pub static SOCKETS_CONNECTION_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    let dict = Arc::new(Mutex::new(HashMap::new()));
+
+    dict.lock()
+        .unwrap()
+        .insert("recv".to_string(), rs_function_new(connection_read));
+
+    Type::as_ref(Type {
+        ob_type: Some(BASE_TYPE.clone()),
+        name: "sockets.Connection".to_string(),
+        dict,
+        ..Default::default()
+    })
+});

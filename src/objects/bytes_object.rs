@@ -21,6 +21,13 @@ impl KyaObjectTrait for BytesObject {
     }
 }
 
+pub fn bytes_new(value: Vec<u8>) -> KyaObjectRef {
+    KyaObject::from_bytes_object(BytesObject {
+        ob_type: BYTES_TYPE.clone(),
+        value,
+    })
+}
+
 pub fn bytes_tp_repr(
     callable: KyaObjectRef,
     _args: &mut Vec<KyaObjectRef>,

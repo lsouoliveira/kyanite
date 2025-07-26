@@ -1,38 +1,8 @@
-class Server
-    def constructor(host, port)
-        self.host = host
-        self.port = port
-        self.socket = socket()
-    end
+socket = socket()
+socket.bind("localhost", 8080)
+print("Server is listening on port 8080")
+connection = socket.accept()
 
-    def start
-        self.socket.bind(self.host, self.port)
+msg = connection.recv(1024)
 
-        print("Server started on ", self.host, ":", self.port)
-        
-        self.accept_connection()
-    end
-
-    def accept_connection
-        print("Waiting for a connection...")
-
-        connection = self.socket.accept()
-
-        self.process_connection(connection)
-    end
-
-    def process_connection(connection)
-        while true
-            msg = connection.recv(1024)
-
-            if msg.length() == 0
-                break
-            end
-
-            print("Received message: ", msg)
-        end
-    end
-end
-
-server = Server("localhost", 8080)
-server.start()
+print("Received message: ", msg)
