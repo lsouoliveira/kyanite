@@ -1,30 +1,30 @@
 use crate::builtins::methods::kya_print;
-use crate::bytecode::{CodeObject, Opcode};
+use crate::bytecode::CodeObject;
 use crate::errors::Error;
 use crate::lock::kya_acquire_lock;
-use crate::objects::bool_object::{bool_new, BOOL_TYPE};
-// use crate::objects::bytes_object::create_bytes_type;
-use crate::objects::class_object::{class_new, ClassObject};
+use crate::objects::bool_object::bool_new;
+use crate::objects::class_object::class_new;
 use crate::objects::modules::threads::thread_object::THREAD_OBJECT;
 // use crate::objects::function_object::{create_function_type, FunctionObject};
 // use crate::objects::method_object::create_method_type;
 // use crate::objects::modules::sockets::connection_object::create_connection_type;
 // use crate::objects::modules::sockets::functions::kya_socket;
 // use crate::objects::modules::sockets::socket_object::create_socket_type;
-use crate::objects::none_object::{none_new, NONE_TYPE};
-use crate::objects::number_object::{kya_compare_numbers, NumberObject};
+use crate::objects::none_object::none_new;
 use crate::objects::rs_function_object::rs_function_new;
-use crate::objects::string_object::{StringObject, STRING_TYPE};
+use crate::objects::string_object::STRING_TYPE;
 use crate::opcodes::OPCODE_HANDLERS;
-// use crate::objects::utils::{create_rs_function_object, kya_is_true};
-use crate::parser;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::LazyLock as Lazy;
 use std::sync::{Arc, Mutex};
 
-use crate::objects::base::{
-    DictRef, KyaObject, KyaObjectRef, Type, TypeDictRef, TypeRef, BASE_TYPE,
-};
+static NONE_OBJECT: Lazy<KyaObjectRef> =
+    Lazy::new(|| none_new().expect("Failed to create None object"));
+static TRUE_OBJECT: Lazy<KyaObjectRef> = Lazy::new(|| bool_new(true));
+static FALSE_OBJECT: Lazy<KyaObjectRef> = Lazy::new(|| bool_new(false));
+
+use crate::objects::base::{DictRef, KyaObjectRef, BASE_TYPE};
 
 pub struct Interpreter {
     root: PathBuf,
@@ -124,18 +124,17 @@ fn register_builtin_objects(frame: &mut Frame) {
     let print_rs_function_object = rs_function_new(kya_print);
 
     frame.register_local("print", print_rs_function_object);
+    frame.register_local("None", NONE_OBJECT.clone());
+    frame.register_local("true", TRUE_OBJECT.clone());
+    frame.register_local("false", FALSE_OBJECT.clone());
 }
 
 fn register_builtin_types(frame: &mut Frame) {
     let type_object = class_new(BASE_TYPE.clone());
-    let none_type = class_new(NONE_TYPE.clone());
     let string_class = class_new(STRING_TYPE.clone());
     let thread_class = class_new(THREAD_OBJECT.clone());
 
     frame.register_local("Type", type_object);
-    frame.register_local("None", none_type);
-    frame.register_local("true", bool_new(true));
-    frame.register_local("false", bool_new(false));
     frame.register_local("String", string_class);
     frame.register_local("Thread", thread_class);
 

@@ -1,4 +1,4 @@
-use crate::bytecode::{CodeObject, Opcode};
+use crate::bytecode::{CodeObject, ComparisonOperator, Opcode};
 use crate::errors::Error;
 use crate::objects::code_object::code_object_new;
 use crate::objects::function_object::function_new;
@@ -155,6 +155,12 @@ impl CompilerVisitor for Compiler {
     }
 
     fn compile_compare(&mut self, compare: &ast::Compare) -> Result<(), Error> {
+        compare.left.compile(self)?;
+        compare.right.compile(self)?;
+
+        self.code.add_instruction(Opcode::Compare as u8);
+        self.code.add_instruction(ComparisonOperator::Equal as u8);
+
         Ok(())
     }
 

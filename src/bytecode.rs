@@ -10,6 +10,30 @@ pub enum Opcode {
     PopTop = 4,
     MakeFunction = 5,
     LoadAttr = 6,
+    Compare = 7,
+}
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ComparisonOperator {
+    Equal = 0,
+}
+
+impl ComparisonOperator {
+    pub fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(ComparisonOperator::Equal),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for ComparisonOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ComparisonOperator::Equal => write!(f, "EQUAL"),
+        }
+    }
 }
 
 impl Opcode {
@@ -22,6 +46,7 @@ impl Opcode {
             4 => Some(Opcode::PopTop),
             5 => Some(Opcode::MakeFunction),
             6 => Some(Opcode::LoadAttr),
+            7 => Some(Opcode::Compare),
             _ => None,
         }
     }
@@ -37,6 +62,7 @@ impl std::fmt::Display for Opcode {
             Opcode::PopTop => write!(f, "POP_TOP"),
             Opcode::MakeFunction => write!(f, "MAKE_FUNCTION"),
             Opcode::LoadAttr => write!(f, "LOAD_ATTR"),
+            Opcode::Compare => write!(f, "COMPARE"),
         }
     }
 }
@@ -154,6 +180,9 @@ impl Disassembler {
                 6 => {
                     pc = self.write_load_attr(pc);
                 }
+                7 => {
+                    pc = self.write_compare(pc);
+                }
                 _ => {
                     panic!("Unknown opcode: {}", opcode);
                 }
@@ -236,6 +265,15 @@ impl Disassembler {
 
         self.output
             .push_str(&format!("LOAD_ATTR {} ({})", attr_index, attr_name));
+
+        pc + 2
+    }
+
+    fn write_compare(&mut self, pc: u8) -> u8 {
+        let op_index = self.instruction_at((pc + 1).into());
+        let op = ComparisonOperator::from_u8(op_index).expect("Invalid comparison operation index");
+
+        self.output.push_str(&format!("COMPARE {}", op));
 
         pc + 2
     }

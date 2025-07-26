@@ -1,6 +1,7 @@
+use crate::bytecode::ComparisonOperator;
 use crate::errors::Error;
 use crate::interpreter::Frame;
-use crate::objects::base::{kya_call, KyaObject};
+use crate::objects::base::{kya_call, kya_compare, KyaObject};
 use crate::objects::function_object::function_new;
 
 pub static OPCODE_HANDLERS: &[fn(&mut Frame) -> Result<(), Error>] = &[
@@ -11,6 +12,7 @@ pub static OPCODE_HANDLERS: &[fn(&mut Frame) -> Result<(), Error>] = &[
     op_pop_top,
     op_make_function,
     op_load_attr,
+    op_compare,
 ];
 
 fn op_load_const(frame: &mut Frame) -> Result<(), Error> {
@@ -114,6 +116,20 @@ pub fn op_load_attr(frame: &mut Frame) -> Result<(), Error> {
             instance_type.lock().unwrap().name
         )));
     }
+
+    Ok(())
+}
+
+pub fn op_compare(frame: &mut Frame) -> Result<(), Error> {
+    let right = frame.pop_stack()?;
+    let left = frame.pop_stack()?;
+    let op = frame.next_opcode();
+    let operator = ComparisonOperator::from_u8(op)
+        .ok_or_else(|| Error::RuntimeError(format!("Invalid comparison operator: {}", op)))?;
+
+    let result = kya_compare(left, right, operator)?;
+
+    frame.push_stack(result);
 
     Ok(())
 }

@@ -1,5 +1,6 @@
-use crate::ast;
+use crate::bytecode::ComparisonOperator;
 use crate::errors::Error;
+
 use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE};
 use crate::objects::bool_object::{BoolObject, BOOL_TYPE};
 use crate::objects::string_object::{StringObject, STRING_TYPE};
@@ -51,7 +52,7 @@ pub fn number_nb_bool(object: KyaObjectRef) -> Result<f64, Error> {
 pub fn number_tp_compare(
     obj1: KyaObjectRef,
     obj2: KyaObjectRef,
-    _operator: ast::Operator,
+    _operator: ComparisonOperator,
 ) -> Result<KyaObjectRef, Error> {
     if let (KyaObject::NumberObject(num1), KyaObject::NumberObject(num2)) =
         (&*obj1.lock().unwrap(), &*obj2.lock().unwrap())
@@ -67,20 +68,6 @@ pub fn number_tp_compare(
             obj2.lock().unwrap().get_type()?.lock().unwrap().name
         )));
     }
-}
-
-pub fn kya_compare_numbers(
-    obj1: KyaObjectRef,
-    obj2: KyaObjectRef,
-    operator: ast::Operator,
-) -> Result<KyaObjectRef, Error> {
-    obj1.lock()
-        .unwrap()
-        .get_type()?
-        .lock()
-        .unwrap()
-        .tp_compare(obj1.clone(), obj2, operator)
-        .map_err(|e| Error::RuntimeError(format!("Error comparing numbers: {}", e)))
 }
 
 pub fn number_new(value: f64) -> KyaObjectRef {

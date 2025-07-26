@@ -2,6 +2,7 @@ use once_cell::sync::Lazy;
 use std::sync::{Arc, Mutex};
 
 use crate::ast;
+use crate::bytecode::ComparisonOperator;
 use crate::errors::Error;
 use crate::objects::bool_object::BoolObject;
 use crate::objects::code_object::CodeObject;
@@ -41,7 +42,7 @@ pub type LenFunctionPtr = fn(obj: KyaObjectRef) -> Result<usize, Error>;
 pub type CompareFunctionPtr = fn(
     obj1: KyaObjectRef,
     obj2: KyaObjectRef,
-    operator: ast::Operator,
+    operator: ComparisonOperator,
 ) -> Result<KyaObjectRef, Error>;
 pub type SetAttrFunctionPtr =
     fn(obj: KyaObjectRef, attr_name: String, value: KyaObjectRef) -> Result<(), Error>;
@@ -244,22 +245,6 @@ impl Type {
         } else {
             Err(Error::RuntimeError(format!(
                 "The object '{}' does not support length calculation",
-                self.name
-            )))
-        }
-    }
-
-    pub fn tp_compare(
-        &self,
-        obj1: KyaObjectRef,
-        obj2: KyaObjectRef,
-        operator: ast::Operator,
-    ) -> Result<KyaObjectRef, Error> {
-        if let Some(compare_fn) = self.tp_compare {
-            compare_fn(obj1, obj2, operator)
-        } else {
-            Err(Error::RuntimeError(format!(
-                "The object '{}' does not support comparison",
                 self.name
             )))
         }
@@ -512,6 +497,38 @@ pub fn kya_call(
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' is not callable",
+            ob_type.lock().unwrap().name
+        )))
+    }
+}
+
+pub fn kya_compare(
+    obj1: KyaObjectRef,
+    obj2: KyaObjectRef,
+    operator: ComparisonOperator,
+) -> Result<KyaObjectRef, Error> {
+    let ob_type = obj1.lock().unwrap().get_type()?;
+    let tp_compare = ob_type.lock().unwrap().tp_compare.clone();
+
+    if let Some(compare_fn) = tp_compare {
+        compare_fn(obj1, obj2, operator)
+    } else {
+        Err(Error::RuntimeError(format!(
+            "The object '{}' does not support comparison",
+            ob_type.lock().unwrap().name
+        )))
+    }
+}
+
+pub fn kya_nb_bool(obj: KyaObjectRef) -> Result<f64, Error> {
+    let ob_type = obj.lock().unwrap().get_type()?;
+    let nb_bool_fn = ob_type.lock().unwrap().nb_bool.clone();
+
+    if let Some(nb_bool_fn) = nb_bool_fn {
+        nb_bool_fn(obj)
+    } else {
+        Err(Error::RuntimeError(format!(
+            "The object '{}' does not support boolean conversion",
             ob_type.lock().unwrap().name
         )))
     }
