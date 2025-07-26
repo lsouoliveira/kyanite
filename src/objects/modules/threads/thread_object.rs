@@ -1,5 +1,5 @@
 use crate::errors::Error;
-use crate::lock::KYA_LOCK;
+use crate::lock::{kya_acquire_lock, kya_release_lock};
 use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE};
 use crate::objects::none_object::none_new;
 use crate::objects::rs_function_object::rs_function_new;
@@ -73,8 +73,6 @@ pub fn thread_start(
     args: &mut Vec<KyaObjectRef>,
     receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
-    println!("Thread.start() called");
-
     if args.len() != 0 {
         return Err(Error::RuntimeError(
             "Thread.start() takes no arguments".to_string(),
@@ -101,9 +99,13 @@ pub fn thread_start(
         }
 
         let thread_handle = thread::spawn(move || {
-            let _lock = KYA_LOCK.lock().unwrap();
+            kya_acquire_lock();
 
-            tp_call.unwrap()(target.clone(), &mut vec![], None)
+            let result = tp_call.unwrap()(target.clone(), &mut vec![], None);
+
+            kya_release_lock();
+
+            result
         });
 
         thread_obj.thread_handle = Some(thread_handle);
@@ -137,9 +139,14 @@ pub fn thread_join(
 
     if let KyaObject::ThreadObject(ref mut thread_obj) = *receiver.lock().unwrap() {
         if let Some(handle) = thread_obj.thread_handle.take() {
+            kya_release_lock();
+
             let _ = handle
                 .join()
                 .map_err(|_| Error::RuntimeError("Thread join failed".to_string()))?;
+
+            kya_acquire_lock();
+
             Ok(none_new()?)
         } else {
             Err(Error::RuntimeError(

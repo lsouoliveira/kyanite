@@ -1,7 +1,7 @@
 use crate::builtins::methods::kya_print;
 use crate::bytecode::{CodeObject, Opcode};
 use crate::errors::Error;
-use crate::lock::KYA_LOCK;
+use crate::lock::kya_acquire_lock;
 use crate::objects::bool_object::{bool_new, BOOL_TYPE};
 // use crate::objects::bytes_object::create_bytes_type;
 use crate::objects::class_object::{class_new, ClassObject};
@@ -170,7 +170,7 @@ impl Interpreter {
     }
 
     pub fn eval(&mut self, code_object: &CodeObject) -> Result<KyaObjectRef, Error> {
-        let _lock = KYA_LOCK.lock().unwrap();
+        kya_acquire_lock();
 
         let mut frame = create_main_frame(code_object.clone());
 

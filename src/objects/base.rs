@@ -498,3 +498,21 @@ pub static BASE_TYPE: Lazy<TypeRef> = Lazy::new(|| {
 
     base_type
 });
+
+pub fn kya_call(
+    object: KyaObjectRef,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let ob_type = object.lock().unwrap().get_type()?;
+    let tp_call = ob_type.lock().unwrap().tp_call.clone();
+
+    if let Some(callable_fn) = tp_call {
+        callable_fn(object, args, receiver)
+    } else {
+        Err(Error::RuntimeError(format!(
+            "The object '{}' is not callable",
+            ob_type.lock().unwrap().name
+        )))
+    }
+}

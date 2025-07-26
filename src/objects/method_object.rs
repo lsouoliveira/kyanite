@@ -1,5 +1,7 @@
 use crate::errors::Error;
-use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE};
+use crate::objects::base::{
+    kya_call, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE,
+};
 use crate::objects::string_object::string_new;
 use once_cell::sync::Lazy;
 
@@ -57,16 +59,7 @@ pub fn method_tp_call(
         )));
     };
 
-    let function_type = function_object.lock().unwrap().get_type()?;
-    let tp_call = function_type.lock().unwrap().tp_call.clone();
-
-    if tp_call.is_none() {
-        return Err(Error::RuntimeError(format!("The method is not callable",)));
-    }
-
-    let call_fn = tp_call.unwrap();
-
-    call_fn(function_object.clone(), args, Some(instance_object.clone()))
+    kya_call(function_object, args, Some(instance_object))
 }
 
 pub static METHOD_TYPE: Lazy<TypeRef> = Lazy::new(|| {
