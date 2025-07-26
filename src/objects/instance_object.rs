@@ -1,6 +1,6 @@
 use crate::errors::Error;
 use crate::objects::base::{
-    DictRef, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE,
+    kya_call, DictRef, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE,
 };
 // use crate::objects::method_object::MethodObject;
 use crate::objects::string_object::{StringObject, STRING_TYPE};
@@ -55,17 +55,7 @@ pub fn instance_tp_init(
             .cloned();
 
         if let Some(init) = constructor_option {
-            let init_type = init.lock().unwrap().get_type()?;
-            let tp_call = init_type.lock().unwrap().tp_call;
-
-            if tp_call.is_none() {
-                return Err(Error::RuntimeError(format!(
-                    "The object '{}' has no callable constructor",
-                    object.get_type()?.lock().unwrap().name
-                )));
-            }
-
-            let result = tp_call.unwrap()(init.clone(), args, receiver);
+            let result = kya_call(init, args, receiver);
 
             result
         } else {

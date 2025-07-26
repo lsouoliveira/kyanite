@@ -1,6 +1,8 @@
 use crate::errors::Error;
 use crate::lock::{kya_acquire_lock, kya_release_lock};
-use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE};
+use crate::objects::base::{
+    kya_call, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE,
+};
 use crate::objects::none_object::none_new;
 use crate::objects::rs_function_object::rs_function_new;
 use crate::objects::string_object::string_new;
@@ -89,19 +91,11 @@ pub fn thread_start(
 
     if let KyaObject::ThreadObject(ref mut thread_obj) = *receiver.lock().unwrap() {
         let target = thread_obj.target.clone();
-        let function_type = target.lock().unwrap().get_type()?;
-        let tp_call = function_type.lock().unwrap().tp_call;
-
-        if tp_call.is_none() {
-            return Err(Error::RuntimeError(
-                "Thread type does not have a callable method".to_string(),
-            ));
-        }
 
         let thread_handle = thread::spawn(move || {
             kya_acquire_lock();
 
-            let result = tp_call.unwrap()(target.clone(), &mut vec![], None);
+            let result = kya_call(target.clone(), &mut vec![], None);
 
             kya_release_lock();
 

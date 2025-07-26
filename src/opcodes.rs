@@ -1,6 +1,6 @@
 use crate::errors::Error;
 use crate::interpreter::Frame;
-use crate::objects::base::KyaObject;
+use crate::objects::base::{kya_call, KyaObject};
 use crate::objects::function_object::function_new;
 
 pub static OPCODE_HANDLERS: &[fn(&mut Frame) -> Result<(), Error>] = &[
@@ -60,21 +60,11 @@ fn op_call(frame: &mut Frame) -> Result<(), Error> {
     }
 
     let callable = frame.pop_stack()?;
-    let callable_type = callable.lock().unwrap().get_type()?;
-    let tp_call = callable_type.lock().unwrap().tp_call;
+    let result = kya_call(callable, &mut args, None)?;
 
-    if let Some(call_fn) = tp_call {
-        let result = call_fn(callable, &mut args, None)?;
+    frame.push_stack(result);
 
-        frame.push_stack(result);
-
-        Ok(())
-    } else {
-        Err(Error::RuntimeError(format!(
-            "Object '{}' is not callable",
-            callable.lock().unwrap().get_type()?.lock().unwrap().name
-        )))
-    }
+    Ok(())
 }
 
 fn op_pop_top(frame: &mut Frame) -> Result<(), Error> {
