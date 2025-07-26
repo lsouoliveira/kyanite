@@ -11,6 +11,7 @@ use crate::objects::class_object::{
 use crate::objects::code_object::CodeObject;
 use crate::objects::function_object::FunctionObject;
 use crate::objects::instance_object::InstanceObject;
+use crate::objects::list_object::ListObject;
 use crate::objects::method_object::{MethodObject, METHOD_TYPE};
 use crate::objects::modules::sockets::connection_object::ConnectionObject;
 use crate::objects::modules::sockets::socket_object::SocketObject;
@@ -61,6 +62,7 @@ pub enum KyaObject {
     BoolObject(BoolObject),
     CodeObject(CodeObject),
     ThreadObject(ThreadObject),
+    ListObject(ListObject),
 }
 
 pub trait KyaObjectTrait {
@@ -264,6 +266,7 @@ impl KyaObject {
             KyaObject::BoolObject(obj) => Some(obj),
             KyaObject::CodeObject(obj) => Some(obj),
             KyaObject::ThreadObject(obj) => Some(obj),
+            KyaObject::ListObject(obj) => Some(obj),
             _ => None,
         }
     }
@@ -361,6 +364,10 @@ impl KyaObject {
 
     pub fn from_thread_object(thread_object: ThreadObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::ThreadObject(thread_object))
+    }
+
+    pub fn from_list_object(list_object: ListObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::ListObject(list_object))
     }
 }
 
@@ -549,6 +556,24 @@ pub fn kya_repr(
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' does not support representation",
+            ob_type.lock().unwrap().name
+        )))
+    }
+}
+
+pub fn kya_init(
+    obj: KyaObjectRef,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let ob_type = obj.lock().unwrap().get_type()?;
+    let tp_init = ob_type.lock().unwrap().tp_init.clone();
+
+    if let Some(init_fn) = tp_init {
+        init_fn(obj, args, receiver)
+    } else {
+        Err(Error::RuntimeError(format!(
+            "The object '{}' cannot be initialized",
             ob_type.lock().unwrap().name
         )))
     }
