@@ -51,7 +51,7 @@ pub fn function_repr(
 pub fn function_call(
     callable: KyaObjectRef,
     args: &mut Vec<KyaObjectRef>,
-    _receiver: Option<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     if let KyaObject::FunctionObject(func) = &*callable.lock().unwrap() {
         if func.code.args.len() != args.len() {
@@ -64,6 +64,10 @@ pub fn function_call(
         }
 
         let mut locals = HashMap::new();
+
+        if let Some(receiver_obj) = receiver {
+            locals.insert("self".to_string(), receiver_obj);
+        }
 
         for (i, arg) in func.code.args.iter().enumerate() {
             locals.insert(arg.clone(), args[i].clone());

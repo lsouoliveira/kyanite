@@ -6,7 +6,7 @@ use crate::errors::Error;
 use crate::objects::bool_object::BoolObject;
 use crate::objects::bytes_object::BytesObject;
 use crate::objects::class_object::{
-    class_nb_bool, class_tp_call, class_tp_new, class_tp_repr, ClassObject,
+    class_nb_bool, class_tp_call, class_tp_init, class_tp_new, class_tp_repr, ClassObject,
 };
 use crate::objects::code_object::CodeObject;
 use crate::objects::function_object::FunctionObject;
@@ -386,7 +386,7 @@ impl Default for Type {
             tp_repr: Some(class_tp_repr),
             tp_call: Some(class_tp_call),
             tp_new: Some(class_tp_new),
-            tp_init: None,
+            tp_init: Some(class_tp_init),
             tp_get_attr: Some(generic_get_attr),
             tp_set_attr: Some(generic_set_attr),
             nb_bool: Some(class_nb_bool),
@@ -582,6 +582,57 @@ pub fn kya_init(
         Err(Error::RuntimeError(format!(
             "The object '{}' cannot be initialized",
             ob_type.lock().unwrap().name
+        )))
+    }
+}
+
+pub fn kya_get_attr(obj: KyaObjectRef, attr_name: String) -> Result<KyaObjectRef, Error> {
+    let ob_type = obj.lock().unwrap().get_type()?;
+    let tp_get_attr = ob_type.lock().unwrap().tp_get_attr.clone();
+
+    if let Some(get_attr_fn) = tp_get_attr {
+        get_attr_fn(obj, attr_name)
+    } else {
+        Err(Error::RuntimeError(format!(
+            "The object '{}' has no attribute '{}'",
+            ob_type.lock().unwrap().name,
+            attr_name
+        )))
+    }
+}
+
+pub fn kya_set_attr(
+    obj: KyaObjectRef,
+    attr_name: String,
+    value: KyaObjectRef,
+) -> Result<(), Error> {
+    let ob_type = obj.lock().unwrap().get_type()?;
+    let tp_set_attr = ob_type.lock().unwrap().tp_set_attr.clone();
+
+    if let Some(set_attr_fn) = tp_set_attr {
+        set_attr_fn(obj, attr_name, value)
+    } else {
+        Err(Error::RuntimeError(format!(
+            "The object '{}' cannot set attribute '{}'",
+            ob_type.lock().unwrap().name,
+            attr_name
+        )))
+    }
+}
+
+pub fn kya_new(
+    ob_type: TypeRef,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let type_obj = ob_type.lock().unwrap();
+
+    if let Some(new_fn) = type_obj.tp_new {
+        new_fn(ob_type.clone(), args, receiver)
+    } else {
+        Err(Error::RuntimeError(format!(
+            "The object '{}' cannot be instantiated",
+            type_obj.name
         )))
     }
 }

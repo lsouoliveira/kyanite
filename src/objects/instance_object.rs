@@ -2,12 +2,9 @@ use crate::errors::Error;
 use crate::objects::base::{
     kya_call, DictRef, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE,
 };
-// use crate::objects::method_object::MethodObject;
+use crate::objects::method_object::{MethodObject, METHOD_TYPE};
 use crate::objects::string_object::{StringObject, STRING_TYPE};
-use crate::objects::utils::parse_arg;
-use once_cell::sync::Lazy;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub struct InstanceObject {
     pub ob_type: TypeRef,
@@ -20,60 +17,47 @@ impl KyaObjectTrait for InstanceObject {
     }
 }
 
-pub fn instance_new(
-    ob_type: TypeRef,
-    args: &mut Vec<KyaObjectRef>,
-    _receiver: Option<KyaObjectRef>,
-) -> Result<KyaObjectRef, Error> {
-    let _arg = parse_arg(&args, 0, 1)?;
-
-    Ok(KyaObject::from_instance_object(InstanceObject {
-        ob_type,
-        dict: Arc::new(Mutex::new(HashMap::new())),
-    }))
-}
-
 pub fn instance_tp_init(
     callable: KyaObjectRef,
     args: &mut Vec<KyaObjectRef>,
     receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
-    let object = callable.lock().unwrap();
-
-    if let KyaObject::InstanceObject(_) = &*object {
-        let constructor_option = object
-            .get_type()?
-            .lock()
-            .unwrap()
-            .parent()?
-            .lock()
-            .unwrap()
-            .dict
-            .lock()
-            .unwrap()
-            .get("constructor")
-            .cloned();
-
-        if let Some(init) = constructor_option {
-            let result = kya_call(init, args, receiver);
-
-            result
-        } else {
-            if args.is_empty() {
-                Ok(callable.clone())
-            } else {
-                Err(Error::RuntimeError(format!(
-                    "The object '{}' takes no arguments, but {} were given",
-                    object.get_type()?.lock().unwrap().name,
-                    args.len()
-                )))
-            }
-        }
-    } else {
-        Err(Error::RuntimeError(format!(
+    if !matches!(&*callable.lock().unwrap(), KyaObject::InstanceObject(_)) {
+        return Err(Error::RuntimeError(format!(
             "The object '{}' is not a instance",
-            object.get_type()?.lock().unwrap().name
-        )))
+            callable.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
+    }
+
+    let constructor = callable
+        .lock()
+        .unwrap()
+        .get_type()?
+        .lock()
+        .unwrap()
+        .parent()?
+        .lock()
+        .unwrap()
+        .dict
+        .lock()
+        .unwrap()
+        .get("constructor")
+        .cloned();
+
+    if let Some(init) = constructor {
+        let result = kya_call(init, args, receiver);
+
+        result
+    } else {
+        if args.is_empty() {
+            Ok(callable.clone())
+        } else {
+            Err(Error::RuntimeError(format!(
+                "The object '{}' takes no arguments, but {} were given",
+                callable.lock().unwrap().get_type()?.lock().unwrap().name,
+                args.len()
+            )))
+        }
     }
 }
 
@@ -138,51 +122,48 @@ pub fn instance_default_repr(
 }
 
 pub fn instance_tp_get_attr(obj: KyaObjectRef, attr_name: String) -> Result<KyaObjectRef, Error> {
-    let object = obj.lock().unwrap();
+    let dict_ref;
 
-    if let KyaObject::InstanceObject(instance_object) = &*object {
-        let found_object = get_attr(obj.clone(), instance_object, attr_name.clone())?;
-
-        // if let KyaObject::FunctionObject(_) = &*found_object.lock().unwrap() {
-        //     return Ok(KyaObject::from_method_object(MethodObject {
-        //         ob_type: interpreter.get_type(METHOD_TYPE),
-        //         instance_object: obj.clone(),
-        //         function: found_object.clone(),
-        //     }));
-        // } else if let KyaObject::RsFunctionObject(_) = &*found_object.lock().unwrap() {
-        //     return Ok(KyaObject::from_method_object(MethodObject {
-        //         ob_type: interpreter.get_type(METHOD_TYPE),
-        //         instance_object: obj.clone(),
-        //         function: found_object.clone(),
-        //     }));
-        // }
-
-        return Ok(found_object);
+    if let KyaObject::InstanceObject(obj_instance) = &*obj.lock().unwrap() {
+        dict_ref = obj_instance.dict.clone();
+    } else {
+        return Err(Error::RuntimeError(format!(
+            "The object '{}' is not a instance",
+            obj.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
     }
 
-    Err(Error::RuntimeError(format!(
-        "The object '{}' has no attribute '{}'",
-        object.get_type()?.lock().unwrap().name,
-        attr_name
-    )))
+    let found_object = get_attr(obj.clone(), dict_ref, attr_name.clone())?;
+
+    if let KyaObject::FunctionObject(_) = &*found_object.lock().unwrap() {
+        return Ok(KyaObject::from_method_object(MethodObject {
+            ob_type: METHOD_TYPE.clone(),
+            instance_object: obj.clone(),
+            function: found_object.clone(),
+        }));
+    } else if let KyaObject::RsFunctionObject(_) = &*found_object.lock().unwrap() {
+        return Ok(KyaObject::from_method_object(MethodObject {
+            ob_type: METHOD_TYPE.clone(),
+            instance_object: obj.clone(),
+            function: found_object.clone(),
+        }));
+    }
+
+    Ok(found_object)
 }
 
 pub fn get_attr(
     object: KyaObjectRef,
-    instance_object: &InstanceObject,
+    dict: DictRef,
     attr_name: String,
 ) -> Result<KyaObjectRef, Error> {
-    if let Some(attr) = instance_object.dict.lock().unwrap().get(&attr_name) {
+    if let Some(attr) = dict.lock().unwrap().get(&attr_name) {
         return Ok(attr.clone());
     } else {
         let mut root_type = object.lock().unwrap().get_type()?;
         let mut parent_type = root_type.lock().unwrap().parent()?;
 
         loop {
-            if Arc::ptr_eq(&parent_type, &BASE_TYPE) {
-                break;
-            }
-
             if let Some(attr) = root_type
                 .lock()
                 .unwrap()
@@ -192,6 +173,8 @@ pub fn get_attr(
                 .get(&attr_name)
             {
                 return Ok(attr.clone());
+            } else if Arc::ptr_eq(&root_type, &BASE_TYPE) {
+                break;
             }
 
             root_type = parent_type.clone();

@@ -1,9 +1,14 @@
 use crate::bytecode::ComparisonOperator;
 use crate::errors::Error;
-use crate::interpreter::Frame;
-use crate::objects::base::{kya_call, kya_compare, KyaObject};
+use crate::interpreter::{eval_frame, Frame};
+use crate::objects::base::{
+    kya_call, kya_compare, kya_get_attr, kya_set_attr, KyaObject, Type, BASE_TYPE,
+};
+use crate::objects::class_object::class_new;
 use crate::objects::function_object::function_new;
 use crate::objects::utils::kya_is_true;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 pub static OPCODE_HANDLERS: &[fn(&mut Frame) -> Result<(), Error>] = &[
     op_load_const,
@@ -17,6 +22,8 @@ pub static OPCODE_HANDLERS: &[fn(&mut Frame) -> Result<(), Error>] = &[
     op_jump_back,
     op_pop_and_jump_if_false,
     op_jump,
+    op_make_class,
+    op_store_attr,
 ];
 
 fn op_load_const(frame: &mut Frame) -> Result<(), Error> {
@@ -165,6 +172,55 @@ pub fn op_jump(frame: &mut Frame) -> Result<(), Error> {
     let target_pc = frame.next_opcode() as usize;
 
     frame.set_pc(target_pc);
+
+    Ok(())
+}
+
+pub fn op_make_class(frame: &mut Frame) -> Result<(), Error> {
+    let code_object = frame.pop_stack()?;
+
+    if let KyaObject::CodeObject(c) = &*code_object.lock().unwrap() {
+        let locals = HashMap::new();
+
+        let mut frame_ref = Frame {
+            locals: Arc::new(Mutex::new(locals)),
+            globals: frame.globals.clone(),
+            code: c.code.clone(),
+            pc: 0,
+            stack: vec![],
+        };
+
+        let _ = eval_frame(&mut frame_ref);
+
+        let class_type = Type::as_ref(Type {
+            ob_type: Some(BASE_TYPE.clone()),
+            name: c.code.name.clone(),
+            dict: frame_ref.locals.clone(),
+            ..Default::default()
+        });
+
+        frame.register_local(&c.code.name, class_new(class_type));
+    } else {
+        return Err(Error::RuntimeError(format!(
+            "Expected a CodeObject, but got '{}'",
+            code_object.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
+    }
+
+    Ok(())
+}
+
+pub fn op_store_attr(frame: &mut Frame) -> Result<(), Error> {
+    let instance = frame.pop_stack()?;
+    let value = frame.pop_stack()?;
+    let name_index = frame.next_opcode() as usize;
+    let name = frame
+        .get_name(name_index)
+        .ok_or_else(|| Error::RuntimeError(format!("Name at index {} not defined", name_index)))?;
+
+    kya_set_attr(instance.clone(), name.clone(), value.clone())?;
+
+    frame.push_stack(value);
 
     Ok(())
 }

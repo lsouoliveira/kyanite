@@ -1,5 +1,6 @@
 use crate::errors::Error;
-use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, TypeRef};
+use crate::interpreter::NONE_OBJECT;
+use crate::objects::base::{kya_init, kya_new, KyaObject, KyaObjectRef, KyaObjectTrait, TypeRef};
 use crate::objects::instance_object::{instance_type_new, InstanceObject};
 use crate::objects::string_object::string_new;
 
@@ -19,37 +20,15 @@ impl KyaObjectTrait for ClassObject {
 pub fn class_tp_call(
     callable: KyaObjectRef,
     args: &mut Vec<KyaObjectRef>,
-    _receiver: Option<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let class_type = callable.lock().unwrap().get_type()?;
 
-    let tp_new = class_type.lock().unwrap().tp_new;
+    let obj = kya_new(class_type.clone(), args, receiver)?;
 
-    if let Some(new_fn) = tp_new {
-        let obj = new_fn(
-            class_type.clone(),
-            &mut args.clone(),
-            Some(callable.clone()),
-        )?;
+    kya_init(obj.clone(), args, Some(obj.clone()))?;
 
-        let tp_init = class_type.lock().unwrap().tp_init;
-
-        if let Some(init_fn) = tp_init {
-            init_fn(obj.clone(), args, Some(obj.clone()))?;
-        } else {
-            return Err(Error::RuntimeError(format!(
-                "Class '{}' does not have a tp_init method",
-                class_type.lock().unwrap().name
-            )));
-        }
-
-        Ok(obj)
-    } else {
-        return Err(Error::RuntimeError(format!(
-            "Class '{}' does not have a tp_new method",
-            class_type.lock().unwrap().name
-        )));
-    }
+    Ok(obj)
 }
 
 pub fn class_tp_new(
@@ -61,6 +40,14 @@ pub fn class_tp_new(
         ob_type: instance_type_new(ob_type),
         dict: Arc::new(Mutex::new(HashMap::new())),
     }))
+}
+
+pub fn class_tp_init(
+    _callable: KyaObjectRef,
+    _args: &mut Vec<KyaObjectRef>,
+    _receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    Ok(NONE_OBJECT.clone())
 }
 
 pub fn class_tp_repr(

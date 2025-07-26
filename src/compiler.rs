@@ -93,6 +93,12 @@ impl Compiler {
         let index = self.code.add_name(value.to_string());
         self.code.add_instruction(index);
     }
+
+    fn store_attr(&mut self, value: &str) {
+        self.code.add_instruction(Opcode::StoreAttr as u8);
+        let index = self.code.add_name(value.to_string());
+        self.code.add_instruction(index);
+    }
 }
 
 impl CompilerVisitor for Compiler {
@@ -140,6 +146,9 @@ impl CompilerVisitor for Compiler {
         if let ast::ASTNode::Identifier(identifier) = &*assignment.name {
             self.store_variable(identifier.name.clone());
             self.load_variable(identifier.name.clone());
+        } else if let ast::ASTNode::Attribute(attribute) = &*assignment.name {
+            attribute.name.compile(self)?;
+            self.store_attr(&attribute.value);
         } else {
             return Err(Error::CompilationError(
                 "Assignment name must be an identifier".to_string(),
@@ -189,6 +198,20 @@ impl CompilerVisitor for Compiler {
     }
 
     fn compile_class_def(&mut self, class_def: &ast::ClassDef) -> Result<(), Error> {
+        let mut compiler = Compiler::new(Arc::new(*class_def.body.clone()));
+        let _ = compiler.compile()?;
+        let mut code = compiler.get_output();
+
+        code.name = class_def.name.clone();
+
+        let code_object = code_object_new(Arc::new(code));
+
+        let index = self.code.add_const(code_object);
+        self.code.add_instruction(Opcode::LoadConst as u8);
+        self.code.add_instruction(index);
+
+        self.code.add_instruction(Opcode::MakeClass as u8);
+
         Ok(())
     }
 
@@ -425,6 +448,27 @@ mod tests {
             Opcode::LoadName as u8,          // Load variable 'x' in the body
             0,                               // Index for 'x'
             Opcode::PopTop as u8,            // Pop the result of the body
+        ];
+
+        assert_eq!(expected_output, code_object.code);
+    }
+
+    #[test]
+    fn test_compile_class() {
+        let class_def = ASTNode::ClassDef(ast::ClassDef {
+            name: "MyClass".to_string(),
+            body: Box::new(ASTNode::Block(ast::Block::new(vec![]))),
+        });
+
+        let mut compiler = Compiler::new(Arc::new(class_def));
+        let _ = compiler.compile();
+
+        let code_object = compiler.get_output();
+
+        let expected_output = vec![
+            Opcode::LoadConst as u8, // Load class definition
+            0,                       // Index for class definition
+            Opcode::MakeClass as u8, // Create class object
         ];
 
         assert_eq!(expected_output, code_object.code);

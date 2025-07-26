@@ -14,6 +14,8 @@ pub enum Opcode {
     JumpBack = 8,
     PopAndJumpIfFalse = 9,
     Jump = 10,
+    MakeClass = 11,
+    StoreAttr = 12,
 }
 
 #[repr(u8)]
@@ -53,6 +55,8 @@ impl Opcode {
             8 => Some(Opcode::JumpBack),
             9 => Some(Opcode::PopAndJumpIfFalse),
             10 => Some(Opcode::Jump),
+            11 => Some(Opcode::MakeClass),
+            12 => Some(Opcode::StoreAttr),
             _ => None,
         }
     }
@@ -72,6 +76,8 @@ impl std::fmt::Display for Opcode {
             Opcode::JumpBack => write!(f, "JUMP_BACK"),
             Opcode::PopAndJumpIfFalse => write!(f, "POP_AND_JUMP_IF_FALSE"),
             Opcode::Jump => write!(f, "JUMP"),
+            Opcode::MakeClass => write!(f, "MAKE_CLASS"),
+            Opcode::StoreAttr => write!(f, "STORE_ATTR"),
         }
     }
 }
@@ -209,6 +215,9 @@ impl Disassembler {
                 10 => {
                     pc = self.write_jump(pc);
                 }
+                11 => {
+                    pc = self.write_make_class(pc);
+                }
                 _ => {
                     panic!("Unknown opcode: {}", opcode);
                 }
@@ -320,5 +329,10 @@ impl Disassembler {
         let offset = self.instruction_at((pc + 1).into());
         self.output.push_str(&format!("JUMP {}", offset));
         pc + 2
+    }
+
+    pub fn write_make_class(&mut self, pc: u8) -> u8 {
+        self.output.push_str("MAKE_CLASS");
+        pc + 1
     }
 }
