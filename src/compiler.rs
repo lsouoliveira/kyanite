@@ -8,9 +8,20 @@ use crate::{ast, visitor::CompilerVisitor};
 
 use std::sync::Arc;
 
+#[derive(Debug, Clone, PartialEq)]
+enum ScopeType {
+    While,
+}
+
+pub struct Scope {
+    scope_type: ScopeType,
+    jumps: Vec<usize>,
+}
+
 pub struct Compiler {
     ast: Arc<ast::ASTNode>,
     code: CodeObject,
+    scopes: Vec<Scope>,
 }
 
 impl Compiler {
@@ -18,15 +29,48 @@ impl Compiler {
         Compiler {
             ast,
             code: CodeObject::new(),
+            scopes: vec![],
         }
     }
 
     pub fn compile(&mut self) -> Result<(), Error> {
-        self.ast.clone().compile(self)
+        self.ast.clone().compile(self)?;
+
+        Ok(())
     }
 
     pub fn get_output(&self) -> CodeObject {
         self.code.clone()
+    }
+
+    fn enter_scope(&mut self, scope_type: ScopeType) {
+        self.scopes.push(Scope {
+            scope_type,
+            jumps: vec![],
+        });
+    }
+
+    fn exit_scope(&mut self) {
+        if let Some(scope) = self.scopes.pop() {
+            for jump in scope.jumps {
+                self.code
+                    .set_instruction_at(jump, self.code.instructions_count() as u8);
+            }
+        }
+    }
+
+    fn current_scope(&mut self) -> &mut Scope {
+        self.scopes.last_mut().unwrap()
+    }
+
+    fn push_jump(&mut self, jump: usize) {
+        self.current_scope().jumps.push(jump);
+    }
+
+    fn backpatch(&mut self, target: usize) {
+        for jump in self.current_scope().jumps.clone() {
+            self.code.set_instruction_at(jump, target as u8);
+        }
     }
 
     fn store_variable(&mut self, name: String) {
@@ -181,9 +225,9 @@ impl CompilerVisitor for Compiler {
     }
 
     fn compile_while(&mut self, while_node: &ast::While) -> Result<(), Error> {
-        let condition_target = self.code.instructions_count() as u8;
+        self.enter_scope(ScopeType::While);
 
-        println!("Compiling while loop at target: {}", condition_target);
+        let condition_target = self.code.instructions_count() as u8;
 
         while_node.condition.compile(self)?;
 
@@ -192,6 +236,7 @@ impl CompilerVisitor for Compiler {
         let jump_target = self.code.instructions_count() as u8;
 
         self.code.add_instruction(0);
+        self.push_jump(jump_target as usize);
 
         while_node.body.compile(self)?;
 
@@ -200,18 +245,36 @@ impl CompilerVisitor for Compiler {
 
         self.code.add_instruction(Opcode::JumpBack as u8);
         self.code.add_instruction(jump_offset);
-        self.code
-            .set_instruction_at(jump_target as usize, end_target + 2);
+
+        self.backpatch(end_target as usize + 2);
+
+        self.exit_scope();
 
         Ok(())
     }
 
     fn compile_break(&mut self) -> Result<(), Error> {
+        if self.scopes.is_empty() || self.current_scope().scope_type != ScopeType::While {
+            return Err(Error::SyntaxError(
+                "Break statement outside of loop".to_string(),
+            ));
+        }
+
+        self.code.add_instruction(Opcode::Jump as u8);
+        self.code.add_instruction(0);
+        self.push_jump(self.code.instructions_count() - 1);
+
         Ok(())
     }
 
     fn compile_block(&mut self, block: &ast::Block) -> Result<(), Error> {
         for statement in &block.statements {
+            if let ast::ASTNode::Break() = &**statement {
+                statement.compile(self)?;
+
+                return Ok(());
+            }
+
             statement.compile(self)?;
 
             if statement.is_expression() {
@@ -250,8 +313,6 @@ mod tests {
 
         let code_object = compiler.get_output();
 
-        println!("{}", code_object.dis());
-
         let expected_output = vec![
             Opcode::LoadName as u8,  // Load variable 'x'
             0,                       // Index for 'x'
@@ -266,6 +327,50 @@ mod tests {
             Opcode::PopTop as u8,            // Pop the result of the body
             Opcode::JumpBack as u8,          // Jump back to the condition check
             13,                              // Offset to jump back to the condition check
+        ];
+
+        assert_eq!(expected_output, code_object.code);
+    }
+
+    #[test]
+    fn test_compile_with_break() {
+        let condition = ASTNode::Compare(ast::Compare {
+            left: Box::new(ASTNode::Identifier(ast::Identifier::new("x".to_string()))),
+            operator: ast::Operator::Equal,
+            right: Box::new(ASTNode::NumberLiteral(0.0)),
+        });
+
+        let body = ASTNode::Block(ast::Block::new(vec![
+            Box::new(ASTNode::Identifier(ast::Identifier::new("x".to_string()))),
+            Box::new(ASTNode::Break()),
+        ]));
+
+        let while_node = ASTNode::While(ast::While {
+            condition: Box::new(condition),
+            body: Box::new(body),
+        });
+
+        let mut compiler = Compiler::new(Arc::new(while_node));
+        let _ = compiler.compile();
+
+        let code_object = compiler.get_output();
+
+        let expected_output = vec![
+            Opcode::LoadName as u8,  // Load variable 'x'
+            0,                       // Index for 'x'
+            Opcode::LoadConst as u8, // Load constant 0.0
+            0,                       // Index for constant 0.0
+            Opcode::Compare as u8,   // Compare x == 0.0
+            ComparisonOperator::Equal as u8,
+            Opcode::PopAndJumpIfFalse as u8, // Jump if condition is false
+            15,                              // Jump target
+            Opcode::LoadName as u8,          // Load variable 'x' again in the body
+            0,                               // Index for 'x'
+            Opcode::PopTop as u8,            // Pop the result of the body
+            Opcode::Jump as u8,              // Jump to the end of the loop
+            15,                              // Offset to jump to the end of the loop
+            Opcode::JumpBack as u8,          // Jump back to the condition check
+            15,
         ];
 
         assert_eq!(expected_output, code_object.code);

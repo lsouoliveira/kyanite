@@ -11,6 +11,7 @@ pub enum Error {
     BreakInterrupt(String),
     NotImplemented(String),
     CompilationError(String),
+    SyntaxError(String),
 }
 
 #[derive(Debug, Clone)]
@@ -67,6 +68,7 @@ impl std::fmt::Display for Error {
                 msg.red().bold()
             ),
             Error::CompilationError(msg) => write!(f, "{}", format_error("Compilation Error", msg)),
+            Error::SyntaxError(msg) => write!(f, "{}", format_error("Syntax Error", msg)),
         }
     }
 }

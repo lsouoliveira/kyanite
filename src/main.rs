@@ -52,7 +52,11 @@ fn interpret(filename: &str) -> Result<(), String> {
     }));
 
     let mut compiler = compiler::Compiler::new(ast);
-    let _ = compiler.compile();
+    let _ = compiler.compile().unwrap_or_else(|e| {
+        eprintln!("{}", e.to_string());
+
+        std::process::exit(1);
+    });
 
     let mut interpreter = interpreter::Interpreter::new(".");
 

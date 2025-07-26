@@ -13,6 +13,7 @@ pub enum Opcode {
     Compare = 7,
     JumpBack = 8,
     PopAndJumpIfFalse = 9,
+    Jump = 10,
 }
 
 #[repr(u8)]
@@ -51,6 +52,7 @@ impl Opcode {
             7 => Some(Opcode::Compare),
             8 => Some(Opcode::JumpBack),
             9 => Some(Opcode::PopAndJumpIfFalse),
+            10 => Some(Opcode::Jump),
             _ => None,
         }
     }
@@ -69,6 +71,7 @@ impl std::fmt::Display for Opcode {
             Opcode::Compare => write!(f, "COMPARE"),
             Opcode::JumpBack => write!(f, "JUMP_BACK"),
             Opcode::PopAndJumpIfFalse => write!(f, "POP_AND_JUMP_IF_FALSE"),
+            Opcode::Jump => write!(f, "JUMP"),
         }
     }
 }
@@ -203,6 +206,9 @@ impl Disassembler {
                 9 => {
                     pc = self.write_jump_if_false(pc);
                 }
+                10 => {
+                    pc = self.write_jump(pc);
+                }
                 _ => {
                     panic!("Unknown opcode: {}", opcode);
                 }
@@ -307,6 +313,12 @@ impl Disassembler {
     fn write_jump_if_false(&mut self, pc: u8) -> u8 {
         let offset = self.instruction_at((pc + 1).into());
         self.output.push_str(&format!("JUMP_IF_FALSE {}", offset));
+        pc + 2
+    }
+
+    fn write_jump(&mut self, pc: u8) -> u8 {
+        let offset = self.instruction_at((pc + 1).into());
+        self.output.push_str(&format!("JUMP {}", offset));
         pc + 2
     }
 }

@@ -244,7 +244,7 @@ impl ASTNode {
             ASTNode::BinOp(bin_op) => compiler.compile_bin_op(&bin_op),
             ASTNode::UnaryOp(unary_op) => compiler.compile_unary_op(&unary_op),
             ASTNode::While(while_node) => compiler.compile_while(&while_node),
-            ASTNode::Break() => Ok(()),
+            ASTNode::Break() => compiler.compile_break(),
             ASTNode::Block(block) => compiler.compile_block(&block),
         }
     }

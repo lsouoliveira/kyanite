@@ -16,6 +16,7 @@ pub static OPCODE_HANDLERS: &[fn(&mut Frame) -> Result<(), Error>] = &[
     op_compare,
     op_jump_back,
     op_pop_and_jump_if_false,
+    op_jump,
 ];
 
 fn op_load_const(frame: &mut Frame) -> Result<(), Error> {
@@ -154,6 +155,14 @@ pub fn op_pop_and_jump_if_false(frame: &mut Frame) -> Result<(), Error> {
         let current_pc = frame.current_pc();
         frame.set_pc(current_pc + jump_offset);
     }
+
+    Ok(())
+}
+
+pub fn op_jump(frame: &mut Frame) -> Result<(), Error> {
+    let target_pc = frame.next_opcode() as usize;
+
+    frame.set_pc(target_pc);
 
     Ok(())
 }
