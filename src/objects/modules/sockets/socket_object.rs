@@ -111,12 +111,14 @@ pub fn socket_bind(
         let host = parse_arg(&args, 0, 2)?;
         let port = parse_arg(&args, 1, 2)?;
 
-        host.lock().unwrap()
+        host.lock()
+            .unwrap()
             .is_instance_of(&interpreter.get_type(STRING_TYPE))?
             .then_some(())
             .ok_or_else(|| Error::ValueError("The 'host' argument must be a string".to_string()))?;
 
-        port.lock().unwrap()
+        port.lock()
+            .unwrap()
             .is_instance_of(&interpreter.get_type(NUMBER_TYPE))?
             .then_some(())
             .ok_or_else(|| Error::ValueError("The 'port' argument must be a string".to_string()))?;

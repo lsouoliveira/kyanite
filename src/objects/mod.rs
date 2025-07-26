@@ -1,16 +1,14 @@
 pub mod base;
 pub mod bool_object;
-// pub mod bytes_object;
+pub mod bytes_object;
 pub mod class_object;
+pub mod code_object;
 pub mod function_object;
 pub mod instance_object;
 pub mod method_object;
 pub mod modules;
 pub mod none_object;
 pub mod number_object;
-// pub mod opcodes;
 pub mod rs_function_object;
 pub mod string_object;
-// pub mod type_container;
-pub mod code_object;
 pub mod utils;

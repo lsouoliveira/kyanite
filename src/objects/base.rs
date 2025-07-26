@@ -5,11 +5,11 @@ use crate::ast;
 use crate::bytecode::ComparisonOperator;
 use crate::errors::Error;
 use crate::objects::bool_object::BoolObject;
-use crate::objects::code_object::CodeObject;
-// use crate::objects::bytes_object::BytesObject;
+use crate::objects::bytes_object::BytesObject;
 use crate::objects::class_object::{
     class_nb_bool, class_tp_call, class_tp_new, class_tp_repr, ClassObject,
 };
+use crate::objects::code_object::CodeObject;
 use crate::objects::function_object::FunctionObject;
 use crate::objects::instance_object::InstanceObject;
 use crate::objects::method_object::{MethodObject, METHOD_TYPE};
@@ -58,7 +58,7 @@ pub enum KyaObject {
     MethodObject(MethodObject),
     // SocketObject(SocketObject),
     // ConnectionObject(ConnectionObject),
-    // BytesObject(BytesObject),
+    BytesObject(BytesObject),
     BoolObject(BoolObject),
     CodeObject(CodeObject),
     ThreadObject(ThreadObject),
@@ -239,17 +239,6 @@ impl Type {
         }
     }
 
-    pub fn sq_len(&self, obj: KyaObjectRef) -> Result<usize, Error> {
-        if let Some(sq_len_fn) = self.sq_len {
-            sq_len_fn(obj)
-        } else {
-            Err(Error::RuntimeError(format!(
-                "The object '{}' does not support length calculation",
-                self.name
-            )))
-        }
-    }
-
     pub fn parent(&self) -> Result<TypeRef, Error> {
         if let Some(parent_type) = &self.ob_type {
             Ok(parent_type.clone())
@@ -272,7 +261,7 @@ impl KyaObject {
             KyaObject::MethodObject(obj) => Some(obj),
             // KyaObject::SocketObject(obj) => Some(obj),
             // KyaObject::ConnectionObject(obj) => Some(obj),
-            // KyaObject::BytesObject(obj) => Some(obj),
+            KyaObject::BytesObject(obj) => Some(obj),
             KyaObject::BoolObject(obj) => Some(obj),
             KyaObject::CodeObject(obj) => Some(obj),
             KyaObject::ThreadObject(obj) => Some(obj),
@@ -359,10 +348,10 @@ impl KyaObject {
     //     KyaObject::as_ref(KyaObject::ConnectionObject(connection_object))
     // }
     //
-    // pub fn from_bytes_object(bytes_object: BytesObject) -> KyaObjectRef {
-    //     KyaObject::as_ref(KyaObject::BytesObject(bytes_object))
-    // }
-    //
+    pub fn from_bytes_object(bytes_object: BytesObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::BytesObject(bytes_object))
+    }
+
     pub fn from_bool_object(bool_object: BoolObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::BoolObject(bool_object))
     }
@@ -529,6 +518,20 @@ pub fn kya_nb_bool(obj: KyaObjectRef) -> Result<f64, Error> {
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' does not support boolean conversion",
+            ob_type.lock().unwrap().name
+        )))
+    }
+}
+
+pub fn kya_sq_len(obj: KyaObjectRef) -> Result<usize, Error> {
+    let ob_type = obj.lock().unwrap().get_type()?;
+    let sq_len_fn = ob_type.lock().unwrap().sq_len.clone();
+
+    if let Some(sq_len_fn) = sq_len_fn {
+        sq_len_fn(obj)
+    } else {
+        Err(Error::RuntimeError(format!(
+            "The object '{}' does not support length calculation",
             ob_type.lock().unwrap().name
         )))
     }

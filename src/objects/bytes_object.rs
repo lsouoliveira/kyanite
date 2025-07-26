@@ -1,13 +1,14 @@
 use crate::errors::Error;
-use crate::interpreter::{Interpreter, STRING_TYPE};
-use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef};
-use crate::objects::number_object::NumberObject;
-use crate::objects::rs_function_object::RsFunctionObject;
-use crate::objects::string_object::StringObject;
+use crate::objects::base::{
+    kya_sq_len, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE,
+};
+use crate::objects::number_object::number_new;
+use crate::objects::rs_function_object::rs_function_new;
+use crate::objects::string_object::string_new;
 use crate::objects::utils::parse_receiver;
-use std::cell::RefCell;
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 pub struct BytesObject {
     pub ob_type: TypeRef,
@@ -20,29 +21,7 @@ impl KyaObjectTrait for BytesObject {
     }
 }
 
-pub fn create_bytes_type(ob_type: TypeRef, rs_function_type: TypeRef) -> TypeRef {
-    let dict = Rc::new(RefCell::new(HashMap::new()));
-
-    dict.lock_mut().insert(
-        "length".to_string(),
-        KyaObject::from_rs_function_object(RsFunctionObject::new(
-            rs_function_type.clone(),
-            bytes_length,
-        )),
-    );
-
-    Type::as_ref(Type {
-        ob_type: Some(ob_type.clone()),
-        name: "Bytes".to_string(),
-        tp_repr: Some(bytes_tp_repr),
-        sq_len: Some(bytes_sq_len),
-        dict: dict.clone(),
-        ..Default::default()
-    })
-}
-
 pub fn bytes_tp_repr(
-    interpreter: &mut Interpreter,
     callable: KyaObjectRef,
     _args: &mut Vec<KyaObjectRef>,
     _receiver: Option<KyaObjectRef>,
@@ -50,10 +29,9 @@ pub fn bytes_tp_repr(
     let object = callable.lock().unwrap();
 
     if let KyaObject::BytesObject(obj) = &*object {
-        Ok(KyaObject::from_string_object(StringObject {
-            ob_type: interpreter.get_type(STRING_TYPE),
-            value: format!("b'{}'", String::from_utf8_lossy(&obj.value)),
-        }))
+        Ok(string_new(
+            format!("b'{}'", String::from_utf8_lossy(&obj.value)).as_str(),
+        ))
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' is not a bytes object.",
@@ -62,7 +40,7 @@ pub fn bytes_tp_repr(
     }
 }
 
-pub fn bytes_sq_len(_interpreter: &mut Interpreter, object: KyaObjectRef) -> Result<usize, Error> {
+pub fn bytes_sq_len(object: KyaObjectRef) -> Result<usize, Error> {
     if let KyaObject::BytesObject(obj) = &*object.lock().unwrap() {
         Ok(obj.value.len())
     } else {
@@ -74,18 +52,16 @@ pub fn bytes_sq_len(_interpreter: &mut Interpreter, object: KyaObjectRef) -> Res
 }
 
 pub fn bytes_length(
-    interpreter: &mut Interpreter,
     _callable: KyaObjectRef,
     _args: &mut Vec<KyaObjectRef>,
     receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let instance = parse_receiver(&receiver)?;
 
-    if let KyaObject::BytesObject(obj) = &*instance.lock().unwrap() {
-        Ok(KyaObject::from_number_object(NumberObject {
-            ob_type: interpreter.get_type("Number"),
-            value: obj.value.len() as f64,
-        }))
+    if let KyaObject::BytesObject(_) = &*instance.lock().unwrap() {
+        let bytes_length = kya_sq_len(instance.clone())?;
+
+        Ok(number_new(bytes_length as f64))
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' is not a bytes object.",
@@ -93,3 +69,20 @@ pub fn bytes_length(
         )))
     }
 }
+
+pub static BYTES_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    let dict = Arc::new(Mutex::new(HashMap::new()));
+
+    dict.lock()
+        .unwrap()
+        .insert("length".to_string(), rs_function_new(bytes_length));
+
+    Type::as_ref(Type {
+        ob_type: Some(BASE_TYPE.clone()),
+        name: "Bytes".to_string(),
+        tp_repr: Some(bytes_tp_repr),
+        sq_len: Some(bytes_sq_len),
+        dict: dict.clone(),
+        ..Default::default()
+    })
+});
