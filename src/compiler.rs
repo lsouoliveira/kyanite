@@ -11,6 +11,7 @@ use std::sync::Arc;
 #[derive(Debug, Clone, PartialEq)]
 enum ScopeType {
     While,
+    If,
 }
 
 pub struct Scope {
@@ -209,6 +210,20 @@ impl CompilerVisitor for Compiler {
     }
 
     fn compile_if(&mut self, if_node: &ast::If) -> Result<(), Error> {
+        self.enter_scope(ScopeType::If);
+
+        if_node.test.compile(self)?;
+
+        self.code.add_instruction(Opcode::PopAndJumpIfFalse as u8);
+        self.code.add_instruction(0);
+        self.push_jump(self.code.instructions_count() - 1);
+
+        if_node.body.compile(self)?;
+
+        self.backpatch(self.code.instructions_count() - 1);
+
+        self.exit_scope();
+
         Ok(())
     }
 
@@ -246,7 +261,7 @@ impl CompilerVisitor for Compiler {
         self.code.add_instruction(Opcode::JumpBack as u8);
         self.code.add_instruction(jump_offset);
 
-        self.backpatch(end_target as usize + 2);
+        self.backpatch(self.code.instructions_count() - 1);
 
         self.exit_scope();
 
@@ -371,6 +386,45 @@ mod tests {
             15,                              // Offset to jump to the end of the loop
             Opcode::JumpBack as u8,          // Jump back to the condition check
             15,
+        ];
+
+        assert_eq!(expected_output, code_object.code);
+    }
+
+    #[test]
+    fn test_if() {
+        let condition = ASTNode::Compare(ast::Compare {
+            left: Box::new(ASTNode::Identifier(ast::Identifier::new("x".to_string()))),
+            operator: ast::Operator::Equal,
+            right: Box::new(ASTNode::NumberLiteral(0.0)),
+        });
+
+        let body = ASTNode::Block(ast::Block::new(vec![Box::new(ASTNode::Identifier(
+            ast::Identifier::new("x".to_string()),
+        ))]));
+
+        let if_node = ASTNode::If(ast::If {
+            test: Box::new(condition),
+            body: Box::new(body),
+        });
+
+        let mut compiler = Compiler::new(Arc::new(if_node));
+        let _ = compiler.compile();
+
+        let code_object = compiler.get_output();
+
+        let expected_output = vec![
+            Opcode::LoadName as u8,  // Load variable 'x'
+            0,                       // Index for 'x'
+            Opcode::LoadConst as u8, // Load constant 0.0
+            0,                       // Index for constant 0.0
+            Opcode::Compare as u8,   // Compare x == 0.0
+            ComparisonOperator::Equal as u8,
+            Opcode::PopAndJumpIfFalse as u8, // Jump if condition is false
+            11,                              // Jump target
+            Opcode::LoadName as u8,          // Load variable 'x' in the body
+            0,                               // Index for 'x'
+            Opcode::PopTop as u8,            // Pop the result of the body
         ];
 
         assert_eq!(expected_output, code_object.code);
