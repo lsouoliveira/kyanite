@@ -58,6 +58,12 @@ pub struct Identifier {
     pub name: String,
 }
 
+impl Identifier {
+    pub fn new(name: String) -> Self {
+        Identifier { name }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct MethodCall {
     pub name: Box<ASTNode>,

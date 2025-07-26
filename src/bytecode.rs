@@ -11,6 +11,8 @@ pub enum Opcode {
     MakeFunction = 5,
     LoadAttr = 6,
     Compare = 7,
+    JumpBack = 8,
+    PopAndJumpIfFalse = 9,
 }
 
 #[repr(u8)]
@@ -47,6 +49,8 @@ impl Opcode {
             5 => Some(Opcode::MakeFunction),
             6 => Some(Opcode::LoadAttr),
             7 => Some(Opcode::Compare),
+            8 => Some(Opcode::JumpBack),
+            9 => Some(Opcode::PopAndJumpIfFalse),
             _ => None,
         }
     }
@@ -63,6 +67,8 @@ impl std::fmt::Display for Opcode {
             Opcode::MakeFunction => write!(f, "MAKE_FUNCTION"),
             Opcode::LoadAttr => write!(f, "LOAD_ATTR"),
             Opcode::Compare => write!(f, "COMPARE"),
+            Opcode::JumpBack => write!(f, "JUMP_BACK"),
+            Opcode::PopAndJumpIfFalse => write!(f, "POP_AND_JUMP_IF_FALSE"),
         }
     }
 }
@@ -130,6 +136,14 @@ impl CodeObject {
         }
     }
 
+    pub fn set_instruction_at(&mut self, offset: usize, value: u8) {
+        if offset < self.code.len() {
+            self.code[offset] = value;
+        } else {
+            panic!("Offset out of bounds");
+        }
+    }
+
     pub fn dis(&self) -> String {
         let mut disassembler = Disassembler::new(self.clone());
         disassembler.disassemble();
@@ -182,6 +196,12 @@ impl Disassembler {
                 }
                 7 => {
                     pc = self.write_compare(pc);
+                }
+                8 => {
+                    pc = self.write_jump_back(pc);
+                }
+                9 => {
+                    pc = self.write_jump_if_false(pc);
                 }
                 _ => {
                     panic!("Unknown opcode: {}", opcode);
@@ -275,6 +295,18 @@ impl Disassembler {
 
         self.output.push_str(&format!("COMPARE {}", op));
 
+        pc + 2
+    }
+
+    fn write_jump_back(&mut self, pc: u8) -> u8 {
+        let offset = self.instruction_at((pc + 1).into());
+        self.output.push_str(&format!("JUMP_BACK {}", offset));
+        pc + 2
+    }
+
+    fn write_jump_if_false(&mut self, pc: u8) -> u8 {
+        let offset = self.instruction_at((pc + 1).into());
+        self.output.push_str(&format!("JUMP_IF_FALSE {}", offset));
         pc + 2
     }
 }

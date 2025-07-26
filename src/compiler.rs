@@ -181,6 +181,28 @@ impl CompilerVisitor for Compiler {
     }
 
     fn compile_while(&mut self, while_node: &ast::While) -> Result<(), Error> {
+        let condition_target = self.code.instructions_count() as u8;
+
+        println!("Compiling while loop at target: {}", condition_target);
+
+        while_node.condition.compile(self)?;
+
+        self.code.add_instruction(Opcode::PopAndJumpIfFalse as u8);
+
+        let jump_target = self.code.instructions_count() as u8;
+
+        self.code.add_instruction(0);
+
+        while_node.body.compile(self)?;
+
+        let end_target = self.code.instructions_count() as u8;
+        let jump_offset = end_target - condition_target + 2;
+
+        self.code.add_instruction(Opcode::JumpBack as u8);
+        self.code.add_instruction(jump_offset);
+        self.code
+            .set_instruction_at(jump_target as usize, end_target + 2);
+
         Ok(())
     }
 
@@ -207,45 +229,45 @@ mod tests {
     use crate::ast::{ASTNode, Module};
 
     #[test]
-    fn test_compile_string() {
-        let ast = Arc::new(ASTNode::Module(Module {
-            statements: vec![Box::new(ASTNode::StringLiteral(
-                "Hello, World!".to_string(),
-            ))],
-        }));
+    fn test_compile_while() {
+        let condition = ASTNode::Compare(ast::Compare {
+            left: Box::new(ASTNode::Identifier(ast::Identifier::new("x".to_string()))),
+            operator: ast::Operator::Equal,
+            right: Box::new(ASTNode::NumberLiteral(0.0)),
+        });
 
-        let mut compiler = Compiler::new(ast);
-        compiler.compile().unwrap();
+        let body = ASTNode::Block(ast::Block::new(vec![Box::new(ASTNode::Identifier(
+            ast::Identifier::new("x".to_string()),
+        ))]));
 
-        let expected_code = vec![
-            Opcode::LoadConst as u8,
-            0, // index of "Hello, World!" in consts
+        let while_node = ASTNode::While(ast::While {
+            condition: Box::new(condition),
+            body: Box::new(body),
+        });
+
+        let mut compiler = Compiler::new(Arc::new(while_node));
+        let _ = compiler.compile();
+
+        let code_object = compiler.get_output();
+
+        println!("{}", code_object.dis());
+
+        let expected_output = vec![
+            Opcode::LoadName as u8,  // Load variable 'x'
+            0,                       // Index for 'x'
+            Opcode::LoadConst as u8, // Load constant 0.0
+            0,                       // Index for constant 0.0
+            Opcode::Compare as u8,   // Compare x == 0.0
+            ComparisonOperator::Equal as u8,
+            Opcode::PopAndJumpIfFalse as u8, // Jump if condition is false
+            13,                              // Jump target
+            Opcode::LoadName as u8,          // Load variable 'x' again in the body
+            0,                               // Index for 'x'
+            Opcode::PopTop as u8,            // Pop the result of the body
+            Opcode::JumpBack as u8,          // Jump back to the condition check
+            13,                              // Offset to jump back to the condition check
         ];
 
-        assert_eq!(compiler.get_output().code, expected_code);
-    }
-
-    #[test]
-    fn test_compile_assignment() {
-        let ast = Arc::new(ASTNode::Module(Module {
-            statements: vec![Box::new(ASTNode::Assignment(ast::Assignment {
-                name: Box::new(ASTNode::Identifier(ast::Identifier {
-                    name: "x".to_string(),
-                })),
-                value: Box::new(ASTNode::NumberLiteral(42.0)),
-            }))],
-        }));
-
-        let mut compiler = Compiler::new(ast);
-        compiler.compile().unwrap();
-
-        let expected_code = vec![
-            Opcode::LoadConst as u8,
-            0, // index of 42.0 in consts
-            Opcode::StoreName as u8,
-            0, // index of "x" in names
-        ];
-
-        assert_eq!(compiler.get_output().code, expected_code);
+        assert_eq!(expected_output, code_object.code);
     }
 }

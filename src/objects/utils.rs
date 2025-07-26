@@ -1,5 +1,5 @@
 use crate::errors::Error;
-use crate::objects::base::{KyaObject, KyaObjectRef};
+use crate::objects::base::{kya_nb_bool, KyaObject, KyaObjectRef};
 
 pub fn parse_arg(
     args: &Vec<KyaObjectRef>,
@@ -39,15 +39,7 @@ pub fn number_object_to_float(obj: &KyaObjectRef) -> Result<f64, Error> {
 }
 
 pub fn kya_is_true(obj: KyaObjectRef) -> Result<bool, Error> {
-    if obj
-        .lock()
-        .unwrap()
-        .get_type()?
-        .lock()
-        .unwrap()
-        .nb_bool(obj.clone())?
-        != 0.0
-    {
+    if kya_nb_bool(obj.clone())? != 0.0 {
         return Ok(true);
     } else {
         return Ok(false);

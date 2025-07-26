@@ -3,6 +3,7 @@ use crate::errors::Error;
 use crate::interpreter::Frame;
 use crate::objects::base::{kya_call, kya_compare, KyaObject};
 use crate::objects::function_object::function_new;
+use crate::objects::utils::kya_is_true;
 
 pub static OPCODE_HANDLERS: &[fn(&mut Frame) -> Result<(), Error>] = &[
     op_load_const,
@@ -13,6 +14,8 @@ pub static OPCODE_HANDLERS: &[fn(&mut Frame) -> Result<(), Error>] = &[
     op_make_function,
     op_load_attr,
     op_compare,
+    op_jump_back,
+    op_pop_and_jump_if_false,
 ];
 
 fn op_load_const(frame: &mut Frame) -> Result<(), Error> {
@@ -130,6 +133,27 @@ pub fn op_compare(frame: &mut Frame) -> Result<(), Error> {
     let result = kya_compare(left, right, operator)?;
 
     frame.push_stack(result);
+
+    Ok(())
+}
+
+pub fn op_jump_back(frame: &mut Frame) -> Result<(), Error> {
+    let jump_offset = frame.next_opcode() as usize;
+    let current_pc = frame.current_pc();
+
+    frame.set_pc(current_pc - jump_offset);
+
+    Ok(())
+}
+
+pub fn op_pop_and_jump_if_false(frame: &mut Frame) -> Result<(), Error> {
+    let condition = frame.pop_stack()?;
+    let jump_offset = frame.next_opcode() as usize;
+
+    if kya_is_true(condition.clone())? == false {
+        let current_pc = frame.current_pc();
+        frame.set_pc(current_pc + jump_offset);
+    }
 
     Ok(())
 }

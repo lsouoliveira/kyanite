@@ -78,7 +78,7 @@ impl Frame {
         self.pc
     }
 
-    pub fn set_current_pc(&mut self, pc: usize) {
+    pub fn set_pc(&mut self, pc: usize) {
         self.pc = pc;
     }
 
