@@ -1,4 +1,5 @@
 use crate::errors::Error;
+use crate::interpreter::NONE_OBJECT;
 use crate::objects::base::{kya_nb_bool, KyaObject, KyaObjectRef};
 
 pub fn parse_arg(
@@ -6,6 +7,10 @@ pub fn parse_arg(
     index: usize,
     args_count: usize,
 ) -> Result<KyaObjectRef, Error> {
+    if args_count == 0 && args.is_empty() {
+        return Ok(NONE_OBJECT.clone());
+    }
+
     if index >= args_count {
         return Err(Error::RuntimeError(format!(
             "Expected {} arguments, but got {}",

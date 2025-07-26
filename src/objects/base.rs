@@ -15,6 +15,7 @@ use crate::objects::list_object::ListObject;
 use crate::objects::method_object::{MethodObject, METHOD_TYPE};
 use crate::objects::modules::sockets::connection_object::ConnectionObject;
 use crate::objects::modules::sockets::socket_object::SocketObject;
+use crate::objects::modules::threads::lock_object::LockObject;
 use crate::objects::modules::threads::thread_object::ThreadObject;
 use crate::objects::none_object::NoneObject;
 use crate::objects::number_object::NumberObject;
@@ -62,6 +63,7 @@ pub enum KyaObject {
     BoolObject(BoolObject),
     CodeObject(CodeObject),
     ThreadObject(ThreadObject),
+    LockObject(LockObject),
     ListObject(ListObject),
 }
 
@@ -266,6 +268,7 @@ impl KyaObject {
             KyaObject::BoolObject(obj) => Some(obj),
             KyaObject::CodeObject(obj) => Some(obj),
             KyaObject::ThreadObject(obj) => Some(obj),
+            KyaObject::LockObject(obj) => Some(obj),
             KyaObject::ListObject(obj) => Some(obj),
             _ => None,
         }
@@ -364,6 +367,10 @@ impl KyaObject {
 
     pub fn from_thread_object(thread_object: ThreadObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::ThreadObject(thread_object))
+    }
+
+    pub fn from_lock_object(lock_object: LockObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::LockObject(lock_object))
     }
 
     pub fn from_list_object(list_object: ListObject) -> KyaObjectRef {

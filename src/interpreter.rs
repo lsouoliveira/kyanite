@@ -6,6 +6,7 @@ use crate::objects::bool_object::bool_new;
 use crate::objects::class_object::class_new;
 use crate::objects::list_object::LIST_TYPE;
 use crate::objects::modules::sockets::functions::kya_socket;
+use crate::objects::modules::threads::lock_object::LOCK_TYPE;
 use crate::objects::modules::threads::thread_object::THREAD_OBJECT;
 use crate::objects::none_object::none_new;
 use crate::objects::rs_function_object::rs_function_new;
@@ -132,11 +133,13 @@ fn register_builtin_types(frame: &mut Frame) {
     let string_class = class_new(STRING_TYPE.clone());
     let thread_class = class_new(THREAD_OBJECT.clone());
     let list_class = class_new(LIST_TYPE.clone());
+    let lock_class = class_new(LOCK_TYPE.clone());
 
     frame.register_local("Type", type_object);
     frame.register_local("String", string_class);
     frame.register_local("Thread", thread_class);
     frame.register_local("List", list_class);
+    frame.register_local("Lock", lock_class);
 
     // frame.register_local(RS_FUNCTION_TYPE, rs_function_type);
 }
