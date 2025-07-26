@@ -77,12 +77,34 @@ pub fn bytes_length(
     }
 }
 
+pub fn bytes_decode(
+    _callable: KyaObjectRef,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let instance = parse_receiver(&receiver)?;
+
+    if let KyaObject::BytesObject(obj) = &*instance.lock().unwrap() {
+        let decoded_string = String::from_utf8_lossy(&obj.value).to_string();
+        Ok(string_new(decoded_string.as_str()))
+    } else {
+        Err(Error::RuntimeError(format!(
+            "The object '{}' is not a bytes object.",
+            instance.lock().unwrap().get_type()?.lock().unwrap().name
+        )))
+    }
+}
+
 pub static BYTES_TYPE: Lazy<TypeRef> = Lazy::new(|| {
     let dict = Arc::new(Mutex::new(HashMap::new()));
 
     dict.lock()
         .unwrap()
         .insert("length".to_string(), rs_function_new(bytes_length));
+
+    dict.lock()
+        .unwrap()
+        .insert("decode".to_string(), rs_function_new(bytes_decode));
 
     Type::as_ref(Type {
         ob_type: Some(BASE_TYPE.clone()),
