@@ -1,7 +1,7 @@
 use crate::builtins::methods::kya_print;
 use crate::bytecode::CodeObject;
 use crate::errors::Error;
-use crate::lock::kya_acquire_lock;
+use crate::lock::{kya_acquire_lock, kya_release_lock};
 use crate::objects::bool_object::bool_new;
 use crate::objects::class_object::class_new;
 use crate::objects::list_object::LIST_TYPE;
@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::LazyLock as Lazy;
 use std::sync::{Arc, Mutex};
+use std::thread;
 
 pub static NONE_OBJECT: Lazy<KyaObjectRef> =
     Lazy::new(|| none_new().expect("Failed to create None object"));
@@ -183,10 +184,20 @@ impl Interpreter {
 }
 
 pub fn eval_frame(frame: &mut Frame) -> Result<KyaObjectRef, Error> {
+    let mut instructions_processed = 0;
+
     while frame.current_pc() < frame.current_code_length() {
+        if instructions_processed >= 100 {
+            kya_release_lock();
+            thread::yield_now();
+            kya_acquire_lock();
+        }
+
         let opcode = frame.next_opcode();
 
         OPCODE_HANDLERS[opcode as usize](frame)?;
+
+        instructions_processed += 1;
     }
 
     if let Some(object) = frame.stack.last() {
