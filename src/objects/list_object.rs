@@ -5,6 +5,7 @@ use crate::objects::base::{
     kya_compare, kya_init, kya_repr, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef,
     BASE_TYPE,
 };
+use crate::objects::number_object::number_new;
 use crate::objects::rs_function_object::rs_function_new;
 use crate::objects::string_object::string_new;
 use crate::objects::utils::{kya_is_true, parse_arg, parse_receiver, string_object_to_string};
@@ -60,12 +61,20 @@ pub fn list_tp_repr(
     if let KyaObject::ListObject(obj) = &*object {
         let mut output = String::new();
 
+        output.push('[');
+
         for item in &obj.items {
             let repr = kya_repr(item.clone(), &mut vec![], None)?;
             let repr_str = string_object_to_string(&repr)?;
 
-            output.push_str(&repr_str);
+            output.push_str(&format!("{}, ", repr_str));
         }
+
+        if output.ends_with(", ") {
+            output.truncate(output.len() - 2); // Remove the last comma and space
+        }
+
+        output.push(']');
 
         Ok(string_new(&output))
     } else {
@@ -160,6 +169,23 @@ pub fn list_at(
     }
 }
 
+pub fn list_length(
+    _callable: KyaObjectRef,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let instance = parse_receiver(&receiver)?;
+
+    if let KyaObject::ListObject(list_object) = &*instance.lock().unwrap() {
+        Ok(number_new(list_object.items.len() as f64))
+    } else {
+        Err(Error::RuntimeError(format!(
+            "The object '{}' is not a list",
+            instance.lock().unwrap().get_type()?.lock().unwrap().name
+        )))
+    }
+}
+
 pub static LIST_TYPE: Lazy<TypeRef> = Lazy::new(|| {
     let dict = Arc::new(Mutex::new(HashMap::new()));
 
@@ -174,6 +200,10 @@ pub static LIST_TYPE: Lazy<TypeRef> = Lazy::new(|| {
     dict.lock()
         .unwrap()
         .insert("at".to_string(), rs_function_new(list_at));
+
+    dict.lock()
+        .unwrap()
+        .insert("length".to_string(), rs_function_new(list_length));
 
     Type::as_ref(Type {
         ob_type: Some(BASE_TYPE.clone()),
@@ -232,6 +262,18 @@ mod tests {
 
         if let KyaObject::NumberObject(num) = &*item.lock().unwrap() {
             assert_eq!(num.value, 42.0);
+        } else {
+            panic!("Expected a NumberObject");
+        }
+    }
+
+    #[test]
+    fn test_list_length() {
+        let list = list_new(vec![number_new(42.0), number_new(43.0)]);
+        let length = list_length(list.clone(), &mut vec![], Some(list.clone())).unwrap();
+
+        if let KyaObject::NumberObject(num) = &*length.lock().unwrap() {
+            assert_eq!(num.value, 2.0);
         } else {
             panic!("Expected a NumberObject");
         }

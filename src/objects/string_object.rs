@@ -240,6 +240,7 @@ pub static STRING_TYPE: Lazy<TypeRef> = Lazy::new(|| {
         tp_init: Some(string_tp_init),
         tp_compare: Some(string_tp_compare),
         tp_hash: Some(string_tp_hash),
+        dict: dict,
         ..Default::default()
     })
 });

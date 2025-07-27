@@ -43,6 +43,12 @@ pub struct Lexer {
     symbols: HashMap<String, TokenType>,
 }
 
+pub fn unescape_string_literal(s: &str) -> String {
+    s.replace("\\n", "\n")
+        .replace("\\t", "\t")
+        .replace("\\r", "\r")
+}
+
 fn is_newline(c: char) -> bool {
     c == '\n' || c == '\r'
 }
@@ -276,7 +282,7 @@ impl Lexer {
 
         Ok(Some(Token {
             kind: TokenType::StringLiteral,
-            value: content,
+            value: unescape_string_literal(&content),
             line: self.line,
             column: column_start,
         }))

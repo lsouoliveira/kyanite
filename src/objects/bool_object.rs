@@ -1,8 +1,10 @@
+use crate::bytecode::ComparisonOperator;
 use crate::errors::Error;
 use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE};
 use crate::objects::string_object::{StringObject, STRING_TYPE};
 
 use once_cell::sync::Lazy;
+use std::sync::Arc;
 
 pub struct BoolObject {
     pub ob_type: TypeRef,
@@ -52,6 +54,28 @@ pub fn bool_nb_bool(object: KyaObjectRef) -> Result<f64, Error> {
     }
 }
 
+pub fn bool_tp_compare(
+    obj1: KyaObjectRef,
+    obj2: KyaObjectRef,
+    _operator: ComparisonOperator,
+) -> Result<KyaObjectRef, Error> {
+    if Arc::ptr_eq(&obj1, &obj2) {
+        return Ok(bool_new(true));
+    }
+
+    if obj1.lock().unwrap().is_instance_of(&*BOOL_TYPE)?
+        && obj2.lock().unwrap().is_instance_of(&*BOOL_TYPE)?
+    {
+        if let (KyaObject::BoolObject(b1), KyaObject::BoolObject(b2)) =
+            (&*obj1.lock().unwrap(), &*obj2.lock().unwrap())
+        {
+            return Ok(bool_new(b1.value == b2.value));
+        }
+    }
+
+    Ok(bool_new(false))
+}
+
 pub fn bool_new(value: bool) -> KyaObjectRef {
     KyaObject::from_bool_object(BoolObject {
         ob_type: BOOL_TYPE.clone(),
@@ -64,6 +88,7 @@ pub static BOOL_TYPE: Lazy<TypeRef> = Lazy::new(|| {
         ob_type: Some(BASE_TYPE.clone()),
         name: "Bool".to_string(),
         tp_repr: Some(bool_tp_repr),
+        tp_compare: Some(bool_tp_compare),
         nb_bool: Some(bool_nb_bool),
         ..Default::default()
     })
