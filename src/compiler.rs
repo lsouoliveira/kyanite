@@ -1,4 +1,4 @@
-use crate::bytecode::{CodeObject, ComparisonOperator, Opcode};
+use crate::bytecode::{CodeObject, ComparisonOperator, Opcode, Operator};
 use crate::errors::Error;
 use crate::objects::code_object::code_object_new;
 use crate::objects::function_object::function_new;
@@ -268,6 +268,18 @@ impl CompilerVisitor for Compiler {
     }
 
     fn compile_bin_op(&mut self, bin_op: &ast::BinOp) -> Result<(), Error> {
+        bin_op.left.compile(self)?;
+        bin_op.right.compile(self)?;
+        let operator = if let Some(op) = Operator::from_ast_operator(bin_op.operator.clone()) {
+            op
+        } else {
+            return Err(Error::CompilationError(
+                "Binary operator is missing".to_string(),
+            ));
+        };
+        self.code.add_instruction(Opcode::BinaryOp as u8);
+        self.code.add_instruction(operator as u8);
+
         Ok(())
     }
 
@@ -553,5 +565,30 @@ mod tests {
         ];
 
         assert_eq!(expected_output, function_code_object.code.code);
+    }
+
+    #[test]
+    fn test_compile_bin_op() {
+        let bin_op = ASTNode::BinOp(ast::BinOp {
+            left: Box::new(ASTNode::NumberLiteral(5.0)),
+            operator: ast::Operator::Plus,
+            right: Box::new(ASTNode::NumberLiteral(3.0)),
+        });
+
+        let mut compiler = Compiler::new(Arc::new(bin_op));
+        let _ = compiler.compile();
+
+        let code_object = compiler.get_output();
+
+        let expected_output = vec![
+            Opcode::LoadConst as u8, // Load constant 5.0
+            0,                       // Index for constant 5.0
+            Opcode::LoadConst as u8, // Load constant 3.0
+            1,                       // Index for constant 3.0
+            Opcode::BinaryOp as u8,  // Perform addition
+            Operator::Plus as u8,
+        ];
+
+        assert_eq!(expected_output, code_object.code);
     }
 }

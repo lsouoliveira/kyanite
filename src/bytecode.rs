@@ -18,6 +18,7 @@ pub enum Opcode {
     StoreAttr = 12,
     Return = 13,
     Raise = 14,
+    BinaryOp = 15,
 }
 
 #[repr(u8)]
@@ -40,6 +41,7 @@ impl ComparisonOperator {
             ast::Operator::Gte => Some(ComparisonOperator::Gte),
             ast::Operator::Lte => Some(ComparisonOperator::Lte),
             ast::Operator::Neq => Some(ComparisonOperator::Neq),
+            _ => None,
         }
     }
 
@@ -51,6 +53,31 @@ impl ComparisonOperator {
             3 => Some(ComparisonOperator::Gte),
             4 => Some(ComparisonOperator::Lte),
             5 => Some(ComparisonOperator::Neq),
+            _ => None,
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Operator {
+    Plus,
+    Minus,
+}
+
+impl Operator {
+    pub fn from_ast_operator(value: ast::Operator) -> Option<Self> {
+        match value {
+            ast::Operator::Plus => Some(Operator::Plus),
+            ast::Operator::Minus => Some(Operator::Minus),
+            _ => None,
+        }
+    }
+
+    pub fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(Operator::Plus),
+            1 => Some(Operator::Minus),
             _ => None,
         }
     }
@@ -87,6 +114,7 @@ impl Opcode {
             12 => Some(Opcode::StoreAttr),
             13 => Some(Opcode::Return),
             14 => Some(Opcode::Raise),
+            15 => Some(Opcode::BinaryOp),
             _ => None,
         }
     }
@@ -110,6 +138,7 @@ impl std::fmt::Display for Opcode {
             Opcode::StoreAttr => write!(f, "STORE_ATTR"),
             Opcode::Return => write!(f, "RETURN"),
             Opcode::Raise => write!(f, "RAISE"),
+            Opcode::BinaryOp => write!(f, "BINARY_OP"),
         }
     }
 }
@@ -253,6 +282,15 @@ impl Disassembler {
                 12 => {
                     pc = self.write_store_attr(pc);
                 }
+                13 => {
+                    pc = self.write_return(pc);
+                }
+                14 => {
+                    pc = self.write_raise(pc);
+                }
+                15 => {
+                    pc = self.write_binary_op(pc);
+                }
                 _ => {
                     panic!("Unknown opcode: {}", opcode);
                 }
@@ -385,8 +423,22 @@ impl Disassembler {
         pc + 2
     }
 
+    pub fn write_return(&mut self, pc: u8) -> u8 {
+        self.output.push_str("RETURN");
+        pc + 1
+    }
+
     pub fn write_raise(&mut self, pc: u8) -> u8 {
         self.output.push_str("RAISE");
         pc + 1
+    }
+
+    pub fn write_binary_op(&mut self, pc: u8) -> u8 {
+        let op_index = self.instruction_at((pc + 1).into());
+        let op = ComparisonOperator::from_u8(op_index).expect("Invalid binary operation index");
+
+        self.output.push_str(&format!("BINARY_OP {}", op));
+
+        pc + 2
     }
 }

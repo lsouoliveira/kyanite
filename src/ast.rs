@@ -139,6 +139,8 @@ pub enum Operator {
     Gte,
     Lte,
     Neq,
+    Plus,
+    Minus,
 }
 
 impl Operator {
@@ -150,6 +152,8 @@ impl Operator {
             TokenType::Gte => Some(Operator::Gte),
             TokenType::Lte => Some(Operator::Lte),
             TokenType::Neq => Some(Operator::Neq),
+            TokenType::Plus => Some(Operator::Plus),
+            TokenType::Minus => Some(Operator::Minus),
             _ => None,
         }
     }
@@ -211,7 +215,7 @@ impl Block {
 #[derive(Debug, PartialEq, Clone)]
 pub struct BinOp {
     pub left: Box<ASTNode>,
-    pub operator: TokenType,
+    pub operator: Operator,
     pub right: Box<ASTNode>,
 }
 

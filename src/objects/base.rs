@@ -51,6 +51,8 @@ pub type CompareFunctionPtr = fn(
 pub type HashFunctionPtr = fn(obj: KyaObjectRef) -> Result<usize, Error>;
 pub type SetAttrFunctionPtr =
     fn(obj: KyaObjectRef, attr_name: String, value: KyaObjectRef) -> Result<(), Error>;
+pub type BinaryFunctionPtr =
+    fn(obj1: KyaObjectRef, obj2: KyaObjectRef) -> Result<KyaObjectRef, Error>;
 
 pub enum KyaObject {
     NoneObject(NoneObject),
@@ -90,6 +92,8 @@ pub struct Type {
     pub sq_len: Option<LenFunctionPtr>,
     pub tp_compare: Option<CompareFunctionPtr>,
     pub tp_hash: Option<HashFunctionPtr>,
+    pub tp_add: Option<BinaryFunctionPtr>,
+    pub tp_sub: Option<BinaryFunctionPtr>,
     pub dict: DictRef,
 }
 
@@ -414,6 +418,8 @@ impl Default for Type {
             sq_len: None,
             tp_compare: Some(generic_tp_compare),
             tp_hash: Some(generic_tp_hash),
+            tp_add: None,
+            tp_sub: None,
             dict: Arc::new(Mutex::new(std::collections::HashMap::new())),
         }
     }
@@ -542,11 +548,12 @@ pub fn kya_call(
     receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let ob_type = object.lock().unwrap().get_type()?;
+    let ob_name = ob_type.lock().unwrap().name.clone();
     let callable_fn = match ob_type.lock().unwrap().tp_call {
         Some(callable_fn) => Ok(callable_fn),
         None => Err(Error::RuntimeError(format!(
             "The object '{}' is not callable",
-            ob_type.lock().unwrap().name
+            ob_name
         ))),
     }?;
 
@@ -561,11 +568,12 @@ pub fn kya_compare(
     operator: ComparisonOperator,
 ) -> Result<KyaObjectRef, Error> {
     let ob_type = obj1.lock().unwrap().get_type()?;
+    let ob_name = ob_type.lock().unwrap().name.clone();
     let compare_fn = match ob_type.lock().unwrap().tp_compare {
         Some(compare_fn) => Ok(compare_fn),
         None => Err(Error::RuntimeError(format!(
             "The object '{}' does not support comparison",
-            ob_type.lock().unwrap().name
+            ob_name
         ))),
     }?;
 
@@ -576,11 +584,12 @@ pub fn kya_compare(
 
 pub fn kya_nb_bool(obj: KyaObjectRef) -> Result<f64, Error> {
     let ob_type = obj.lock().unwrap().get_type()?;
+    let ob_name = ob_type.lock().unwrap().name.clone();
     let nb_bool_fn = match ob_type.lock().unwrap().nb_bool {
         Some(nb_bool_fn) => Ok(nb_bool_fn),
         None => Err(Error::RuntimeError(format!(
             "The object '{}' does not support boolean conversion",
-            ob_type.lock().unwrap().name
+            ob_name
         ))),
     }?;
 
@@ -591,11 +600,12 @@ pub fn kya_nb_bool(obj: KyaObjectRef) -> Result<f64, Error> {
 
 pub fn kya_sq_len(obj: KyaObjectRef) -> Result<usize, Error> {
     let ob_type = obj.lock().unwrap().get_type()?;
+    let ob_name = ob_type.lock().unwrap().name.clone();
     let sq_len_fn = match ob_type.lock().unwrap().sq_len {
         Some(len_fn) => Ok(len_fn),
         None => Err(Error::RuntimeError(format!(
             "The object '{}' does not support length calculation",
-            ob_type.lock().unwrap().name
+            ob_name
         ))),
     }?;
 
@@ -610,11 +620,12 @@ pub fn kya_repr(
     receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let ob_type = obj.lock().unwrap().get_type()?;
+    let ob_name = ob_type.lock().unwrap().name.clone();
     let tp_repr = match ob_type.lock().unwrap().tp_repr {
         Some(repr_fn) => Ok(repr_fn),
         None => Err(Error::RuntimeError(format!(
             "The object '{}' does not support representation",
-            ob_type.lock().unwrap().name
+            ob_name
         ))),
     }?;
 
@@ -629,11 +640,12 @@ pub fn kya_init(
     receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let ob_type = obj.lock().unwrap().get_type()?;
+    let ob_name = ob_type.lock().unwrap().name.clone();
     let tp_init = match ob_type.lock().unwrap().tp_init {
         Some(init_fn) => Ok(init_fn),
         None => Err(Error::RuntimeError(format!(
             "The object '{}' cannot be initialized",
-            ob_type.lock().unwrap().name
+            ob_name
         ))),
     }?;
 
@@ -644,12 +656,12 @@ pub fn kya_init(
 
 pub fn kya_get_attr(obj: KyaObjectRef, attr_name: String) -> Result<KyaObjectRef, Error> {
     let ob_type = obj.lock().unwrap().get_type()?;
+    let ob_name = ob_type.lock().unwrap().name.clone();
     let get_attr_fn = match ob_type.lock().unwrap().tp_get_attr {
         Some(get_attr_fn) => Ok(get_attr_fn),
         None => Err(Error::RuntimeError(format!(
             "The object '{}' has no attribute '{}'",
-            ob_type.lock().unwrap().name,
-            attr_name
+            ob_name, attr_name
         ))),
     }?;
 
@@ -664,12 +676,12 @@ pub fn kya_set_attr(
     value: KyaObjectRef,
 ) -> Result<(), Error> {
     let ob_type = obj.lock().unwrap().get_type()?;
+    let ob_name = ob_type.lock().unwrap().name.clone();
     let tp_set_attr = match ob_type.lock().unwrap().tp_set_attr {
         Some(set_attr_fn) => Ok(set_attr_fn),
         None => Err(Error::RuntimeError(format!(
             "The object '{}' cannot set attribute '{}'",
-            ob_type.lock().unwrap().name,
-            attr_name
+            ob_name, attr_name
         ))),
     }?;
 
@@ -683,11 +695,12 @@ pub fn kya_new(
     args: &mut Vec<KyaObjectRef>,
     receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
+    let ob_name = ob_type.lock().unwrap().name.clone();
     let tp_new = match ob_type.lock().unwrap().tp_new {
         Some(new_fn) => Ok(new_fn),
         None => Err(Error::RuntimeError(format!(
             "The object '{}' cannot be instantiated",
-            ob_type.lock().unwrap().name
+            ob_name
         ))),
     }?;
 
@@ -696,15 +709,49 @@ pub fn kya_new(
 
 pub fn kya_hash(obj: KyaObjectRef) -> Result<usize, Error> {
     let ob_type = obj.lock().unwrap().get_type()?;
+    let ob_name = ob_type.lock().unwrap().name.clone();
     let tp_hash = match ob_type.lock().unwrap().tp_hash {
         Some(hash_fn) => Ok(hash_fn),
         None => Err(Error::RuntimeError(format!(
             "The object '{}' does not support hashing",
-            ob_type.lock().unwrap().name
+            ob_name
         ))),
     }?;
 
     drop(ob_type);
 
     tp_hash(obj)
+}
+
+pub fn kya_add(obj1: KyaObjectRef, obj2: KyaObjectRef) -> Result<KyaObjectRef, Error> {
+    let ob_type = obj1.lock().unwrap().get_type()?;
+    let ob_name = ob_type.lock().unwrap().name.clone();
+
+    let tp_add = match ob_type.lock().unwrap().tp_add {
+        Some(add_fn) => Ok(add_fn),
+        None => Err(Error::RuntimeError(format!(
+            "The object '{}' does not support addition",
+            ob_name
+        ))),
+    }?;
+
+    drop(ob_type);
+
+    tp_add(obj1, obj2)
+}
+
+pub fn kya_sub(obj1: KyaObjectRef, obj2: KyaObjectRef) -> Result<KyaObjectRef, Error> {
+    let ob_type = obj1.lock().unwrap().get_type()?;
+    let ob_name = ob_type.lock().unwrap().name.clone();
+    let tp_sub = match ob_type.lock().unwrap().tp_sub {
+        Some(sub_fn) => Ok(sub_fn),
+        None => Err(Error::RuntimeError(format!(
+            "The object '{}' does not support subtraction",
+            ob_name
+        ))),
+    }?;
+
+    drop(ob_type);
+
+    tp_sub(obj1, obj2)
 }

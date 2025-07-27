@@ -50,6 +50,56 @@ pub fn number_nb_bool(object: KyaObjectRef) -> Result<f64, Error> {
     }
 }
 
+pub fn number_tp_add(obj1: KyaObjectRef, obj2: KyaObjectRef) -> Result<KyaObjectRef, Error> {
+    let a;
+    let b;
+
+    if let KyaObject::NumberObject(num1) = &*obj1.lock().unwrap() {
+        a = num1.value;
+    } else {
+        return Err(Error::RuntimeError(format!(
+            "Unsupported operand types: '{}' and 'Number'",
+            obj1.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
+    }
+
+    if let KyaObject::NumberObject(num2) = &*obj2.lock().unwrap() {
+        b = num2.value;
+    } else {
+        return Err(Error::RuntimeError(format!(
+            "Unsupported operand types: 'Number' and '{}'",
+            obj2.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
+    }
+
+    Ok(number_new(a + b))
+}
+
+pub fn number_tp_sub(obj1: KyaObjectRef, obj2: KyaObjectRef) -> Result<KyaObjectRef, Error> {
+    let a;
+    let b;
+
+    if let KyaObject::NumberObject(num1) = &*obj1.lock().unwrap() {
+        a = num1.value;
+    } else {
+        return Err(Error::RuntimeError(format!(
+            "Unsupported operand types: '{}' and 'Number'",
+            obj1.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
+    }
+
+    if let KyaObject::NumberObject(num2) = &*obj2.lock().unwrap() {
+        b = num2.value;
+    } else {
+        return Err(Error::RuntimeError(format!(
+            "Unsupported operand types: 'Number' and '{}'",
+            obj2.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
+    }
+
+    Ok(number_new(a - b))
+}
+
 pub fn number_tp_compare(
     obj1: KyaObjectRef,
     obj2: KyaObjectRef,
@@ -100,6 +150,8 @@ pub static NUMBER_TYPE: Lazy<TypeRef> = Lazy::new(|| {
         tp_repr: Some(number_tp_repr),
         nb_bool: Some(number_nb_bool),
         tp_compare: Some(number_tp_compare),
+        tp_add: Some(number_tp_add),
+        tp_sub: Some(number_tp_sub),
         ..Default::default()
     })
 });

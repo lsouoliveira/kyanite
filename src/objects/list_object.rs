@@ -216,6 +216,44 @@ pub static LIST_TYPE: Lazy<TypeRef> = Lazy::new(|| {
     })
 });
 
+pub fn list_slice(
+    _callable: KyaObjectRef,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let instance = parse_receiver(&receiver)?;
+    let start = parse_arg(&args, 0, 1)?;
+    let end = parse_arg(&args, 1, 2)?;
+
+    if let KyaObject::ListObject(list_object) = &*instance.lock().unwrap() {
+        if let (KyaObject::NumberObject(start_num), KyaObject::NumberObject(end_num)) =
+            (&*start.lock().unwrap(), &*end.lock().unwrap())
+        {
+            let start_idx = start_num.value as usize;
+            let end_idx = end_num.value as usize;
+
+            if start_idx < list_object.items.len() && end_idx <= list_object.items.len() {
+                let slice_items = list_object.items[start_idx..end_idx].to_vec();
+                return Ok(list_new(slice_items));
+            } else {
+                return Err(Error::RuntimeError(format!(
+                    "Slice indices out of range: {} to {}",
+                    start_idx, end_idx
+                )));
+            }
+        } else {
+            return Err(Error::TypeError(
+                "Start and end must be numbers".to_string(),
+            ));
+        }
+    } else {
+        return Err(Error::RuntimeError(format!(
+            "The object '{}' is not a list",
+            instance.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

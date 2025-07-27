@@ -283,7 +283,7 @@ impl Parser {
 
     fn parse_sum(&mut self) -> Result<Box<ast::ASTNode>, Error> {
         let mut primary = self.parse_primary()?;
-        let operators = [TokenType::Plus];
+        let operators = [TokenType::Plus, TokenType::Minus];
 
         loop {
             let mut check = false;
@@ -293,7 +293,9 @@ impl Parser {
                     let right = self.parse_primary()?;
                     primary = Box::new(ast::ASTNode::BinOp(ast::BinOp {
                         left: primary,
-                        operator: operator.clone(),
+                        operator: ast::Operator::from_token(operator).ok_or_else(|| {
+                            Error::ParserError(format!("Invalid operator: {:?}", operator))
+                        })?,
                         right,
                     }));
                     check = true;

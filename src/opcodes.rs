@@ -1,8 +1,8 @@
-use crate::bytecode::ComparisonOperator;
+use crate::bytecode::{ComparisonOperator, Operator};
 use crate::errors::Error;
 use crate::interpreter::{eval_frame, Frame};
 use crate::objects::base::{
-    kya_call, kya_compare, kya_get_attr, kya_set_attr, KyaObject, Type, BASE_TYPE,
+    kya_add, kya_call, kya_compare, kya_get_attr, kya_set_attr, kya_sub, KyaObject, Type, BASE_TYPE,
 };
 use crate::objects::class_object::class_new;
 use crate::objects::function_object::function_new;
@@ -26,6 +26,7 @@ pub static OPCODE_HANDLERS: &[fn(&mut Frame) -> Result<(), Error>] = &[
     op_store_attr,
     op_return,
     op_raise,
+    op_bin_op,
 ];
 
 fn op_load_const(frame: &mut Frame) -> Result<(), Error> {
@@ -247,6 +248,23 @@ pub fn op_raise(frame: &mut Frame) -> Result<(), Error> {
     }
 
     frame.set_error(Some(exception.clone()));
+
+    Ok(())
+}
+
+pub fn op_bin_op(frame: &mut Frame) -> Result<(), Error> {
+    let right = frame.pop_stack()?;
+    let left = frame.pop_stack()?;
+    let op = frame.next_opcode();
+    let operator = Operator::from_u8(op)
+        .ok_or_else(|| Error::RuntimeError(format!("Invalid binary operator: {}", op)))?;
+
+    let result = match operator {
+        Operator::Plus => kya_add(left, right)?,
+        Operator::Minus => kya_sub(left, right)?,
+    };
+
+    frame.push_stack(result);
 
     Ok(())
 }
