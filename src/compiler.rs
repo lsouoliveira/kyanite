@@ -349,7 +349,10 @@ impl CompilerVisitor for Compiler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{ASTNode, Module};
+    use crate::{
+        ast::{ASTNode, Module},
+        objects::base::KyaObject,
+    };
 
     #[test]
     fn test_compile_while() {
@@ -498,21 +501,36 @@ mod tests {
 
     #[test]
     fn test_compile_return() {
-        let return_node = ASTNode::Return(ast::Return {
-            value: Some(Box::new(ASTNode::NumberLiteral(42.0))),
+        let return_node = ASTNode::MethodDef(ast::MethodDef {
+            name: "my_method".to_string(),
+            parameters: vec![Box::new(ASTNode::Identifier(ast::Identifier::new(
+                "x".to_string(),
+            )))],
+            body: Box::new(ASTNode::Block(ast::Block::new(vec![Box::new(
+                ASTNode::Return(ast::Return {
+                    value: Some(Box::new(ASTNode::Identifier(ast::Identifier::new(
+                        "x".to_string(),
+                    )))),
+                }),
+            )]))),
         });
 
         let mut compiler = Compiler::new(Arc::new(return_node));
         let _ = compiler.compile();
 
         let code_object = compiler.get_output();
+        let function_code_object = code_object.consts[0].lock().unwrap();
+        let function_code_object = match &*function_code_object {
+            KyaObject::CodeObject(code_object) => code_object,
+            _ => panic!("Expected CodeObject"),
+        };
 
         let expected_output = vec![
-            Opcode::LoadConst as u8, // Load constant 42.0
-            0,                       // Index for constant 42.0
-            Opcode::Return as u8,    // Return from function
+            Opcode::LoadName as u8, // Load variable 'x'
+            0,                      // Index for 'x'
+            Opcode::Return as u8,   // Return from method
         ];
 
-        assert_eq!(expected_output, code_object.code);
+        assert_eq!(expected_output, function_code_object.code.code);
     }
 }

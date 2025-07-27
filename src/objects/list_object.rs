@@ -132,6 +132,34 @@ pub fn list_remove(
     Ok(NONE_OBJECT.clone())
 }
 
+pub fn list_at(
+    _callable: KyaObjectRef,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let instance = parse_receiver(&receiver)?;
+    let index = parse_arg(&args, 0, 1)?;
+
+    if let KyaObject::ListObject(list_object) = &*instance.lock().unwrap() {
+        if let KyaObject::NumberObject(index_number) = &*index.lock().unwrap() {
+            let idx = index_number.value as usize;
+
+            if idx < list_object.items.len() {
+                return Ok(list_object.items[idx].clone());
+            } else {
+                return Err(Error::RuntimeError(format!("Index out of range: {}", idx)));
+            }
+        } else {
+            return Err(Error::TypeError("Index must be a number".to_string()));
+        }
+    } else {
+        return Err(Error::RuntimeError(format!(
+            "The object '{}' is not a list",
+            instance.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
+    }
+}
+
 pub static LIST_TYPE: Lazy<TypeRef> = Lazy::new(|| {
     let dict = Arc::new(Mutex::new(HashMap::new()));
 
@@ -143,6 +171,10 @@ pub static LIST_TYPE: Lazy<TypeRef> = Lazy::new(|| {
         .unwrap()
         .insert("remove".to_string(), rs_function_new(list_remove));
 
+    dict.lock()
+        .unwrap()
+        .insert("at".to_string(), rs_function_new(list_at));
+
     Type::as_ref(Type {
         ob_type: Some(BASE_TYPE.clone()),
         name: "List".to_string(),
@@ -153,3 +185,55 @@ pub static LIST_TYPE: Lazy<TypeRef> = Lazy::new(|| {
         ..Default::default()
     })
 });
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::objects::number_object::number_new;
+
+    #[test]
+    fn test_list_append() {
+        let list = list_new(vec![]);
+        list_append(
+            list.clone(),
+            &mut vec![number_new(42.0)],
+            Some(list.clone()),
+        )
+        .unwrap();
+
+        if let KyaObject::ListObject(list_object) = &*list.lock().unwrap() {
+            assert_eq!(list_object.items.len(), 1);
+        } else {
+            panic!("Expected a ListObject");
+        }
+    }
+
+    #[test]
+    fn test_list_remove() {
+        let list = list_new(vec![number_new(42.0), number_new(43.0)]);
+        list_remove(
+            list.clone(),
+            &mut vec![number_new(42.0)],
+            Some(list.clone()),
+        )
+        .unwrap();
+
+        if let KyaObject::ListObject(list_object) = &*list.lock().unwrap() {
+            assert_eq!(list_object.items.len(), 1);
+        } else {
+            panic!("Expected a ListObject");
+        }
+    }
+
+    #[test]
+    fn test_list_at() {
+        let list = list_new(vec![number_new(42.0), number_new(43.0)]);
+        let item = list_at(list.clone(), &mut vec![number_new(0.0)], Some(list.clone())).unwrap();
+
+        if let KyaObject::NumberObject(num) = &*item.lock().unwrap() {
+            assert_eq!(num.value, 42.0);
+        } else {
+            panic!("Expected a NumberObject");
+        }
+    }
+}
