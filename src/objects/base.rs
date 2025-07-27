@@ -11,6 +11,7 @@ use crate::objects::class_object::{
 };
 use crate::objects::code_object::CodeObject;
 use crate::objects::function_object::FunctionObject;
+use crate::objects::hash_object::HashObject;
 use crate::objects::instance_object::InstanceObject;
 use crate::objects::list_object::ListObject;
 use crate::objects::method_object::{MethodObject, METHOD_TYPE};
@@ -46,6 +47,7 @@ pub type CompareFunctionPtr = fn(
     obj2: KyaObjectRef,
     operator: ComparisonOperator,
 ) -> Result<KyaObjectRef, Error>;
+pub type HashFunctionPtr = fn(obj: KyaObjectRef) -> Result<usize, Error>;
 pub type SetAttrFunctionPtr =
     fn(obj: KyaObjectRef, attr_name: String, value: KyaObjectRef) -> Result<(), Error>;
 
@@ -66,6 +68,7 @@ pub enum KyaObject {
     ThreadObject(ThreadObject),
     LockObject(LockObject),
     ListObject(ListObject),
+    HashObject(HashObject),
 }
 
 pub trait KyaObjectTrait {
@@ -84,6 +87,7 @@ pub struct Type {
     pub nb_bool: Option<NumberCheckFunctionPtr>,
     pub sq_len: Option<LenFunctionPtr>,
     pub tp_compare: Option<CompareFunctionPtr>,
+    pub tp_hash: Option<HashFunctionPtr>,
     pub dict: DictRef,
 }
 
@@ -130,6 +134,10 @@ impl Type {
 
         if self.tp_compare.is_none() {
             self.tp_compare = parent_type.tp_compare.clone();
+        }
+
+        if self.tp_hash.is_none() {
+            self.tp_hash = parent_type.tp_hash.clone();
         }
 
         Ok(())
@@ -271,6 +279,7 @@ impl KyaObject {
             KyaObject::ThreadObject(obj) => Some(obj),
             KyaObject::LockObject(obj) => Some(obj),
             KyaObject::ListObject(obj) => Some(obj),
+            KyaObject::HashObject(obj) => Some(obj),
             _ => None,
         }
     }
@@ -377,6 +386,10 @@ impl KyaObject {
     pub fn from_list_object(list_object: ListObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::ListObject(list_object))
     }
+
+    pub fn from_hash_object(hash_object: HashObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::HashObject(hash_object))
+    }
 }
 
 impl Default for Type {
@@ -393,6 +406,7 @@ impl Default for Type {
             nb_bool: Some(class_nb_bool),
             sq_len: None,
             tp_compare: Some(generic_tp_compare),
+            tp_hash: Some(generic_tp_hash),
             dict: Arc::new(Mutex::new(std::collections::HashMap::new())),
         }
     }
@@ -468,6 +482,12 @@ pub fn generic_tp_compare(
     } else {
         return Ok(FALSE_OBJECT.clone());
     }
+}
+
+pub fn generic_tp_hash(obj: KyaObjectRef) -> Result<usize, Error> {
+    let hash: usize = Arc::as_ptr(&obj) as usize;
+
+    Ok(hash)
 }
 
 pub fn generic_set_attr(
@@ -655,4 +675,19 @@ pub fn kya_new(
     }?;
 
     tp_new(ob_type.clone(), args, receiver)
+}
+
+pub fn kya_hash(obj: KyaObjectRef) -> Result<usize, Error> {
+    let ob_type = obj.lock().unwrap().get_type()?;
+    let tp_hash = match ob_type.lock().unwrap().tp_hash {
+        Some(hash_fn) => Ok(hash_fn),
+        None => Err(Error::RuntimeError(format!(
+            "The object '{}' does not support hashing",
+            ob_type.lock().unwrap().name
+        ))),
+    }?;
+
+    drop(ob_type);
+
+    tp_hash(obj)
 }

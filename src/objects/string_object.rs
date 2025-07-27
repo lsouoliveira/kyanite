@@ -1,12 +1,16 @@
+use crate::bytecode::ComparisonOperator;
 use crate::errors::Error;
 use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE};
+use crate::objects::bool_object::bool_new;
 use crate::objects::list_object::list_new;
 use crate::objects::none_object::none_new;
 use crate::objects::number_object::number_new;
 use crate::objects::rs_function_object::rs_function_new;
 use crate::objects::utils::{parse_arg, parse_receiver};
 use once_cell::sync::Lazy;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
 
 pub struct StringObject {
@@ -93,6 +97,33 @@ pub fn string_length(
     }
 }
 
+pub fn string_tp_hash(obj: KyaObjectRef) -> Result<usize, Error> {
+    let mut hasher = DefaultHasher::new();
+
+    if let KyaObject::StringObject(string_object) = &*obj.lock().unwrap() {
+        string_object.value.hash(&mut hasher);
+        Ok(hasher.finish() as usize)
+    } else {
+        Err(Error::RuntimeError("Expected a string object".to_string()))
+    }
+}
+
+pub fn string_tp_compare(
+    obj1: KyaObjectRef,
+    obj2: KyaObjectRef,
+    _operator: ComparisonOperator,
+) -> Result<KyaObjectRef, Error> {
+    if let (KyaObject::StringObject(string1), KyaObject::StringObject(string2)) =
+        (&*obj1.lock().unwrap(), &*obj2.lock().unwrap())
+    {
+        Ok(bool_new(string1.value == string2.value))
+    } else {
+        Err(Error::RuntimeError(
+            "Expected both objects to be strings".to_string(),
+        ))
+    }
+}
+
 pub fn string_char_at(
     _callable: KyaObjectRef,
     args: &mut Vec<KyaObjectRef>,
@@ -167,6 +198,8 @@ pub static STRING_TYPE: Lazy<TypeRef> = Lazy::new(|| {
         tp_repr: Some(string_tp_repr),
         tp_new: Some(string_tp_new),
         tp_init: Some(string_tp_init),
+        tp_compare: Some(string_tp_compare),
+        tp_hash: Some(string_tp_hash),
         ..Default::default()
     })
 });

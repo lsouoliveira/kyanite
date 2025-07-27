@@ -4,6 +4,7 @@ pub mod bytes_object;
 pub mod class_object;
 pub mod code_object;
 pub mod function_object;
+pub mod hash_object;
 pub mod instance_object;
 pub mod list_object;
 pub mod method_object;
