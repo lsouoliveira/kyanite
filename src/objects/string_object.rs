@@ -1,8 +1,13 @@
 use crate::errors::Error;
 use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE};
+use crate::objects::list_object::list_new;
 use crate::objects::none_object::none_new;
-use crate::objects::utils::parse_arg;
+use crate::objects::number_object::number_new;
+use crate::objects::rs_function_object::rs_function_new;
+use crate::objects::utils::{parse_arg, parse_receiver};
 use once_cell::sync::Lazy;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 pub struct StringObject {
     pub ob_type: TypeRef,
@@ -73,7 +78,89 @@ pub fn string_tp_new(
     Ok(string_new(""))
 }
 
+pub fn string_length(
+    _callable: KyaObjectRef,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let _ = parse_arg(&_args, 0, 0)?;
+    let instance = parse_receiver(&receiver)?;
+
+    if let KyaObject::StringObject(string_object) = &*instance.lock().unwrap() {
+        Ok(number_new(string_object.value.len() as f64))
+    } else {
+        Err(Error::RuntimeError("Expected a string object".to_string()))
+    }
+}
+
+pub fn string_char_at(
+    _callable: KyaObjectRef,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let index = parse_arg(&args, 0, 1)?;
+    let instance = parse_receiver(&receiver)?;
+
+    if let KyaObject::StringObject(string_object) = &*instance.lock().unwrap() {
+        if let KyaObject::NumberObject(number_object) = &*index.lock().unwrap() {
+            let idx = number_object.value as usize;
+            if idx < string_object.value.len() {
+                Ok(string_new(&string_object.value[idx..=idx]))
+            } else {
+                Err(Error::RuntimeError(format!(
+                    "Index out of bounds: {} for string of length {}",
+                    idx,
+                    string_object.value.len()
+                )))
+            }
+        } else {
+            Err(Error::TypeError("Expected a number".to_string()))
+        }
+    } else {
+        Err(Error::RuntimeError("Expected a string object".to_string()))
+    }
+}
+
+pub fn string_split(
+    _callable: KyaObjectRef,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let separator = parse_arg(&args, 0, 1)?;
+    let instance = parse_receiver(&receiver)?;
+
+    if let KyaObject::StringObject(string_object) = &*instance.lock().unwrap() {
+        if let KyaObject::StringObject(separator_string) = &*separator.lock().unwrap() {
+            let parts: Vec<KyaObjectRef> = string_object
+                .value
+                .split(&separator_string.value)
+                .map(|s| string_new(s))
+                .collect();
+
+            Ok(list_new(parts))
+        } else {
+            Err(Error::TypeError("Expected a string".to_string()))
+        }
+    } else {
+        Err(Error::RuntimeError("Expected a string object".to_string()))
+    }
+}
+
 pub static STRING_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    let dict = Arc::new(Mutex::new(HashMap::new()));
+
+    dict.lock()
+        .unwrap()
+        .insert("length".to_string(), rs_function_new(string_length));
+
+    dict.lock()
+        .unwrap()
+        .insert("char_at".to_string(), rs_function_new(string_char_at));
+
+    dict.lock()
+        .unwrap()
+        .insert("split".to_string(), rs_function_new(string_split));
+
     Type::as_ref(Type {
         ob_type: Some(BASE_TYPE.clone()),
         name: "String".to_string(),
