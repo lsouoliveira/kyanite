@@ -110,16 +110,36 @@ pub fn string_tp_hash(obj: KyaObjectRef) -> Result<usize, Error> {
 pub fn string_tp_compare(
     obj1: KyaObjectRef,
     obj2: KyaObjectRef,
-    _operator: ComparisonOperator,
+    operator: ComparisonOperator,
 ) -> Result<KyaObjectRef, Error> {
-    if let (KyaObject::StringObject(string1), KyaObject::StringObject(string2)) =
-        (&*obj1.lock().unwrap(), &*obj2.lock().unwrap())
-    {
-        Ok(bool_to_bool_object(string1.value == string2.value))
+    let a;
+    let b;
+
+    if let KyaObject::StringObject(string1) = &*obj1.lock().unwrap() {
+        a = string1.value.clone();
     } else {
-        Err(Error::RuntimeError(
-            "Expected both objects to be strings".to_string(),
-        ))
+        return Err(Error::RuntimeError(format!(
+            "The first object '{}' is not a string",
+            obj1.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
+    }
+
+    if let KyaObject::StringObject(string2) = &*obj2.lock().unwrap() {
+        b = string2.value.clone();
+    } else {
+        return Err(Error::RuntimeError(format!(
+            "The second object '{}' is not a string",
+            obj2.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
+    }
+
+    match operator {
+        ComparisonOperator::Equal => Ok(bool_to_bool_object(a == b)),
+        ComparisonOperator::Neq => Ok(bool_to_bool_object(a != b)),
+        ComparisonOperator::Gt => Ok(bool_to_bool_object(a > b)),
+        ComparisonOperator::Lt => Ok(bool_to_bool_object(a < b)),
+        ComparisonOperator::Gte => Ok(bool_to_bool_object(a >= b)),
+        ComparisonOperator::Lte => Ok(bool_to_bool_object(a <= b)),
     }
 }
 

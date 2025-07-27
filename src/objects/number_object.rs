@@ -4,6 +4,7 @@ use crate::errors::Error;
 use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE};
 use crate::objects::bool_object::{BoolObject, BOOL_TYPE};
 use crate::objects::string_object::{StringObject, STRING_TYPE};
+use crate::objects::utils::bool_to_bool_object;
 
 use once_cell::sync::Lazy;
 
@@ -52,21 +53,36 @@ pub fn number_nb_bool(object: KyaObjectRef) -> Result<f64, Error> {
 pub fn number_tp_compare(
     obj1: KyaObjectRef,
     obj2: KyaObjectRef,
-    _operator: ComparisonOperator,
+    operator: ComparisonOperator,
 ) -> Result<KyaObjectRef, Error> {
-    if let (KyaObject::NumberObject(num1), KyaObject::NumberObject(num2)) =
-        (&*obj1.lock().unwrap(), &*obj2.lock().unwrap())
-    {
-        return Ok(KyaObject::from_bool_object(BoolObject {
-            ob_type: BOOL_TYPE.clone(),
-            value: num1.value == num2.value,
-        }));
+    let a;
+    let b;
+
+    if let KyaObject::NumberObject(num1) = &*obj1.lock().unwrap() {
+        a = num1.value;
     } else {
         return Err(Error::RuntimeError(format!(
-            "Cannot compare '{}' with '{}'",
-            obj1.lock().unwrap().get_type()?.lock().unwrap().name,
+            "The first object '{}' is not a number",
+            obj1.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
+    }
+
+    if let KyaObject::NumberObject(num2) = &*obj2.lock().unwrap() {
+        b = num2.value;
+    } else {
+        return Err(Error::RuntimeError(format!(
+            "The second object '{}' is not a number",
             obj2.lock().unwrap().get_type()?.lock().unwrap().name
         )));
+    }
+
+    match operator {
+        ComparisonOperator::Equal => Ok(bool_to_bool_object(a == b)),
+        ComparisonOperator::Neq => Ok(bool_to_bool_object(a != b)),
+        ComparisonOperator::Gt => Ok(bool_to_bool_object(a > b)),
+        ComparisonOperator::Lt => Ok(bool_to_bool_object(a < b)),
+        ComparisonOperator::Gte => Ok(bool_to_bool_object(a >= b)),
+        ComparisonOperator::Lte => Ok(bool_to_bool_object(a <= b)),
     }
 }
 

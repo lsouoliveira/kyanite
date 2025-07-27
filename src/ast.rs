@@ -133,6 +133,25 @@ impl Attribute {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Operator {
     Equal,
+    Gt,
+    Lt,
+    Gte,
+    Lte,
+    Neq,
+}
+
+impl Operator {
+    pub fn from_token(token: &TokenType) -> Option<Self> {
+        match token {
+            TokenType::EqEqual => Some(Operator::Equal),
+            TokenType::Gt => Some(Operator::Gt),
+            TokenType::Lt => Some(Operator::Lt),
+            TokenType::Gte => Some(Operator::Gte),
+            TokenType::Lte => Some(Operator::Lte),
+            TokenType::Neq => Some(Operator::Neq),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]

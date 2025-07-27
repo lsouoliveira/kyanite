@@ -10,6 +10,11 @@ pub enum TokenType {
     RightParen,
     Equal,
     EqEqual,
+    Gt,
+    Lt,
+    Gte,
+    Lte,
+    Neq,
     NumberLiteral,
     Def,
     End,
@@ -24,6 +29,7 @@ pub enum TokenType {
     While,
     Break,
     Return,
+    Not,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -88,6 +94,11 @@ fn symbols() -> HashMap<String, TokenType> {
     symbols.insert(")".to_string(), TokenType::RightParen);
     symbols.insert("=".to_string(), TokenType::Equal);
     symbols.insert("==".to_string(), TokenType::EqEqual);
+    symbols.insert(">".to_string(), TokenType::Gt);
+    symbols.insert("<".to_string(), TokenType::Lt);
+    symbols.insert(">=".to_string(), TokenType::Gte);
+    symbols.insert("<=".to_string(), TokenType::Lte);
+    symbols.insert("!=".to_string(), TokenType::Neq);
     symbols.insert("def".to_string(), TokenType::Def);
     symbols.insert("end".to_string(), TokenType::End);
     symbols.insert(",".to_string(), TokenType::Comma);
@@ -100,6 +111,7 @@ fn symbols() -> HashMap<String, TokenType> {
     symbols.insert("while".to_string(), TokenType::While);
     symbols.insert("break".to_string(), TokenType::Break);
     symbols.insert("return".to_string(), TokenType::Return);
+    symbols.insert("!".to_string(), TokenType::Not);
     symbols
 }
 

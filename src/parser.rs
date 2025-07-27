@@ -232,16 +232,36 @@ impl Parser {
     fn parse_comparison(&mut self) -> Result<Box<ast::ASTNode>, Error> {
         let mut primary = self.parse_sum()?;
 
-        loop {
-            if self.accept(TokenType::EqEqual).is_some() {
-                let right = self.parse_sum()?;
+        let operators = [
+            TokenType::EqEqual,
+            TokenType::Gt,
+            TokenType::Lt,
+            TokenType::Gte,
+            TokenType::Lte,
+            TokenType::Neq,
+        ];
 
-                primary = Box::new(ast::ASTNode::Compare(ast::Compare {
-                    left: primary,
-                    operator: ast::Operator::Equal,
-                    right,
-                }));
-            } else {
+        loop {
+            let mut check = false;
+
+            for operator in &operators {
+                if let Some(_) = self.accept(operator.clone()) {
+                    let right = self.parse_sum()?;
+                    let op = ast::Operator::from_token(operator).ok_or_else(|| {
+                        Error::ParserError(format!("Invalid operator: {:?}", operator))
+                    })?;
+
+                    primary = Box::new(ast::ASTNode::Compare(ast::Compare {
+                        left: primary,
+                        operator: op,
+                        right,
+                    }));
+
+                    check = true;
+                }
+            }
+
+            if !check {
                 break;
             }
         }

@@ -1,4 +1,4 @@
-use crate::objects::base::KyaObjectRef;
+use crate::{ast, objects::base::KyaObjectRef};
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,12 +23,33 @@ pub enum Opcode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ComparisonOperator {
     Equal = 0,
+    Gt = 1,
+    Lt = 2,
+    Gte = 3,
+    Lte = 4,
+    Neq = 5,
 }
 
 impl ComparisonOperator {
+    pub fn from_ast_operator(value: ast::Operator) -> Option<Self> {
+        match value {
+            ast::Operator::Equal => Some(ComparisonOperator::Equal),
+            ast::Operator::Gt => Some(ComparisonOperator::Gt),
+            ast::Operator::Lt => Some(ComparisonOperator::Lt),
+            ast::Operator::Gte => Some(ComparisonOperator::Gte),
+            ast::Operator::Lte => Some(ComparisonOperator::Lte),
+            ast::Operator::Neq => Some(ComparisonOperator::Neq),
+        }
+    }
+
     pub fn from_u8(value: u8) -> Option<Self> {
         match value {
             0 => Some(ComparisonOperator::Equal),
+            1 => Some(ComparisonOperator::Gt),
+            2 => Some(ComparisonOperator::Lt),
+            3 => Some(ComparisonOperator::Gte),
+            4 => Some(ComparisonOperator::Lte),
+            5 => Some(ComparisonOperator::Neq),
             _ => None,
         }
     }
@@ -38,6 +59,11 @@ impl std::fmt::Display for ComparisonOperator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ComparisonOperator::Equal => write!(f, "EQUAL"),
+            ComparisonOperator::Gt => write!(f, "GT"),
+            ComparisonOperator::Lt => write!(f, "LT"),
+            ComparisonOperator::Gte => write!(f, "GTE"),
+            ComparisonOperator::Lte => write!(f, "LTE"),
+            ComparisonOperator::Neq => write!(f, "NEQ"),
         }
     }
 }

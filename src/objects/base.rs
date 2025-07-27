@@ -475,12 +475,22 @@ fn get_attr_helper(object: KyaObjectRef, attr_name: String) -> Result<KyaObjectR
 pub fn generic_tp_compare(
     obj1: KyaObjectRef,
     obj2: KyaObjectRef,
-    _operator: ComparisonOperator,
+    operator: ComparisonOperator,
 ) -> Result<KyaObjectRef, Error> {
-    if Arc::ptr_eq(&obj1, &obj2) {
-        return Ok(TRUE_OBJECT.clone());
-    } else {
-        return Ok(FALSE_OBJECT.clone());
+    match operator {
+        ComparisonOperator::Equal => {
+            if Arc::ptr_eq(&obj1, &obj2) {
+                return Ok(TRUE_OBJECT.clone());
+            } else {
+                return Ok(FALSE_OBJECT.clone());
+            }
+        }
+        _ => {
+            return Err(Error::RuntimeError(format!(
+                "Comparison operator '{:?}' is not supported",
+                operator
+            )));
+        }
     }
 }
 

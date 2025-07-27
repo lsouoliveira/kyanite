@@ -232,8 +232,17 @@ impl CompilerVisitor for Compiler {
         compare.left.compile(self)?;
         compare.right.compile(self)?;
 
+        let operator =
+            if let Some(op) = ComparisonOperator::from_ast_operator(compare.operator.clone()) {
+                op
+            } else {
+                return Err(Error::CompilationError(
+                    "Comparison operator is missing".to_string(),
+                ));
+            };
+
         self.code.add_instruction(Opcode::Compare as u8);
-        self.code.add_instruction(ComparisonOperator::Equal as u8);
+        self.code.add_instruction(operator as u8);
 
         Ok(())
     }
