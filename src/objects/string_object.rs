@@ -143,6 +143,22 @@ pub fn string_tp_compare(
     }
 }
 
+pub fn string_tp_add(obj1: KyaObjectRef, obj2: KyaObjectRef) -> Result<KyaObjectRef, Error> {
+    if let KyaObject::StringObject(string1) = &*obj1.lock().unwrap() {
+        if let KyaObject::StringObject(string2) = &*obj2.lock().unwrap() {
+            let new_value = format!("{}{}", string1.value, string2.value);
+
+            return Ok(string_new(&new_value));
+        }
+    }
+
+    Err(Error::RuntimeError(format!(
+        "Unsupported operand type(s) for +: '{}' and '{}'",
+        obj1.lock().unwrap().get_type()?.lock().unwrap().name,
+        obj2.lock().unwrap().get_type()?.lock().unwrap().name
+    )))
+}
+
 pub fn string_char_at(
     _callable: KyaObjectRef,
     args: &mut Vec<KyaObjectRef>,
@@ -255,6 +271,10 @@ pub static STRING_TYPE: Lazy<TypeRef> = Lazy::new(|| {
         .unwrap()
         .insert("concat".to_string(), rs_function_new(string_concat));
 
+    dict.lock()
+        .unwrap()
+        .insert("strip".to_string(), rs_function_new(string_strip));
+
     Type::as_ref(Type {
         ob_type: Some(BASE_TYPE.clone()),
         name: "String".to_string(),
@@ -263,6 +283,7 @@ pub static STRING_TYPE: Lazy<TypeRef> = Lazy::new(|| {
         tp_init: Some(string_tp_init),
         tp_compare: Some(string_tp_compare),
         tp_hash: Some(string_tp_hash),
+        tp_add: Some(string_tp_add),
         dict: dict,
         ..Default::default()
     })
@@ -283,6 +304,21 @@ pub fn string_concat(
         } else {
             Err(Error::TypeError("Expected a string".to_string()))
         }
+    } else {
+        Err(Error::RuntimeError("Expected a string object".to_string()))
+    }
+}
+
+pub fn string_strip(
+    _callable: KyaObjectRef,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let instance = parse_receiver(&receiver)?;
+
+    if let KyaObject::StringObject(string_object) = &*instance.lock().unwrap() {
+        let stripped_value = string_object.value.trim().to_string();
+        Ok(string_new(&stripped_value))
     } else {
         Err(Error::RuntimeError("Expected a string object".to_string()))
     }
@@ -400,6 +436,21 @@ mod tests {
         assert!(concat_result.is_ok());
         if let Ok(concat_obj) = concat_result {
             if let KyaObject::StringObject(string_object) = &*concat_obj.lock().unwrap() {
+                assert_eq!(string_object.value, "Hello, World!");
+            } else {
+                panic!("Expected a StringObject");
+            }
+        }
+    }
+
+    #[test]
+    fn test_string_strip() {
+        let string = string_new("   Hello, World!   ");
+        let strip_result = string_strip(string.clone(), &mut vec![], Some(string.clone()));
+
+        assert!(strip_result.is_ok());
+        if let Ok(stripped_obj) = strip_result {
+            if let KyaObject::StringObject(string_object) = &*stripped_obj.lock().unwrap() {
                 assert_eq!(string_object.value, "Hello, World!");
             } else {
                 panic!("Expected a StringObject");

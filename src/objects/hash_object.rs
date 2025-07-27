@@ -57,18 +57,16 @@ pub fn hash_tp_init(
 }
 
 pub fn hash_tp_repr(
-    _callable: KyaObjectRef,
+    callable: KyaObjectRef,
     _args: &mut Vec<KyaObjectRef>,
-    receiver: Option<KyaObjectRef>,
+    _receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
-    let instance = parse_receiver(&receiver)?;
-
-    let items = match &*instance.lock().unwrap() {
+    let items = match &*callable.lock().unwrap() {
         KyaObject::HashObject(hash) => hash.items.clone(),
         _ => {
             return Err(Error::RuntimeError(format!(
                 "The object '{}' is not a hash",
-                instance.lock().unwrap().get_type()?.lock().unwrap().name
+                callable.lock().unwrap().get_type()?.lock().unwrap().name
             )))
         }
     };

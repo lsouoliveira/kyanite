@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::bytecode::ComparisonOperator;
 use crate::errors::Error;
-use crate::interpreter::{FALSE_OBJECT, TRUE_OBJECT};
+use crate::interpreter::{FALSE_OBJECT, NONE_OBJECT, TRUE_OBJECT};
 use crate::objects::bool_object::BoolObject;
 use crate::objects::bytes_object::BytesObject;
 use crate::objects::class_object::{
@@ -22,8 +22,10 @@ use crate::objects::modules::threads::lock_object::LockObject;
 use crate::objects::modules::threads::thread_object::ThreadObject;
 use crate::objects::none_object::NoneObject;
 use crate::objects::number_object::NumberObject;
-use crate::objects::rs_function_object::RsFunctionObject;
+use crate::objects::rs_function_object::{rs_function_new, RsFunctionObject};
 use crate::objects::string_object::StringObject;
+use crate::objects::url_object::UrlObject;
+use crate::objects::utils::parse_receiver;
 
 pub type KyaObjectRef = Arc<Mutex<KyaObject>>;
 pub type TypeRef = Arc<Mutex<Type>>;
@@ -73,6 +75,7 @@ pub enum KyaObject {
     ListObject(ListObject),
     HashObject(HashObject),
     ExceptionObject(ExceptionObject),
+    UrlObject(UrlObject),
 }
 
 pub trait KyaObjectTrait {
@@ -287,6 +290,7 @@ impl KyaObject {
             KyaObject::ListObject(obj) => Some(obj),
             KyaObject::HashObject(obj) => Some(obj),
             KyaObject::ExceptionObject(obj) => Some(obj),
+            KyaObject::UrlObject(obj) => Some(obj),
             _ => None,
         }
     }
@@ -400,6 +404,10 @@ impl KyaObject {
 
     pub fn from_exception(exception: ExceptionObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::ExceptionObject(exception))
+    }
+
+    pub fn from_url_object(url_object: UrlObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::UrlObject(url_object))
     }
 }
 
@@ -541,6 +549,16 @@ pub static BASE_TYPE: Lazy<TypeRef> = Lazy::new(|| {
 
     base_type
 });
+
+pub fn default_repr(
+    _obj: KyaObjectRef,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let instance = parse_receiver(&receiver)?;
+
+    kya_repr(instance, args, receiver)
+}
 
 pub fn kya_call(
     object: KyaObjectRef,

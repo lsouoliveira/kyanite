@@ -14,4 +14,5 @@ pub mod none_object;
 pub mod number_object;
 pub mod rs_function_object;
 pub mod string_object;
+pub mod url_object;
 pub mod utils;

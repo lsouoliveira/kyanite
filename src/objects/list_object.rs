@@ -205,6 +205,10 @@ pub static LIST_TYPE: Lazy<TypeRef> = Lazy::new(|| {
         .unwrap()
         .insert("length".to_string(), rs_function_new(list_length));
 
+    dict.lock()
+        .unwrap()
+        .insert("slice".to_string(), rs_function_new(list_slice));
+
     Type::as_ref(Type {
         ob_type: Some(BASE_TYPE.clone()),
         name: "List".to_string(),

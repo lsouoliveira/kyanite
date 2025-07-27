@@ -13,6 +13,7 @@ use crate::objects::modules::threads::thread_object::THREAD_OBJECT;
 use crate::objects::none_object::none_new;
 use crate::objects::rs_function_object::rs_function_new;
 use crate::objects::string_object::{string_new, STRING_TYPE};
+use crate::objects::url_object::URL_TYPE;
 use crate::objects::utils::{object_to_string_repr, string_object_to_string};
 use crate::opcodes::OPCODE_HANDLERS;
 use std::collections::HashMap;
@@ -26,7 +27,7 @@ pub static NONE_OBJECT: Lazy<KyaObjectRef> =
 pub static TRUE_OBJECT: Lazy<KyaObjectRef> = Lazy::new(|| bool_new(true));
 pub static FALSE_OBJECT: Lazy<KyaObjectRef> = Lazy::new(|| bool_new(false));
 
-use crate::objects::base::{DictRef, KyaObject, KyaObjectRef, BASE_TYPE};
+use crate::objects::base::{default_repr, DictRef, KyaObject, KyaObjectRef, BASE_TYPE};
 
 pub struct Interpreter {
     root: PathBuf,
@@ -150,6 +151,7 @@ fn register_builtin_types(frame: &mut Frame) {
     let lock_class = class_new(LOCK_TYPE.clone());
     let hash_class = class_new(HASH_TYPE.clone());
     let exception_class = class_new(EXCEPTION_TYPE.clone());
+    let url_class = class_new(URL_TYPE.clone());
 
     frame.register_local("Type", type_object);
     frame.register_local("String", string_class);
@@ -158,6 +160,7 @@ fn register_builtin_types(frame: &mut Frame) {
     frame.register_local("Lock", lock_class);
     frame.register_local("Hash", hash_class);
     frame.register_local("Exception", exception_class);
+    frame.register_local("Url", url_class);
 
     // frame.register_local(RS_FUNCTION_TYPE, rs_function_type);
 }
@@ -250,7 +253,7 @@ pub fn eval_frame(frame: &mut Frame) -> Result<KyaObjectRef, Error> {
 fn map_error_to_exception(error: Error) -> Result<KyaObjectRef, Error> {
     let message = match error {
         Error::RuntimeError(msg) => msg,
-        _ => "An error occurred".to_string(),
+        _ => error.to_string(),
     };
 
     let exception_object = exception_new(string_new(&message));
