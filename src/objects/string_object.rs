@@ -177,6 +177,42 @@ pub fn string_split(
     }
 }
 
+pub fn string_substr(
+    _callable: KyaObjectRef,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let start = parse_arg(&args, 0, 1)?;
+    let end = parse_arg(&args, 1, 2)?;
+    let instance = parse_receiver(&receiver)?;
+
+    if let KyaObject::StringObject(string_object) = &*instance.lock().unwrap() {
+        if let (KyaObject::NumberObject(start_num), KyaObject::NumberObject(end_num)) =
+            (&*start.lock().unwrap(), &*end.lock().unwrap())
+        {
+            let start_idx = start_num.value as usize;
+            let end_idx = end_num.value as usize;
+
+            if start_idx <= end_idx && end_idx <= string_object.value.len() {
+                Ok(string_new(&string_object.value[start_idx..end_idx]))
+            } else {
+                Err(Error::RuntimeError(format!(
+                    "Invalid substring range: {} to {} for string of length {}",
+                    start_idx,
+                    end_idx,
+                    string_object.value.len()
+                )))
+            }
+        } else {
+            Err(Error::TypeError(
+                "Expected numbers for start and end".to_string(),
+            ))
+        }
+    } else {
+        Err(Error::RuntimeError("Expected a string object".to_string()))
+    }
+}
+
 pub static STRING_TYPE: Lazy<TypeRef> = Lazy::new(|| {
     let dict = Arc::new(Mutex::new(HashMap::new()));
 
@@ -192,6 +228,10 @@ pub static STRING_TYPE: Lazy<TypeRef> = Lazy::new(|| {
         .unwrap()
         .insert("split".to_string(), rs_function_new(string_split));
 
+    dict.lock()
+        .unwrap()
+        .insert("substr".to_string(), rs_function_new(string_substr));
+
     Type::as_ref(Type {
         ob_type: Some(BASE_TYPE.clone()),
         name: "String".to_string(),
@@ -203,3 +243,103 @@ pub static STRING_TYPE: Lazy<TypeRef> = Lazy::new(|| {
         ..Default::default()
     })
 });
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_string_new() {
+        let string = string_new("Hello, World!");
+
+        assert_eq!(
+            string
+                .lock()
+                .unwrap()
+                .get_type()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .name,
+            "String"
+        );
+
+        if let KyaObject::StringObject(string_object) = &*string.lock().unwrap() {
+            assert_eq!(string_object.value, "Hello, World!");
+        } else {
+            panic!("Expected a StringObject");
+        }
+    }
+
+    #[test]
+    fn test_string_length() {
+        let string = string_new("Hello, World!");
+        let length = string_length(string.clone(), &mut vec![], Some(string.clone()));
+
+        assert!(length.is_ok());
+        if let Ok(length_obj) = length {
+            if let KyaObject::NumberObject(number_object) = &*length_obj.lock().unwrap() {
+                assert_eq!(number_object.value, 13.0);
+            } else {
+                panic!("Expected a NumberObject");
+            }
+        }
+    }
+
+    #[test]
+    fn test_string_char_at() {
+        let string = string_new("Hello, World!");
+        let char_at = string_char_at(
+            string.clone(),
+            &mut vec![number_new(7.0)],
+            Some(string.clone()),
+        );
+
+        assert!(char_at.is_ok());
+        if let Ok(char_obj) = char_at {
+            if let KyaObject::StringObject(string_object) = &*char_obj.lock().unwrap() {
+                assert_eq!(string_object.value, "W");
+            } else {
+                panic!("Expected a StringObject");
+            }
+        }
+    }
+
+    #[test]
+    fn test_string_split() {
+        let string = string_new("Hello, World!");
+        let split_result = string_split(
+            string.clone(),
+            &mut vec![string_new(", ")],
+            Some(string.clone()),
+        );
+
+        assert!(split_result.is_ok());
+        if let Ok(list_obj) = split_result {
+            if let KyaObject::ListObject(list_object) = &*list_obj.lock().unwrap() {
+                assert_eq!(list_object.items.len(), 2);
+            } else {
+                panic!("Expected a ListObject");
+            }
+        }
+    }
+
+    #[test]
+    fn test_string_substr() {
+        let string = string_new("Hello, World!");
+        let substr_result = string_substr(
+            string.clone(),
+            &mut vec![number_new(7.0), number_new(12.0)],
+            Some(string.clone()),
+        );
+
+        assert!(substr_result.is_ok());
+        if let Ok(substr_obj) = substr_result {
+            if let KyaObject::StringObject(string_object) = &*substr_obj.lock().unwrap() {
+                assert_eq!(string_object.value, "World");
+            } else {
+                panic!("Expected a StringObject");
+            }
+        }
+    }
+}
