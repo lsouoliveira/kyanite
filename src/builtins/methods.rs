@@ -1,6 +1,6 @@
 use crate::errors::Error;
+use crate::interpreter::NONE_OBJECT;
 use crate::objects::base::KyaObjectRef;
-use crate::objects::none_object::none_new;
 use crate::objects::utils::string_object_to_string;
 
 pub fn kya_print(
@@ -28,5 +28,5 @@ pub fn kya_print(
 
     println!("{}", output);
 
-    Ok(none_new()?)
+    Ok(NONE_OBJECT.clone())
 }

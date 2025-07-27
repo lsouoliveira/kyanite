@@ -8,7 +8,6 @@ use crate::interpreter::{eval_frame, Frame};
 use crate::objects::base::{
     DictRef, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE,
 };
-use crate::objects::none_object::none_new;
 use crate::objects::string_object::{StringObject, STRING_TYPE};
 
 pub struct FunctionObject {

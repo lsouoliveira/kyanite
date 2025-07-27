@@ -1,5 +1,5 @@
 use crate::errors::Error;
-use crate::interpreter::NONE_OBJECT;
+use crate::interpreter::{FALSE_OBJECT, NONE_OBJECT, TRUE_OBJECT};
 use crate::objects::base::{kya_nb_bool, KyaObject, KyaObjectRef};
 
 pub fn parse_arg(
@@ -40,6 +40,14 @@ pub fn number_object_to_float(obj: &KyaObjectRef) -> Result<f64, Error> {
         Ok(number_obj.value)
     } else {
         Err(Error::RuntimeError("Expected a Number".to_string()))
+    }
+}
+
+pub fn bool_to_bool_object(value: bool) -> KyaObjectRef {
+    if value {
+        TRUE_OBJECT.clone()
+    } else {
+        FALSE_OBJECT.clone()
     }
 }
 

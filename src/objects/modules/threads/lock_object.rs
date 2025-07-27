@@ -1,9 +1,9 @@
 use crate::errors::Error;
+use crate::interpreter::NONE_OBJECT;
 use crate::lock::{kya_acquire_lock, kya_release_lock};
 use crate::objects::base::{
     kya_call, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE,
 };
-use crate::objects::none_object::none_new;
 use crate::objects::rs_function_object::rs_function_new;
 use crate::objects::string_object::string_new;
 use crate::objects::utils::{parse_arg, parse_receiver};
@@ -98,7 +98,7 @@ pub fn lock_tp_init(
     _args: &mut Vec<KyaObjectRef>,
     _receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
-    Ok(none_new()?)
+    Ok(NONE_OBJECT.clone())
 }
 
 pub fn lock_acquire(
@@ -114,7 +114,7 @@ pub fn lock_acquire(
         lock_object.acquire()?;
         kya_acquire_lock();
 
-        Ok(none_new()?)
+        Ok(NONE_OBJECT.clone())
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' is not a lock",
@@ -136,7 +136,7 @@ pub fn lock_release(
         lock_object.release()?;
         kya_acquire_lock();
 
-        Ok(none_new()?)
+        Ok(NONE_OBJECT.clone())
     } else {
         Err(Error::RuntimeError(format!(
             "The object '{}' is not a lock",

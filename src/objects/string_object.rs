@@ -1,12 +1,11 @@
 use crate::bytecode::ComparisonOperator;
 use crate::errors::Error;
+use crate::interpreter::NONE_OBJECT;
 use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE};
-use crate::objects::bool_object::bool_new;
 use crate::objects::list_object::list_new;
-use crate::objects::none_object::none_new;
 use crate::objects::number_object::number_new;
 use crate::objects::rs_function_object::rs_function_new;
-use crate::objects::utils::{parse_arg, parse_receiver};
+use crate::objects::utils::{bool_to_bool_object, parse_arg, parse_receiver};
 use once_cell::sync::Lazy;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -68,7 +67,7 @@ pub fn string_tp_init(
             return Err(Error::RuntimeError("Expected a string object".to_string()));
         }
 
-        Ok(none_new()?)
+        Ok(NONE_OBJECT.clone())
     } else {
         Err(Error::RuntimeError("Expected a string object".to_string()))
     }
@@ -116,7 +115,7 @@ pub fn string_tp_compare(
     if let (KyaObject::StringObject(string1), KyaObject::StringObject(string2)) =
         (&*obj1.lock().unwrap(), &*obj2.lock().unwrap())
     {
-        Ok(bool_new(string1.value == string2.value))
+        Ok(bool_to_bool_object(string1.value == string2.value))
     } else {
         Err(Error::RuntimeError(
             "Expected both objects to be strings".to_string(),
