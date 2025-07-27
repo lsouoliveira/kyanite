@@ -14,6 +14,7 @@ pub enum Error {
     NotImplemented(String),
     CompilationError(String),
     SyntaxError(String),
+    Exception(String, String),
 }
 
 #[derive(Debug, Clone)]
@@ -71,6 +72,12 @@ impl std::fmt::Display for Error {
             ),
             Error::CompilationError(msg) => write!(f, "{}", format_error("Compilation Error", msg)),
             Error::SyntaxError(msg) => write!(f, "{}", format_error("Syntax Error", msg)),
+            Error::Exception(exception_type, message) => write!(
+                f,
+                "{}: {}",
+                exception_type.purple().bold(),
+                message.red().bold()
+            ),
         }
     }
 }

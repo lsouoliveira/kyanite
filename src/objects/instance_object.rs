@@ -1,6 +1,7 @@
 use crate::errors::Error;
 use crate::objects::base::{
-    kya_call, DictRef, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE,
+    kya_call, kya_get_attr, DictRef, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef,
+    BASE_TYPE,
 };
 use crate::objects::method_object::{MethodObject, METHOD_TYPE};
 use crate::objects::string_object::{StringObject, STRING_TYPE};
@@ -64,36 +65,14 @@ pub fn instance_tp_init(
 pub fn instance_tp_repr(
     callable: KyaObjectRef,
     args: &mut Vec<KyaObjectRef>,
-    receiver: Option<KyaObjectRef>,
+    _receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
-    let object = callable.lock().unwrap();
+    let repr = kya_get_attr(callable.clone(), "__repr__".to_string());
 
-    if let KyaObject::InstanceObject(_) = &*object {
-        let ob_type = callable.lock().unwrap().get_type()?;
-        let tp_get_attr_fn = ob_type.lock().unwrap().tp_get_attr;
-
-        if tp_get_attr_fn.is_none() {
-            return instance_default_repr(callable.clone(), args, receiver);
-        }
-
-        let repr = tp_get_attr_fn.unwrap()(callable.clone(), "__repr__".to_string());
-
-        if let Ok(repr) = repr {
-            let result = repr.lock().unwrap().get_type()?.lock().unwrap().call(
-                repr.clone(),
-                &mut vec![],
-                receiver,
-            );
-
-            result
-        } else {
-            instance_default_repr(callable.clone(), args, receiver)
-        }
+    if repr.is_ok() {
+        kya_call(repr.unwrap(), args, Some(callable.clone()))
     } else {
-        Err(Error::RuntimeError(format!(
-            "The object '{}' is not a instance",
-            object.get_type()?.lock().unwrap().name
-        )))
+        instance_default_repr(callable, args, None)
     }
 }
 

@@ -30,6 +30,7 @@ pub enum TokenType {
     Break,
     Return,
     Not,
+    Raise,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -112,6 +113,7 @@ fn symbols() -> HashMap<String, TokenType> {
     symbols.insert("break".to_string(), TokenType::Break);
     symbols.insert("return".to_string(), TokenType::Return);
     symbols.insert("!".to_string(), TokenType::Not);
+    symbols.insert("raise".to_string(), TokenType::Raise);
     symbols
 }
 
@@ -710,5 +712,38 @@ mod tests {
         assert_eq!(tokens[1].value, "value");
         assert_eq!(tokens[1].line, 1);
         assert_eq!(tokens[1].column, 8);
+    }
+
+    #[test]
+    fn test_raise_keyword() {
+        let mut lexer = Lexer::new("raise Exception()\n".to_string());
+        let tokens = [
+            lexer.next_token().unwrap().unwrap(),
+            lexer.next_token().unwrap().unwrap(),
+        ];
+
+        assert_eq!(tokens[0].kind, TokenType::Raise);
+        assert_eq!(tokens[0].value, "raise");
+        assert_eq!(tokens[0].line, 1);
+        assert_eq!(tokens[0].column, 1);
+
+        assert_eq!(tokens[1].kind, TokenType::Identifier);
+        assert_eq!(tokens[1].value, "Exception");
+        assert_eq!(tokens[1].line, 1);
+        assert_eq!(tokens[1].column, 7);
+
+        let token = lexer.next_token().unwrap().unwrap();
+
+        assert_eq!(token.kind, TokenType::LeftParen);
+        assert_eq!(token.value, "(");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 16);
+
+        let token = lexer.next_token().unwrap().unwrap();
+
+        assert_eq!(token.kind, TokenType::RightParen);
+        assert_eq!(token.value, ")");
+        assert_eq!(token.line, 1);
+        assert_eq!(token.column, 17);
     }
 }

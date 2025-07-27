@@ -25,6 +25,7 @@ pub static OPCODE_HANDLERS: &[fn(&mut Frame) -> Result<(), Error>] = &[
     op_make_class,
     op_store_attr,
     op_return,
+    op_raise,
 ];
 
 fn op_load_const(frame: &mut Frame) -> Result<(), Error> {
@@ -189,6 +190,7 @@ pub fn op_make_class(frame: &mut Frame) -> Result<(), Error> {
             pc: 0,
             stack: vec![],
             return_value: None,
+            error: None,
         };
 
         let _ = eval_frame(&mut frame_ref);
@@ -230,6 +232,21 @@ pub fn op_return(frame: &mut Frame) -> Result<(), Error> {
     let return_value = frame.pop_stack()?;
 
     frame.set_return_value(Some(return_value));
+
+    Ok(())
+}
+
+pub fn op_raise(frame: &mut Frame) -> Result<(), Error> {
+    let exception = frame.pop_stack()?;
+
+    if !matches!(*exception.lock().unwrap(), KyaObject::ExceptionObject(_)) {
+        return Err(Error::RuntimeError(format!(
+            "Expected an ExceptionObject, but got '{}'",
+            exception.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
+    }
+
+    frame.set_error(Some(exception.clone()));
 
     Ok(())
 }

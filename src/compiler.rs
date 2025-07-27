@@ -353,6 +353,18 @@ impl CompilerVisitor for Compiler {
 
         Ok(())
     }
+
+    fn compile_raise(&mut self, raise: &ast::Raise) -> Result<(), Error> {
+        if let Some(message) = &raise.message {
+            message.compile(self)?;
+        } else {
+            self.load_variable("None".to_string());
+        }
+
+        self.code.add_instruction(Opcode::Raise as u8);
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

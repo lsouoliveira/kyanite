@@ -1,6 +1,6 @@
 use crate::errors::Error;
 use crate::interpreter::{FALSE_OBJECT, NONE_OBJECT, TRUE_OBJECT};
-use crate::objects::base::{kya_nb_bool, KyaObject, KyaObjectRef};
+use crate::objects::base::{kya_nb_bool, kya_repr, KyaObject, KyaObjectRef};
 
 pub fn parse_arg(
     args: &Vec<KyaObjectRef>,
@@ -73,4 +73,10 @@ pub fn parse_receiver(receiver: &Option<KyaObjectRef>) -> Result<KyaObjectRef, E
     } else {
         Err(Error::RuntimeError("Receiver is None".to_string()))
     }
+}
+
+pub fn object_to_string_repr(obj: &KyaObjectRef) -> Result<String, Error> {
+    let string_object = kya_repr(obj.clone(), &mut vec![], None)?;
+
+    Ok(string_object_to_string(&string_object)?)
 }

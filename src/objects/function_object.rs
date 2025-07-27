@@ -79,6 +79,7 @@ pub fn function_call(
             pc: 0,
             stack: vec![],
             return_value: None,
+            error: None,
         };
 
         eval_frame(&mut frame_ref)

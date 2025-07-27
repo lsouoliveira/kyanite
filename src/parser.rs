@@ -54,6 +54,8 @@ impl Parser {
             Box::new(ast::ASTNode::Break())
         } else if self.accept(TokenType::Return).is_some() {
             self.parse_return()?
+        } else if self.accept(TokenType::Raise).is_some() {
+            self.parse_raise()?
         } else {
             self.parse_expression()?
         };
@@ -173,6 +175,16 @@ impl Parser {
         };
 
         Ok(Box::new(ast::ASTNode::Return(ast::Return { value })))
+    }
+
+    fn parse_raise(&mut self) -> Result<Box<ast::ASTNode>, Error> {
+        let value = if self.peek().is_some() && self.peek().unwrap().kind != TokenType::Newline {
+            Some(self.parse_expression()?)
+        } else {
+            None
+        };
+
+        Ok(Box::new(ast::ASTNode::Raise(ast::Raise { message: value })))
     }
 
     fn parse_method_def(&mut self) -> Result<Box<ast::ASTNode>, Error> {

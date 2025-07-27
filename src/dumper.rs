@@ -169,4 +169,14 @@ impl Visitor for ASTDumper {
         }
         self.push(")");
     }
+
+    fn visit_raise(&mut self, raise: &ast::Raise) {
+        self.push("Raise(");
+        if let Some(message) = &raise.message {
+            message.accept(self);
+        } else {
+            self.push("None");
+        }
+        self.push(")");
+    }
 }

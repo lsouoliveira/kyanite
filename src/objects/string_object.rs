@@ -251,6 +251,10 @@ pub static STRING_TYPE: Lazy<TypeRef> = Lazy::new(|| {
         .unwrap()
         .insert("substr".to_string(), rs_function_new(string_substr));
 
+    dict.lock()
+        .unwrap()
+        .insert("concat".to_string(), rs_function_new(string_concat));
+
     Type::as_ref(Type {
         ob_type: Some(BASE_TYPE.clone()),
         name: "String".to_string(),
@@ -263,6 +267,26 @@ pub static STRING_TYPE: Lazy<TypeRef> = Lazy::new(|| {
         ..Default::default()
     })
 });
+
+pub fn string_concat(
+    _callable: KyaObjectRef,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let arg = parse_arg(&args, 0, 1)?;
+    let instance = parse_receiver(&receiver)?;
+
+    if let KyaObject::StringObject(string_object) = &*instance.lock().unwrap() {
+        if let KyaObject::StringObject(arg_string) = &*arg.lock().unwrap() {
+            let new_value = format!("{}{}", string_object.value, arg_string.value);
+            Ok(string_new(&new_value))
+        } else {
+            Err(Error::TypeError("Expected a string".to_string()))
+        }
+    } else {
+        Err(Error::RuntimeError("Expected a string object".to_string()))
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -357,6 +381,26 @@ mod tests {
         if let Ok(substr_obj) = substr_result {
             if let KyaObject::StringObject(string_object) = &*substr_obj.lock().unwrap() {
                 assert_eq!(string_object.value, "World");
+            } else {
+                panic!("Expected a StringObject");
+            }
+        }
+    }
+
+    #[test]
+    fn test_string_concat() {
+        let string1 = string_new("Hello, ");
+        let string2 = string_new("World!");
+        let concat_result = string_concat(
+            string1.clone(),
+            &mut vec![string2.clone()],
+            Some(string1.clone()),
+        );
+
+        assert!(concat_result.is_ok());
+        if let Ok(concat_obj) = concat_result {
+            if let KyaObject::StringObject(string_object) = &*concat_obj.lock().unwrap() {
+                assert_eq!(string_object.value, "Hello, World!");
             } else {
                 panic!("Expected a StringObject");
             }

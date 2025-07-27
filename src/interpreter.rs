@@ -4,6 +4,7 @@ use crate::errors::Error;
 use crate::lock::{kya_acquire_lock, kya_release_lock};
 use crate::objects::bool_object::bool_new;
 use crate::objects::class_object::class_new;
+use crate::objects::exception_object::{exception_new, EXCEPTION_TYPE};
 use crate::objects::hash_object::HASH_TYPE;
 use crate::objects::list_object::LIST_TYPE;
 use crate::objects::modules::sockets::functions::kya_socket;
@@ -11,7 +12,8 @@ use crate::objects::modules::threads::lock_object::LOCK_TYPE;
 use crate::objects::modules::threads::thread_object::THREAD_OBJECT;
 use crate::objects::none_object::none_new;
 use crate::objects::rs_function_object::rs_function_new;
-use crate::objects::string_object::STRING_TYPE;
+use crate::objects::string_object::{string_new, STRING_TYPE};
+use crate::objects::utils::{object_to_string_repr, string_object_to_string};
 use crate::opcodes::OPCODE_HANDLERS;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -24,7 +26,7 @@ pub static NONE_OBJECT: Lazy<KyaObjectRef> =
 pub static TRUE_OBJECT: Lazy<KyaObjectRef> = Lazy::new(|| bool_new(true));
 pub static FALSE_OBJECT: Lazy<KyaObjectRef> = Lazy::new(|| bool_new(false));
 
-use crate::objects::base::{DictRef, KyaObjectRef, BASE_TYPE};
+use crate::objects::base::{DictRef, KyaObject, KyaObjectRef, BASE_TYPE};
 
 pub struct Interpreter {
     root: PathBuf,
@@ -37,6 +39,7 @@ pub struct Frame {
     pub pc: usize,
     pub stack: Vec<KyaObjectRef>,
     pub return_value: Option<KyaObjectRef>,
+    pub error: Option<KyaObjectRef>,
 }
 
 impl Frame {
@@ -123,6 +126,10 @@ impl Frame {
     pub fn set_return_value(&mut self, value: Option<KyaObjectRef>) {
         self.return_value = value;
     }
+
+    pub fn set_error(&mut self, error: Option<KyaObjectRef>) {
+        self.error = error;
+    }
 }
 
 fn register_builtin_objects(frame: &mut Frame) {
@@ -142,6 +149,7 @@ fn register_builtin_types(frame: &mut Frame) {
     let list_class = class_new(LIST_TYPE.clone());
     let lock_class = class_new(LOCK_TYPE.clone());
     let hash_class = class_new(HASH_TYPE.clone());
+    let exception_class = class_new(EXCEPTION_TYPE.clone());
 
     frame.register_local("Type", type_object);
     frame.register_local("String", string_class);
@@ -149,6 +157,7 @@ fn register_builtin_types(frame: &mut Frame) {
     frame.register_local("List", list_class);
     frame.register_local("Lock", lock_class);
     frame.register_local("Hash", hash_class);
+    frame.register_local("Exception", exception_class);
 
     // frame.register_local(RS_FUNCTION_TYPE, rs_function_type);
 }
@@ -167,6 +176,7 @@ fn create_main_frame(code: CodeObject) -> Frame {
         pc: 0,
         stack: vec![],
         return_value: None,
+        error: None,
     };
 
     register_builtins(&mut frame);
@@ -188,6 +198,8 @@ impl Interpreter {
 
         let result = eval_frame(&mut frame)?;
 
+        kya_release_lock();
+
         Ok(result)
     }
 }
@@ -206,12 +218,25 @@ pub fn eval_frame(frame: &mut Frame) -> Result<KyaObjectRef, Error> {
 
         let opcode = frame.next_opcode();
 
-        OPCODE_HANDLERS[opcode as usize](frame)?;
+        let result = OPCODE_HANDLERS[opcode as usize](frame);
+
+        if let Err(error) = result {
+            if let Error::Exception(_, _) = error {
+                return Err(error);
+            } else {
+                let error_object = map_error_to_exception(error)?;
+                handle_exception(error_object.clone())?;
+            }
+        }
 
         instructions_processed += 1;
 
         if let Some(return_value) = &frame.return_value {
             return Ok(return_value.clone());
+        }
+
+        if let Some(error) = &frame.error {
+            handle_exception(error.clone())?;
         }
     }
 
@@ -220,4 +245,42 @@ pub fn eval_frame(frame: &mut Frame) -> Result<KyaObjectRef, Error> {
     }
 
     Ok(frame.resolve("None")?)
+}
+
+fn map_error_to_exception(error: Error) -> Result<KyaObjectRef, Error> {
+    let message = match error {
+        Error::RuntimeError(msg) => msg,
+        _ => "An error occurred".to_string(),
+    };
+
+    let exception_object = exception_new(string_new(&message));
+
+    Ok(exception_object)
+}
+
+fn handle_exception(error: KyaObjectRef) -> Result<KyaObjectRef, Error> {
+    kya_release_lock();
+
+    let message = match &*error.lock().unwrap() {
+        KyaObject::ExceptionObject(exception) => exception.message.clone(),
+        _ => {
+            return Err(Error::RuntimeError(
+                "Uncaught exception is not an ExceptionObject".to_string(),
+            ))
+        }
+    };
+
+    let ob_type_name = error
+        .lock()
+        .unwrap()
+        .get_type()?
+        .lock()
+        .unwrap()
+        .name
+        .clone();
+
+    Err(Error::Exception(
+        ob_type_name,
+        object_to_string_repr(&message)?,
+    ))
 }

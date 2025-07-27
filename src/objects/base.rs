@@ -10,6 +10,7 @@ use crate::objects::class_object::{
     class_nb_bool, class_tp_call, class_tp_init, class_tp_new, class_tp_repr, ClassObject,
 };
 use crate::objects::code_object::CodeObject;
+use crate::objects::exception_object::ExceptionObject;
 use crate::objects::function_object::FunctionObject;
 use crate::objects::hash_object::HashObject;
 use crate::objects::instance_object::InstanceObject;
@@ -69,6 +70,7 @@ pub enum KyaObject {
     LockObject(LockObject),
     ListObject(ListObject),
     HashObject(HashObject),
+    ExceptionObject(ExceptionObject),
 }
 
 pub trait KyaObjectTrait {
@@ -280,6 +282,7 @@ impl KyaObject {
             KyaObject::LockObject(obj) => Some(obj),
             KyaObject::ListObject(obj) => Some(obj),
             KyaObject::HashObject(obj) => Some(obj),
+            KyaObject::ExceptionObject(obj) => Some(obj),
             _ => None,
         }
     }
@@ -389,6 +392,10 @@ impl KyaObject {
 
     pub fn from_hash_object(hash_object: HashObject) -> KyaObjectRef {
         KyaObject::as_ref(KyaObject::HashObject(hash_object))
+    }
+
+    pub fn from_exception(exception: ExceptionObject) -> KyaObjectRef {
+        KyaObject::as_ref(KyaObject::ExceptionObject(exception))
     }
 }
 

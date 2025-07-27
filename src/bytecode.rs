@@ -17,6 +17,7 @@ pub enum Opcode {
     MakeClass = 11,
     StoreAttr = 12,
     Return = 13,
+    Raise = 14,
 }
 
 #[repr(u8)]
@@ -85,6 +86,7 @@ impl Opcode {
             11 => Some(Opcode::MakeClass),
             12 => Some(Opcode::StoreAttr),
             13 => Some(Opcode::Return),
+            14 => Some(Opcode::Raise),
             _ => None,
         }
     }
@@ -107,6 +109,7 @@ impl std::fmt::Display for Opcode {
             Opcode::MakeClass => write!(f, "MAKE_CLASS"),
             Opcode::StoreAttr => write!(f, "STORE_ATTR"),
             Opcode::Return => write!(f, "RETURN"),
+            Opcode::Raise => write!(f, "RAISE"),
         }
     }
 }
@@ -247,6 +250,9 @@ impl Disassembler {
                 11 => {
                     pc = self.write_make_class(pc);
                 }
+                12 => {
+                    pc = self.write_store_attr(pc);
+                }
                 _ => {
                     panic!("Unknown opcode: {}", opcode);
                 }
@@ -362,6 +368,25 @@ impl Disassembler {
 
     pub fn write_make_class(&mut self, pc: u8) -> u8 {
         self.output.push_str("MAKE_CLASS");
+        pc + 1
+    }
+
+    pub fn write_store_attr(&mut self, pc: u8) -> u8 {
+        let attr_index = self.instruction_at((pc + 1).into());
+        let attr_name = self
+            .code_object
+            .names
+            .get(attr_index as usize)
+            .expect("Attribute index out of bounds");
+
+        self.output
+            .push_str(&format!("STORE_ATTR {} ({})", attr_index, attr_name));
+
+        pc + 2
+    }
+
+    pub fn write_raise(&mut self, pc: u8) -> u8 {
+        self.output.push_str("RAISE");
         pc + 1
     }
 }
