@@ -44,14 +44,24 @@ INDEX_PAGE = "
       color: #60a5fa;
     }
 
+    .logo {
+      width: 150px;
+    }
+
     .footer-description {
       font-size: 0.8em;
       color: #6b7280;
       margin-top: 2em;
     }
 
-    .logo {
-      width: 150px;
+    .footer-description a {
+      color: #60a5fa;
+      text-decoration: none;
+      transition: color 0.3s;
+    }
+
+    .footer-description a:hover {
+      color: #93c5fd;
     }
   </style>
 </head>
@@ -60,7 +70,7 @@ INDEX_PAGE = "
   <h1>Hello from Kyanite</h1>
   <p>Kyanite is a toy programming language made for fun, experimentation, and learning.</p>
   <div class='tagline'>print('Hello, World!')</div>
-  <p class='footer-description'>This website was built with Kyanite.</p>
+  <p class='footer-description'>This website was built with Kyanite. The source code is available <a href='https://github.com/lsouoliveira/kyanite/blob/3773b88d66d90dcaba72041fe8d1755608d8b261/examples/http/http_server.k'>here</a>.</p>
 </body>
 </html>
 "
