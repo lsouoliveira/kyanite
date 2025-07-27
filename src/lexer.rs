@@ -23,6 +23,7 @@ pub enum TokenType {
     Minus,
     While,
     Break,
+    Return,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -92,6 +93,7 @@ fn symbols() -> HashMap<String, TokenType> {
     symbols.insert("-".to_string(), TokenType::Minus);
     symbols.insert("while".to_string(), TokenType::While);
     symbols.insert("break".to_string(), TokenType::Break);
+    symbols.insert("return".to_string(), TokenType::Return);
     symbols
 }
 
@@ -671,5 +673,24 @@ mod tests {
         assert_eq!(token.value, "break");
         assert_eq!(token.line, 1);
         assert_eq!(token.column, 1);
+    }
+
+    #[test]
+    fn test_return_keyword() {
+        let mut lexer = Lexer::new("return value\n".to_string());
+        let tokens = [
+            lexer.next_token().unwrap().unwrap(),
+            lexer.next_token().unwrap().unwrap(),
+        ];
+
+        assert_eq!(tokens[0].kind, TokenType::Return);
+        assert_eq!(tokens[0].value, "return");
+        assert_eq!(tokens[0].line, 1);
+        assert_eq!(tokens[0].column, 1);
+
+        assert_eq!(tokens[1].kind, TokenType::Identifier);
+        assert_eq!(tokens[1].value, "value");
+        assert_eq!(tokens[1].line, 1);
+        assert_eq!(tokens[1].column, 8);
     }
 }

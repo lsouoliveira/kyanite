@@ -79,6 +79,7 @@ pub fn function_call(
             code: func.code.clone(),
             pc: 0,
             stack: vec![],
+            return_value: None,
         };
 
         eval_frame(&mut frame_ref)

@@ -1,6 +1,6 @@
 use crate::ast::{
     Assignment, Attribute, BinOp, Block, ClassDef, Compare, Identifier, If, Import, MethodCall,
-    MethodDef, Module, UnaryOp, While,
+    MethodDef, Module, Return, UnaryOp, While,
 };
 use crate::errors::Error;
 use crate::objects::base::KyaObjectRef;
@@ -23,6 +23,7 @@ pub trait Visitor {
     fn visit_while(&mut self, while_node: &While);
     fn visit_break(&mut self);
     fn visit_block(&mut self, block: &Block);
+    fn visit_return(&mut self, return_node: &Return);
 }
 
 pub trait CompilerVisitor {
@@ -43,4 +44,5 @@ pub trait CompilerVisitor {
     fn compile_while(&mut self, while_node: &While) -> Result<(), Error>;
     fn compile_break(&mut self) -> Result<(), Error>;
     fn compile_block(&mut self, block: &Block) -> Result<(), Error>;
+    fn compile_return(&mut self, return_node: &Return) -> Result<(), Error>;
 }

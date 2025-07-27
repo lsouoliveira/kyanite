@@ -35,6 +35,7 @@ pub struct Frame {
     pub code: Arc<CodeObject>,
     pub pc: usize,
     pub stack: Vec<KyaObjectRef>,
+    pub return_value: Option<KyaObjectRef>,
 }
 
 impl Frame {
@@ -117,6 +118,10 @@ impl Frame {
             "Attempted to pop from an empty stack".to_string(),
         ))
     }
+
+    pub fn set_return_value(&mut self, value: Option<KyaObjectRef>) {
+        self.return_value = value;
+    }
 }
 
 fn register_builtin_objects(frame: &mut Frame) {
@@ -158,6 +163,7 @@ fn create_main_frame(code: CodeObject) -> Frame {
         code: Arc::new(code),
         pc: 0,
         stack: vec![],
+        return_value: None,
     };
 
     register_builtins(&mut frame);
@@ -200,6 +206,10 @@ pub fn eval_frame(frame: &mut Frame) -> Result<KyaObjectRef, Error> {
         OPCODE_HANDLERS[opcode as usize](frame)?;
 
         instructions_processed += 1;
+
+        if let Some(return_value) = &frame.return_value {
+            return Ok(return_value.clone());
+        }
     }
 
     if let Some(object) = frame.stack.last() {

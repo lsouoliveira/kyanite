@@ -24,6 +24,7 @@ pub static OPCODE_HANDLERS: &[fn(&mut Frame) -> Result<(), Error>] = &[
     op_jump,
     op_make_class,
     op_store_attr,
+    op_return,
 ];
 
 fn op_load_const(frame: &mut Frame) -> Result<(), Error> {
@@ -187,6 +188,7 @@ pub fn op_make_class(frame: &mut Frame) -> Result<(), Error> {
             code: c.code.clone(),
             pc: 0,
             stack: vec![],
+            return_value: None,
         };
 
         let _ = eval_frame(&mut frame_ref);
@@ -220,6 +222,14 @@ pub fn op_store_attr(frame: &mut Frame) -> Result<(), Error> {
     kya_set_attr(instance.clone(), name.clone(), value.clone())?;
 
     frame.push_stack(value);
+
+    Ok(())
+}
+
+pub fn op_return(frame: &mut Frame) -> Result<(), Error> {
+    let return_value = frame.pop_stack()?;
+
+    frame.set_return_value(Some(return_value));
 
     Ok(())
 }

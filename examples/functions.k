@@ -1,5 +1,7 @@
 def hello_world
-    print("Hello, World!")
+    return "Hello, World!"
 end
 
-hello_world()
+result = hello_world()
+
+print(result)

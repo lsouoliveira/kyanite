@@ -159,4 +159,14 @@ impl Visitor for ASTDumper {
         }
         self.push(")");
     }
+
+    fn visit_return(&mut self, return_node: &ast::Return) {
+        self.push("Return(");
+        if let Some(value) = &return_node.value {
+            value.accept(self);
+        } else {
+            self.push("None");
+        }
+        self.push(")");
+    }
 }

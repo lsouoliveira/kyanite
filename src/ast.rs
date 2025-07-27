@@ -23,6 +23,7 @@ pub enum ASTNode {
     Import(Import),
     BinOp(BinOp),
     UnaryOp(UnaryOp),
+    Return(Return),
 }
 
 impl ASTNode {
@@ -200,6 +201,11 @@ pub struct UnaryOp {
     pub operand: Box<ASTNode>,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct Return {
+    pub value: Option<Box<ASTNode>>,
+}
+
 impl ASTNode {
     pub fn accept(&self, visitor: &mut dyn Visitor) {
         match self {
@@ -220,6 +226,7 @@ impl ASTNode {
             ASTNode::While(while_node) => visitor.visit_while(&while_node),
             ASTNode::Break() => visitor.visit_break(),
             ASTNode::Block(block) => visitor.visit_block(&block),
+            ASTNode::Return(return_node) => visitor.visit_return(&return_node),
         }
     }
 
@@ -246,6 +253,7 @@ impl ASTNode {
             ASTNode::While(while_node) => compiler.compile_while(&while_node),
             ASTNode::Break() => compiler.compile_break(),
             ASTNode::Block(block) => compiler.compile_block(&block),
+            ASTNode::Return(return_node) => compiler.compile_return(&return_node),
         }
     }
 }

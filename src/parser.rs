@@ -52,6 +52,8 @@ impl Parser {
             self.parse_while()?
         } else if self.accept(TokenType::Break).is_some() {
             Box::new(ast::ASTNode::Break())
+        } else if self.accept(TokenType::Return).is_some() {
+            self.parse_return()?
         } else {
             self.parse_expression()?
         };
@@ -161,6 +163,16 @@ impl Parser {
         );
 
         Ok(Box::new(ast::ASTNode::While(while_node)))
+    }
+
+    fn parse_return(&mut self) -> Result<Box<ast::ASTNode>, Error> {
+        let value = if self.peek().is_some() && self.peek().unwrap().kind != TokenType::Newline {
+            Some(self.parse_expression()?)
+        } else {
+            None
+        };
+
+        Ok(Box::new(ast::ASTNode::Return(ast::Return { value })))
     }
 
     fn parse_method_def(&mut self) -> Result<Box<ast::ASTNode>, Error> {
@@ -400,4 +412,23 @@ impl Parser {
 mod tests {
     use super::*;
     use crate::lexer::Lexer;
+
+    #[test]
+    fn test_parse_return_statement() {
+        let input = "return 42\n";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let ast = parser.parse().unwrap();
+
+        let expected_ast = ast::ASTNode::Module(ast::Module {
+            block: Box::new(ast::ASTNode::Block(ast::Block {
+                statements: vec![Box::new(ast::ASTNode::Return(ast::Return {
+                    value: Some(Box::new(ast::ASTNode::NumberLiteral(42.0))),
+                }))],
+            })),
+        });
+
+        assert_eq!(ast, expected_ast);
+    }
 }

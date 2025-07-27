@@ -1,5 +1,7 @@
 use colored::Colorize;
 
+use crate::objects::base::KyaObjectRef;
+
 #[derive(Debug, Clone)]
 pub enum Error {
     RuntimeError(String),

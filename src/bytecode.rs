@@ -16,6 +16,7 @@ pub enum Opcode {
     Jump = 10,
     MakeClass = 11,
     StoreAttr = 12,
+    Return = 13,
 }
 
 #[repr(u8)]
@@ -57,6 +58,7 @@ impl Opcode {
             10 => Some(Opcode::Jump),
             11 => Some(Opcode::MakeClass),
             12 => Some(Opcode::StoreAttr),
+            13 => Some(Opcode::Return),
             _ => None,
         }
     }
@@ -78,6 +80,7 @@ impl std::fmt::Display for Opcode {
             Opcode::Jump => write!(f, "JUMP"),
             Opcode::MakeClass => write!(f, "MAKE_CLASS"),
             Opcode::StoreAttr => write!(f, "STORE_ATTR"),
+            Opcode::Return => write!(f, "RETURN"),
         }
     }
 }

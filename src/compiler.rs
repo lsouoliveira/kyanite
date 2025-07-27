@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq)]
 enum ScopeType {
+    Function,
     While,
 }
 
@@ -170,7 +171,13 @@ impl CompilerVisitor for Compiler {
 
     fn compile_method_def(&mut self, method_def: &ast::MethodDef) -> Result<(), Error> {
         let mut compiler = Compiler::new(Arc::new(*method_def.body.clone()));
+
+        compiler.enter_scope(ScopeType::Function);
+
         let _ = compiler.compile()?;
+
+        compiler.exit_scope();
+
         let mut code = compiler.get_output();
 
         for param in &method_def.parameters {
@@ -316,6 +323,24 @@ impl CompilerVisitor for Compiler {
                 self.code.add_instruction(Opcode::PopTop as u8);
             }
         }
+
+        Ok(())
+    }
+
+    fn compile_return(&mut self, return_node: &ast::Return) -> Result<(), Error> {
+        if self.scopes.is_empty() || self.current_scope().scope_type != ScopeType::Function {
+            return Err(Error::SyntaxError(
+                "Return statement outside of function".to_string(),
+            ));
+        }
+
+        if let Some(value) = &return_node.value {
+            value.compile(self)?;
+        } else {
+            self.load_variable("None".to_string());
+        }
+
+        self.code.add_instruction(Opcode::Return as u8);
 
         Ok(())
     }
@@ -466,6 +491,26 @@ mod tests {
             Opcode::LoadConst as u8, // Load class definition
             0,                       // Index for class definition
             Opcode::MakeClass as u8, // Create class object
+        ];
+
+        assert_eq!(expected_output, code_object.code);
+    }
+
+    #[test]
+    fn test_compile_return() {
+        let return_node = ASTNode::Return(ast::Return {
+            value: Some(Box::new(ASTNode::NumberLiteral(42.0))),
+        });
+
+        let mut compiler = Compiler::new(Arc::new(return_node));
+        let _ = compiler.compile();
+
+        let code_object = compiler.get_output();
+
+        let expected_output = vec![
+            Opcode::LoadConst as u8, // Load constant 42.0
+            0,                       // Index for constant 42.0
+            Opcode::Return as u8,    // Return from function
         ];
 
         assert_eq!(expected_output, code_object.code);
