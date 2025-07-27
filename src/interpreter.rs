@@ -187,7 +187,9 @@ pub fn eval_frame(frame: &mut Frame) -> Result<KyaObjectRef, Error> {
     let mut instructions_processed = 0;
 
     while frame.current_pc() < frame.current_code_length() {
-        if instructions_processed >= 100 {
+        if instructions_processed >= 1 {
+            instructions_processed = 0;
+
             kya_release_lock();
             thread::yield_now();
             kya_acquire_lock();

@@ -65,16 +65,16 @@ pub fn bytes_length(
 ) -> Result<KyaObjectRef, Error> {
     let instance = parse_receiver(&receiver)?;
 
-    if let KyaObject::BytesObject(_) = &*instance.lock().unwrap() {
-        let bytes_length = kya_sq_len(instance.clone())?;
-
-        Ok(number_new(bytes_length as f64))
-    } else {
-        Err(Error::RuntimeError(format!(
+    if !matches!(&*instance.lock().unwrap(), KyaObject::BytesObject(_)) {
+        return Err(Error::RuntimeError(format!(
             "The object '{}' is not a bytes object.",
             instance.lock().unwrap().get_type()?.lock().unwrap().name
-        )))
+        )));
     }
+
+    let bytes_length = kya_sq_len(instance.clone())?;
+
+    Ok(number_new(bytes_length as f64))
 }
 
 pub fn bytes_decode(

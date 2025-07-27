@@ -57,17 +57,11 @@ pub fn thread_tp_new(
         ))
     })?;
 
-    if let KyaObject::FunctionObject(_) = &*target_arg.clone().lock().unwrap() {
-        Ok(KyaObject::from_thread_object(ThreadObject {
-            ob_type: ob_type.clone(),
-            target: target_arg.clone(),
-            thread_handle: None,
-        }))
-    } else {
-        return Err(Error::RuntimeError(
-            "Expected a function to create a thread".to_string(),
-        ));
-    }
+    Ok(KyaObject::from_thread_object(ThreadObject {
+        ob_type: ob_type.clone(),
+        target: target_arg.clone(),
+        thread_handle: None,
+    }))
 }
 
 pub fn thread_start(
@@ -96,6 +90,10 @@ pub fn thread_start(
             kya_acquire_lock();
 
             let result = kya_call(target.clone(), &mut vec![], None);
+
+            if result.is_err() {
+                eprintln!("{}", result.as_ref().err().unwrap());
+            }
 
             kya_release_lock();
 

@@ -51,6 +51,14 @@ pub fn kya_is_true(obj: KyaObjectRef) -> Result<bool, Error> {
     }
 }
 
+pub fn kya_is_false(obj: KyaObjectRef) -> Result<bool, Error> {
+    if kya_nb_bool(obj.clone())? == 0.0 {
+        return Ok(true);
+    } else {
+        return Ok(false);
+    }
+}
+
 pub fn parse_receiver(receiver: &Option<KyaObjectRef>) -> Result<KyaObjectRef, Error> {
     if let Some(r) = receiver {
         Ok(r.clone())

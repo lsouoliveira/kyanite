@@ -11,7 +11,6 @@ use std::sync::Arc;
 #[derive(Debug, Clone, PartialEq)]
 enum ScopeType {
     While,
-    If,
 }
 
 pub struct Scope {
@@ -233,19 +232,17 @@ impl CompilerVisitor for Compiler {
     }
 
     fn compile_if(&mut self, if_node: &ast::If) -> Result<(), Error> {
-        self.enter_scope(ScopeType::If);
-
         if_node.test.compile(self)?;
 
         self.code.add_instruction(Opcode::PopAndJumpIfFalse as u8);
         self.code.add_instruction(0);
-        self.push_jump(self.code.instructions_count() - 1);
+
+        let jump_index = self.code.instructions_count() as u8 - 1;
 
         if_node.body.compile(self)?;
 
-        self.backpatch(self.code.instructions_count() - 1);
-
-        self.exit_scope();
+        self.code
+            .set_instruction_at(jump_index as usize, self.code.instructions_count() as u8);
 
         Ok(())
     }

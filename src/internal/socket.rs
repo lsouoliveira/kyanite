@@ -1,4 +1,5 @@
 use std::io::Read;
+use std::io::Write;
 use std::net::TcpListener;
 
 #[derive(Debug, Clone)]
@@ -97,10 +98,15 @@ impl Connection {
     pub fn read(&mut self, buffer_size: usize) -> Result<Vec<u8>, SocketError> {
         self.as_connectionable().read(buffer_size)
     }
+
+    pub fn send(&mut self, data: Vec<u8>) -> Result<(), SocketError> {
+        self.as_connectionable().send(data)
+    }
 }
 
 pub trait Connectionable {
     fn read(&mut self, buffer: usize) -> Result<Vec<u8>, SocketError>;
+    fn send(&mut self, data: Vec<u8>) -> Result<(), SocketError>;
 }
 
 pub struct TcpConnection {
@@ -113,6 +119,13 @@ impl Connectionable for TcpConnection {
 
         match self.stream.read(&mut buffer) {
             Ok(_) => Ok(buffer.into_iter().filter(|&b| b != 0).collect()),
+            Err(e) => Err(SocketError::ReadError(e.to_string())),
+        }
+    }
+
+    fn send(&mut self, data: Vec<u8>) -> Result<(), SocketError> {
+        match self.stream.write(&data) {
+            Ok(_) => Ok(()),
             Err(e) => Err(SocketError::ReadError(e.to_string())),
         }
     }

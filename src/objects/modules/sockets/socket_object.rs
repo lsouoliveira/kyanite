@@ -4,6 +4,7 @@ use crate::errors::Error;
 use crate::internal::socket::Connection;
 use crate::internal::socket::{self};
 use crate::interpreter::NONE_OBJECT;
+use crate::lock::{kya_acquire_lock, kya_release_lock};
 use crate::objects::base::{
     kya_repr, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE,
 };
@@ -111,7 +112,11 @@ pub fn socket_accept(
     let instance = parse_receiver(&receiver)?;
 
     if let KyaObject::SocketObject(ref mut socket_object) = *instance.lock().unwrap() {
+        kya_release_lock();
+
         let connection = socket_object.accept()?;
+
+        kya_acquire_lock();
 
         Ok(connection_new(connection))
     } else {

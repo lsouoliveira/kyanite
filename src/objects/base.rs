@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::bytecode::ComparisonOperator;
 use crate::errors::Error;
+use crate::interpreter::{FALSE_OBJECT, TRUE_OBJECT};
 use crate::objects::bool_object::BoolObject;
 use crate::objects::bytes_object::BytesObject;
 use crate::objects::class_object::{
@@ -391,7 +392,7 @@ impl Default for Type {
             tp_set_attr: Some(generic_set_attr),
             nb_bool: Some(class_nb_bool),
             sq_len: None,
-            tp_compare: None,
+            tp_compare: Some(generic_tp_compare),
             dict: Arc::new(Mutex::new(std::collections::HashMap::new())),
         }
     }
@@ -457,6 +458,18 @@ fn get_attr_helper(object: KyaObjectRef, attr_name: String) -> Result<KyaObjectR
     )))
 }
 
+pub fn generic_tp_compare(
+    obj1: KyaObjectRef,
+    obj2: KyaObjectRef,
+    _operator: ComparisonOperator,
+) -> Result<KyaObjectRef, Error> {
+    if Arc::ptr_eq(&obj1, &obj2) {
+        return Ok(TRUE_OBJECT.clone());
+    } else {
+        return Ok(FALSE_OBJECT.clone());
+    }
+}
+
 pub fn generic_set_attr(
     obj: KyaObjectRef,
     attr_name: String,
@@ -492,16 +505,17 @@ pub fn kya_call(
     receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let ob_type = object.lock().unwrap().get_type()?;
-    let tp_call = ob_type.lock().unwrap().tp_call.clone();
-
-    if let Some(callable_fn) = tp_call {
-        callable_fn(object, args, receiver)
-    } else {
-        Err(Error::RuntimeError(format!(
+    let callable_fn = match ob_type.lock().unwrap().tp_call {
+        Some(callable_fn) => Ok(callable_fn),
+        None => Err(Error::RuntimeError(format!(
             "The object '{}' is not callable",
             ob_type.lock().unwrap().name
-        )))
-    }
+        ))),
+    }?;
+
+    drop(ob_type);
+
+    callable_fn(object, args, receiver)
 }
 
 pub fn kya_compare(
@@ -510,44 +524,47 @@ pub fn kya_compare(
     operator: ComparisonOperator,
 ) -> Result<KyaObjectRef, Error> {
     let ob_type = obj1.lock().unwrap().get_type()?;
-    let tp_compare = ob_type.lock().unwrap().tp_compare.clone();
-
-    if let Some(compare_fn) = tp_compare {
-        compare_fn(obj1, obj2, operator)
-    } else {
-        Err(Error::RuntimeError(format!(
+    let compare_fn = match ob_type.lock().unwrap().tp_compare {
+        Some(compare_fn) => Ok(compare_fn),
+        None => Err(Error::RuntimeError(format!(
             "The object '{}' does not support comparison",
             ob_type.lock().unwrap().name
-        )))
-    }
+        ))),
+    }?;
+
+    drop(ob_type);
+
+    compare_fn(obj1, obj2, operator)
 }
 
 pub fn kya_nb_bool(obj: KyaObjectRef) -> Result<f64, Error> {
     let ob_type = obj.lock().unwrap().get_type()?;
-    let nb_bool_fn = ob_type.lock().unwrap().nb_bool.clone();
-
-    if let Some(nb_bool_fn) = nb_bool_fn {
-        nb_bool_fn(obj)
-    } else {
-        Err(Error::RuntimeError(format!(
+    let nb_bool_fn = match ob_type.lock().unwrap().nb_bool {
+        Some(nb_bool_fn) => Ok(nb_bool_fn),
+        None => Err(Error::RuntimeError(format!(
             "The object '{}' does not support boolean conversion",
             ob_type.lock().unwrap().name
-        )))
-    }
+        ))),
+    }?;
+
+    drop(ob_type);
+
+    nb_bool_fn(obj)
 }
 
 pub fn kya_sq_len(obj: KyaObjectRef) -> Result<usize, Error> {
     let ob_type = obj.lock().unwrap().get_type()?;
-    let sq_len_fn = ob_type.lock().unwrap().sq_len.clone();
-
-    if let Some(sq_len_fn) = sq_len_fn {
-        sq_len_fn(obj)
-    } else {
-        Err(Error::RuntimeError(format!(
+    let sq_len_fn = match ob_type.lock().unwrap().sq_len {
+        Some(len_fn) => Ok(len_fn),
+        None => Err(Error::RuntimeError(format!(
             "The object '{}' does not support length calculation",
             ob_type.lock().unwrap().name
-        )))
-    }
+        ))),
+    }?;
+
+    drop(ob_type);
+
+    sq_len_fn(obj)
 }
 
 pub fn kya_repr(
@@ -556,16 +573,17 @@ pub fn kya_repr(
     receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let ob_type = obj.lock().unwrap().get_type()?;
-    let tp_repr = ob_type.lock().unwrap().tp_repr.clone();
-
-    if let Some(repr_fn) = tp_repr {
-        repr_fn(obj, args, receiver)
-    } else {
-        Err(Error::RuntimeError(format!(
+    let tp_repr = match ob_type.lock().unwrap().tp_repr {
+        Some(repr_fn) => Ok(repr_fn),
+        None => Err(Error::RuntimeError(format!(
             "The object '{}' does not support representation",
             ob_type.lock().unwrap().name
-        )))
-    }
+        ))),
+    }?;
+
+    drop(ob_type);
+
+    tp_repr(obj, args, receiver)
 }
 
 pub fn kya_init(
@@ -574,31 +592,33 @@ pub fn kya_init(
     receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
     let ob_type = obj.lock().unwrap().get_type()?;
-    let tp_init = ob_type.lock().unwrap().tp_init.clone();
-
-    if let Some(init_fn) = tp_init {
-        init_fn(obj, args, receiver)
-    } else {
-        Err(Error::RuntimeError(format!(
+    let tp_init = match ob_type.lock().unwrap().tp_init {
+        Some(init_fn) => Ok(init_fn),
+        None => Err(Error::RuntimeError(format!(
             "The object '{}' cannot be initialized",
             ob_type.lock().unwrap().name
-        )))
-    }
+        ))),
+    }?;
+
+    drop(ob_type);
+
+    tp_init(obj, args, receiver)
 }
 
 pub fn kya_get_attr(obj: KyaObjectRef, attr_name: String) -> Result<KyaObjectRef, Error> {
     let ob_type = obj.lock().unwrap().get_type()?;
-    let tp_get_attr = ob_type.lock().unwrap().tp_get_attr.clone();
-
-    if let Some(get_attr_fn) = tp_get_attr {
-        get_attr_fn(obj, attr_name)
-    } else {
-        Err(Error::RuntimeError(format!(
+    let get_attr_fn = match ob_type.lock().unwrap().tp_get_attr {
+        Some(get_attr_fn) => Ok(get_attr_fn),
+        None => Err(Error::RuntimeError(format!(
             "The object '{}' has no attribute '{}'",
             ob_type.lock().unwrap().name,
             attr_name
-        )))
-    }
+        ))),
+    }?;
+
+    drop(ob_type);
+
+    get_attr_fn(obj, attr_name)
 }
 
 pub fn kya_set_attr(
@@ -607,17 +627,18 @@ pub fn kya_set_attr(
     value: KyaObjectRef,
 ) -> Result<(), Error> {
     let ob_type = obj.lock().unwrap().get_type()?;
-    let tp_set_attr = ob_type.lock().unwrap().tp_set_attr.clone();
-
-    if let Some(set_attr_fn) = tp_set_attr {
-        set_attr_fn(obj, attr_name, value)
-    } else {
-        Err(Error::RuntimeError(format!(
+    let tp_set_attr = match ob_type.lock().unwrap().tp_set_attr {
+        Some(set_attr_fn) => Ok(set_attr_fn),
+        None => Err(Error::RuntimeError(format!(
             "The object '{}' cannot set attribute '{}'",
             ob_type.lock().unwrap().name,
             attr_name
-        )))
-    }
+        ))),
+    }?;
+
+    drop(ob_type);
+
+    tp_set_attr(obj, attr_name, value)
 }
 
 pub fn kya_new(
@@ -625,14 +646,13 @@ pub fn kya_new(
     args: &mut Vec<KyaObjectRef>,
     receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
-    let type_obj = ob_type.lock().unwrap();
-
-    if let Some(new_fn) = type_obj.tp_new {
-        new_fn(ob_type.clone(), args, receiver)
-    } else {
-        Err(Error::RuntimeError(format!(
+    let tp_new = match ob_type.lock().unwrap().tp_new {
+        Some(new_fn) => Ok(new_fn),
+        None => Err(Error::RuntimeError(format!(
             "The object '{}' cannot be instantiated",
-            type_obj.name
-        )))
-    }
+            ob_type.lock().unwrap().name
+        ))),
+    }?;
+
+    tp_new(ob_type.clone(), args, receiver)
 }

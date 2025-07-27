@@ -6,7 +6,7 @@ use crate::objects::base::{
 };
 use crate::objects::class_object::class_new;
 use crate::objects::function_object::function_new;
-use crate::objects::utils::kya_is_true;
+use crate::objects::utils::{kya_is_false, kya_is_true};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -158,11 +158,10 @@ pub fn op_jump_back(frame: &mut Frame) -> Result<(), Error> {
 
 pub fn op_pop_and_jump_if_false(frame: &mut Frame) -> Result<(), Error> {
     let condition = frame.pop_stack()?;
-    let jump_offset = frame.next_opcode() as usize;
+    let jump = frame.next_opcode() as usize;
 
-    if kya_is_true(condition.clone())? == false {
-        let current_pc = frame.current_pc();
-        frame.set_pc(current_pc + jump_offset);
+    if kya_is_false(condition.clone())? {
+        frame.set_pc(jump);
     }
 
     Ok(())

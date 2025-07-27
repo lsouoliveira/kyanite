@@ -1,11 +1,13 @@
+use crate::bytecode::ComparisonOperator;
 use crate::errors::Error;
 use crate::interpreter::NONE_OBJECT;
 use crate::objects::base::{
-    kya_call, kya_init, kya_repr, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE,
+    kya_compare, kya_init, kya_repr, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef,
+    BASE_TYPE,
 };
 use crate::objects::rs_function_object::rs_function_new;
 use crate::objects::string_object::string_new;
-use crate::objects::utils::{parse_arg, parse_receiver, string_object_to_string};
+use crate::objects::utils::{kya_is_true, parse_arg, parse_receiver, string_object_to_string};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -94,12 +96,52 @@ pub fn list_append(
     }
 }
 
+pub fn list_remove(
+    _callable: KyaObjectRef,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let instance = parse_receiver(&receiver)?;
+    let arg = parse_arg(&args, 0, 1)?;
+    let items = if let KyaObject::ListObject(list_object) = &*instance.lock().unwrap() {
+        list_object.items.clone()
+    } else {
+        return Err(Error::RuntimeError(format!(
+            "The object '{}' is not a list",
+            instance.lock().unwrap().get_type()?.lock().unwrap().name
+        )));
+    };
+
+    for (i, item) in items.iter().enumerate() {
+        let compare_result = kya_compare(item.clone(), arg.clone(), ComparisonOperator::Equal)?;
+
+        if kya_is_true(compare_result.clone())? {
+            if let KyaObject::ListObject(ref mut list_object) = *instance.lock().unwrap() {
+                list_object.items.remove(i);
+            } else {
+                return Err(Error::RuntimeError(format!(
+                    "The object '{}' is not a list",
+                    instance.lock().unwrap().get_type()?.lock().unwrap().name
+                )));
+            }
+
+            break;
+        }
+    }
+
+    Ok(NONE_OBJECT.clone())
+}
+
 pub static LIST_TYPE: Lazy<TypeRef> = Lazy::new(|| {
     let dict = Arc::new(Mutex::new(HashMap::new()));
 
     dict.lock()
         .unwrap()
         .insert("append".to_string(), rs_function_new(list_append));
+
+    dict.lock()
+        .unwrap()
+        .insert("remove".to_string(), rs_function_new(list_remove));
 
     Type::as_ref(Type {
         ob_type: Some(BASE_TYPE.clone()),
