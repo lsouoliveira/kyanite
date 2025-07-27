@@ -463,10 +463,6 @@ fn get_attr_helper(object: KyaObjectRef, attr_name: String) -> Result<KyaObjectR
         let mut parent_type = root_type.lock().unwrap().parent()?;
 
         loop {
-            if Arc::ptr_eq(&root_type, &parent_type) {
-                break;
-            }
-
             if let Some(attr) = root_type
                 .lock()
                 .unwrap()
@@ -476,6 +472,8 @@ fn get_attr_helper(object: KyaObjectRef, attr_name: String) -> Result<KyaObjectR
                 .get(&attr_name)
             {
                 return Ok(attr.clone());
+            } else if Arc::ptr_eq(&root_type, &parent_type) {
+                break;
             }
 
             root_type = parent_type.clone();

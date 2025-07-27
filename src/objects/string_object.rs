@@ -2,6 +2,7 @@ use crate::bytecode::ComparisonOperator;
 use crate::errors::Error;
 use crate::interpreter::NONE_OBJECT;
 use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE};
+use crate::objects::bytes_object::bytes_new;
 use crate::objects::list_object::list_new;
 use crate::objects::number_object::number_new;
 use crate::objects::rs_function_object::rs_function_new;
@@ -275,6 +276,10 @@ pub static STRING_TYPE: Lazy<TypeRef> = Lazy::new(|| {
         .unwrap()
         .insert("strip".to_string(), rs_function_new(string_strip));
 
+    dict.lock()
+        .unwrap()
+        .insert("encode".to_string(), rs_function_new(string_encode));
+
     Type::as_ref(Type {
         ob_type: Some(BASE_TYPE.clone()),
         name: "String".to_string(),
@@ -319,6 +324,20 @@ pub fn string_strip(
     if let KyaObject::StringObject(string_object) = &*instance.lock().unwrap() {
         let stripped_value = string_object.value.trim().to_string();
         Ok(string_new(&stripped_value))
+    } else {
+        Err(Error::RuntimeError("Expected a string object".to_string()))
+    }
+}
+
+pub fn string_encode(
+    _callable: KyaObjectRef,
+    _args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let instance = parse_receiver(&receiver)?;
+
+    if let KyaObject::StringObject(string_object) = &*instance.lock().unwrap() {
+        Ok(bytes_new(string_object.value.as_bytes().to_vec()))
     } else {
         Err(Error::RuntimeError("Expected a string object".to_string()))
     }

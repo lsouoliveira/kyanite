@@ -144,6 +144,14 @@ fn register_builtin_objects(frame: &mut Frame) {
 }
 
 fn register_builtin_types(frame: &mut Frame) {
+    BASE_TYPE
+        .lock()
+        .unwrap()
+        .dict
+        .lock()
+        .unwrap()
+        .insert("__repr__".to_string(), rs_function_new(default_repr));
+
     let type_object = class_new(BASE_TYPE.clone());
     let string_class = class_new(STRING_TYPE.clone());
     let thread_class = class_new(THREAD_OBJECT.clone());
