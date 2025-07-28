@@ -14,7 +14,7 @@ use crate::objects::none_object::none_new;
 use crate::objects::rs_function_object::rs_function_new;
 use crate::objects::string_object::{string_new, STRING_TYPE};
 use crate::objects::url_object::URL_TYPE;
-use crate::objects::utils::{object_to_string_repr, string_object_to_string};
+use crate::objects::utils::object_to_string_repr;
 use crate::opcodes::OPCODE_HANDLERS;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -207,11 +207,11 @@ impl Interpreter {
 
         let mut frame = create_main_frame(code_object.clone());
 
-        let result = eval_frame(&mut frame)?;
+        let result = eval_frame(&mut frame);
 
         kya_release_lock();
 
-        Ok(result)
+        result
     }
 }
 
@@ -270,8 +270,6 @@ fn map_error_to_exception(error: Error) -> Result<KyaObjectRef, Error> {
 }
 
 fn handle_exception(error: KyaObjectRef) -> Result<KyaObjectRef, Error> {
-    kya_release_lock();
-
     let message = match &*error.lock().unwrap() {
         KyaObject::ExceptionObject(exception) => exception.message.clone(),
         _ => {

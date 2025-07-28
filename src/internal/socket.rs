@@ -1,6 +1,7 @@
 use std::io::Read;
 use std::io::Write;
 use std::net::TcpListener;
+use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub enum SocketError {
@@ -102,11 +103,16 @@ impl Connection {
     pub fn send(&mut self, data: Vec<u8>) -> Result<(), SocketError> {
         self.as_connectionable().send(data)
     }
+
+    pub fn close(&mut self) -> Result<(), SocketError> {
+        self.as_connectionable().close()
+    }
 }
 
 pub trait Connectionable {
     fn read(&mut self, buffer: usize) -> Result<Vec<u8>, SocketError>;
     fn send(&mut self, data: Vec<u8>) -> Result<(), SocketError>;
+    fn close(&mut self) -> Result<(), SocketError>;
 }
 
 pub struct TcpConnection {
@@ -124,7 +130,14 @@ impl Connectionable for TcpConnection {
     }
 
     fn send(&mut self, data: Vec<u8>) -> Result<(), SocketError> {
-        match self.stream.write(&data) {
+        match self.stream.write_all(&data) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(SocketError::ReadError(e.to_string())),
+        }
+    }
+
+    fn close(&mut self) -> Result<(), SocketError> {
+        match self.stream.shutdown(std::net::Shutdown::Both) {
             Ok(_) => Ok(()),
             Err(e) => Err(SocketError::ReadError(e.to_string())),
         }

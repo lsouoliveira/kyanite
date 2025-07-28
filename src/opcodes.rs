@@ -2,11 +2,11 @@ use crate::bytecode::{ComparisonOperator, Operator};
 use crate::errors::Error;
 use crate::interpreter::{eval_frame, Frame};
 use crate::objects::base::{
-    kya_add, kya_call, kya_compare, kya_get_attr, kya_set_attr, kya_sub, KyaObject, Type, BASE_TYPE,
+    kya_add, kya_call, kya_compare, kya_set_attr, kya_sub, KyaObject, Type, BASE_TYPE,
 };
 use crate::objects::class_object::class_new;
 use crate::objects::function_object::function_new;
-use crate::objects::utils::{kya_is_false, kya_is_true};
+use crate::objects::utils::kya_is_false;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 

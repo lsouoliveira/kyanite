@@ -5,9 +5,7 @@ use crate::internal::socket::Connection;
 use crate::internal::socket::{self};
 use crate::interpreter::NONE_OBJECT;
 use crate::lock::{kya_acquire_lock, kya_release_lock};
-use crate::objects::base::{
-    kya_repr, KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE,
-};
+use crate::objects::base::{KyaObject, KyaObjectRef, KyaObjectTrait, Type, TypeRef, BASE_TYPE};
 use crate::objects::modules::sockets::connection_object::connection_new;
 use crate::objects::number_object::NUMBER_TYPE;
 use crate::objects::rs_function_object::rs_function_new;
@@ -114,11 +112,18 @@ pub fn socket_accept(
     if let KyaObject::SocketObject(ref mut socket_object) = *instance.lock().unwrap() {
         kya_release_lock();
 
-        let connection = socket_object.accept()?;
+        let connection = socket_object.accept();
 
         kya_acquire_lock();
 
-        Ok(connection_new(connection))
+        if let Err(e) = connection {
+            return Err(Error::RuntimeError(format!(
+                "Failed to accept connection: {}",
+                e.to_string()
+            )));
+        }
+
+        Ok(connection_new(connection.unwrap()))
     } else {
         Err(Error::TypeError("Expected a Socket object".to_string()))
     }

@@ -1,6 +1,7 @@
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::thread;
 
 use crate::bytecode::CodeObject;
 use crate::errors::Error;
@@ -52,43 +53,51 @@ pub fn function_call(
     args: &mut Vec<KyaObjectRef>,
     receiver: Option<KyaObjectRef>,
 ) -> Result<KyaObjectRef, Error> {
+    let name;
+    let code;
+    let globals;
+
     if let KyaObject::FunctionObject(func) = &*callable.lock().unwrap() {
-        if func.code.args.len() != args.len() {
-            return Err(Error::RuntimeError(format!(
-                "Function '{}' expects {} arguments, but got {}",
-                func.name,
-                func.code.args.len(),
-                args.len()
-            )));
-        }
-
-        let mut locals = HashMap::new();
-
-        if let Some(receiver_obj) = receiver {
-            locals.insert("self".to_string(), receiver_obj);
-        }
-
-        for (i, arg) in func.code.args.iter().enumerate() {
-            locals.insert(arg.clone(), args[i].clone());
-        }
-
-        let mut frame_ref = Frame {
-            locals: Arc::new(Mutex::new(locals)),
-            globals: func.globals.clone(),
-            code: func.code.clone(),
-            pc: 0,
-            stack: vec![],
-            return_value: None,
-            error: None,
-        };
-
-        eval_frame(&mut frame_ref)
+        name = func.name.clone();
+        code = func.code.clone();
+        globals = func.globals.clone();
     } else {
-        Err(Error::RuntimeError(format!(
+        return Err(Error::RuntimeError(format!(
             "The object '{}' is not callable",
             callable.lock().unwrap().get_type()?.lock().unwrap().name
-        )))
+        )));
     }
+
+    if code.args.len() != args.len() {
+        return Err(Error::RuntimeError(format!(
+            "Function '{}' expects {} arguments, but got {}",
+            name,
+            code.args.len(),
+            args.len()
+        )));
+    }
+
+    let mut locals = HashMap::new();
+
+    if let Some(receiver_obj) = receiver {
+        locals.insert("self".to_string(), receiver_obj);
+    }
+
+    for (i, arg) in code.args.iter().enumerate() {
+        locals.insert(arg.clone(), args[i].clone());
+    }
+
+    let mut frame_ref = Frame {
+        locals: Arc::new(Mutex::new(locals)),
+        globals: globals.clone(),
+        code: code.clone(),
+        pc: 0,
+        stack: vec![],
+        return_value: None,
+        error: None,
+    };
+
+    eval_frame(&mut frame_ref)
 }
 
 pub fn function_new(name: String, code: Arc<CodeObject>, globals: DictRef) -> KyaObjectRef {

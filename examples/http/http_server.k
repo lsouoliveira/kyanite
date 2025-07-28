@@ -102,6 +102,7 @@ class Response
         response = response.concat("Content-Type: text/html; charset=UTF-8\r\n")
         response = response.concat("Cache-Control: no-cache\r\n")
         response = response.concat("Content-Length: ").concat(self.body.length().__repr__()).concat("\r\n")
+        response = response.concat("Connection: close\r\n")
         response = response.concat("\r\n")
         response = response.concat(self.body)
 
@@ -121,21 +122,43 @@ class RequestLine
     end
 end
 
+def build_response(request)
+    if request.path == "/"
+        response = Response()
+        response.set_status_code(200)
+        response.set_body(INDEX_PAGE)
+        response = response.build()
+
+        return response
+    end
+
+    response = Response()
+    response.set_status_code(404)
+    response = response.build()
+
+    return response
+end
+
 class RequestHandler
     def constructor(connection)
         self.connection = connection
     end
 
     def handle
-        while true
-            print("Waiting for request...")
+        request = self.read_request()
 
-            request = self.read_request()
-
-            if request == None
-                break
-            end
+        if request == None
+            print("No request received. Closing connection.")
+            self.connection.close()
+            return
         end
+
+        response = build_response(request)
+
+        self.connection.send(response.encode())
+        self.connection.close()
+
+        print("Handled request: ".concat(request.method).concat(" ").concat(request.path))
     end
 
     def read_request
@@ -151,12 +174,7 @@ class RequestHandler
         headers = self.parse_headers(lines.slice(1, lines.length() - 2))
         request = Request(request_line.method, request_line.path, headers)
 
-        response = Response()
-        response.set_status_code(200)
-        response.set_body(INDEX_PAGE)
-        response = response.build()
-
-        self.connection.send(response.encode())
+        return request
     end
 
     def parse_request_line(line)
@@ -206,6 +224,7 @@ class HttpServer
         self.host = host
         self.port = port
         self.socket = socket()
+        self.connected = 0
     end
 
     def start

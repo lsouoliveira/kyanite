@@ -317,11 +317,11 @@ impl CompilerVisitor for Compiler {
     }
 
     fn compile_break(&mut self) -> Result<(), Error> {
-        if self.scopes.is_empty() || self.current_scope().scope_type != ScopeType::While {
-            return Err(Error::SyntaxError(
-                "Break statement outside of loop".to_string(),
-            ));
-        }
+        // if self.scopes.is_empty() || self.current_scope().scope_type != ScopeType::While {
+        //     return Err(Error::SyntaxError(
+        //         "Break statement outside of loop".to_string(),
+        //     ));
+        // }
 
         self.code.add_instruction(Opcode::Jump as u8);
         self.code.add_instruction(0);
@@ -349,11 +349,11 @@ impl CompilerVisitor for Compiler {
     }
 
     fn compile_return(&mut self, return_node: &ast::Return) -> Result<(), Error> {
-        if self.scopes.is_empty() || self.current_scope().scope_type != ScopeType::Function {
-            return Err(Error::SyntaxError(
-                "Return statement outside of function".to_string(),
-            ));
-        }
+        // if self.scopes.is_empty() || self.current_scope().scope_type != ScopeType::Function {
+        //     return Err(Error::SyntaxError(
+        //         "Return statement outside of function".to_string(),
+        //     ));
+        // }
 
         if let Some(value) = &return_node.value {
             value.compile(self)?;

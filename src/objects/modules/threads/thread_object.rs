@@ -133,11 +133,15 @@ pub fn thread_join(
         if let Some(handle) = thread_obj.thread_handle.take() {
             kya_release_lock();
 
-            let _ = handle
+            let result = handle
                 .join()
-                .map_err(|_| Error::RuntimeError("Thread join failed".to_string()))?;
+                .map_err(|_| Error::RuntimeError("Thread join failed".to_string()));
 
             kya_acquire_lock();
+
+            if let Err(e) = result {
+                return Err(e);
+            }
 
             Ok(NONE_OBJECT.clone())
         } else {

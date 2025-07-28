@@ -38,6 +38,12 @@ impl ConnectionObject {
             ))
         })
     }
+
+    pub fn close(&mut self) -> Result<(), Error> {
+        self.connection.close().map_err(|e| {
+            Error::RuntimeError(format!("Failed to close connection: {}", e.to_string()))
+        })
+    }
 }
 
 impl KyaObjectTrait for ConnectionObject {
@@ -65,11 +71,18 @@ pub fn connection_read(
     if let KyaObject::ConnectionObject(ref mut connection_obj) = *instance.lock().unwrap() {
         kya_release_lock();
 
-        let data = connection_obj.read(buffer_size)?;
+        let data = connection_obj.read(buffer_size);
 
         kya_acquire_lock();
 
-        Ok(bytes_new(data))
+        if let Err(e) = data {
+            return Err(Error::RuntimeError(format!(
+                "Failed to read from connection: {}",
+                e.to_string()
+            )));
+        }
+
+        Ok(bytes_new(data.unwrap()))
     } else {
         Err(Error::RuntimeError(
             "Expected a Connection object".to_string(),
@@ -86,16 +99,53 @@ pub fn connection_send(
     let arg = parse_arg(&args, 0, 1)?;
 
     if let KyaObject::ConnectionObject(ref mut connection_obj) = *instance.lock().unwrap() {
-        kya_release_lock();
-
         let data = match *arg.lock().unwrap() {
             KyaObject::BytesObject(ref bytes_obj) => bytes_obj.value.clone(),
             _ => return Err(Error::RuntimeError("Expected bytes data".to_string())),
         };
 
-        connection_obj.send(data)?;
+        kya_release_lock();
+
+        let result = connection_obj.send(data);
 
         kya_acquire_lock();
+
+        if let Err(e) = result {
+            return Err(Error::RuntimeError(format!(
+                "Failed to send data on connection: {}",
+                e.to_string()
+            )));
+        }
+
+        Ok(NONE_OBJECT.clone())
+    } else {
+        Err(Error::RuntimeError(
+            "Expected a Connection object".to_string(),
+        ))
+    }
+}
+
+pub fn connection_close(
+    _callable: KyaObjectRef,
+    args: &mut Vec<KyaObjectRef>,
+    receiver: Option<KyaObjectRef>,
+) -> Result<KyaObjectRef, Error> {
+    let instance = parse_receiver(&receiver)?;
+    let _ = parse_arg(&args, 0, 0)?;
+
+    if let KyaObject::ConnectionObject(ref mut connection_obj) = *instance.lock().unwrap() {
+        kya_release_lock();
+
+        let result = connection_obj.close();
+
+        kya_acquire_lock();
+
+        if let Err(e) = result {
+            return Err(Error::RuntimeError(format!(
+                "Failed to close connection: {}",
+                e.to_string()
+            )));
+        }
 
         Ok(NONE_OBJECT.clone())
     } else {
@@ -115,6 +165,10 @@ pub static SOCKETS_CONNECTION_TYPE: Lazy<TypeRef> = Lazy::new(|| {
     dict.lock()
         .unwrap()
         .insert("send".to_string(), rs_function_new(connection_send));
+
+    dict.lock()
+        .unwrap()
+        .insert("close".to_string(), rs_function_new(connection_close));
 
     Type::as_ref(Type {
         ob_type: Some(BASE_TYPE.clone()),

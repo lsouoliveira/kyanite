@@ -111,8 +111,15 @@ pub fn lock_acquire(
 
     if let KyaObject::LockObject(ref mut lock_object) = *instance.lock().unwrap() {
         kya_release_lock();
-        lock_object.acquire()?;
+        let result = lock_object.acquire();
         kya_acquire_lock();
+
+        if result.is_err() {
+            return Err(Error::RuntimeError(format!(
+                "Failed to acquire lock: {}",
+                result.unwrap_err()
+            )));
+        }
 
         Ok(NONE_OBJECT.clone())
     } else {
@@ -133,8 +140,17 @@ pub fn lock_release(
 
     if let KyaObject::LockObject(ref mut lock_object) = *instance.lock().unwrap() {
         kya_release_lock();
-        lock_object.release()?;
+
+        let result = lock_object.release();
+
         kya_acquire_lock();
+
+        if result.is_err() {
+            return Err(Error::RuntimeError(format!(
+                "Failed to release lock: {}",
+                result.unwrap_err()
+            )));
+        }
 
         Ok(NONE_OBJECT.clone())
     } else {

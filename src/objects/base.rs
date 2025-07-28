@@ -22,7 +22,7 @@ use crate::objects::modules::threads::lock_object::LockObject;
 use crate::objects::modules::threads::thread_object::ThreadObject;
 use crate::objects::none_object::NoneObject;
 use crate::objects::number_object::NumberObject;
-use crate::objects::rs_function_object::{rs_function_new, RsFunctionObject};
+use crate::objects::rs_function_object::RsFunctionObject;
 use crate::objects::string_object::StringObject;
 use crate::objects::url_object::UrlObject;
 use crate::objects::utils::parse_receiver;
